@@ -1,0 +1,1 @@
+CREATE UNIQUE INDEX UQ_name_id ON cost_elements (co_id, name);

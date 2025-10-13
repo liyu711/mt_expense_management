@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select Data</title>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div style="margin-left:50px;">
+        <form method="POST" id="table_name">
+            <label for="table_name">Table Name:</label>
+            <select id="table_name" name="table_name">
+                {% for option in options %}
+                    <option value="{{ option }}" {% if option == selected_option %}selected{% endif %}>
+                        {{ option }}
+                    </option>
+                {% endfor %}
+            </select>
+            <button type="submit">Retrieve Data</button>
+        </form>
+        {% if data %}
+            {% set chart_tables = [
+                'budgets', 'expenses', 'fundings', 'human_resource_expense', 'project_forecasts_nonpc', 'project_forecasts_pc',
+                'capex_forecasts', 'capex_budgets', 'capex_expenses'] %}
+            {% if selected_option in chart_tables %}
+                <form id="chart-form" method="POST">
+                    <input type="hidden" name="table_name" value="{{ selected_option }}">
+                    <label for="x_col">X Axis:</label>
+                    <select name="x_col" id="x_col">
+                        {% for col in columns %}
+                        <option value="{{ col }}" {% if col == request.form.x_col %}selected{% endif %}>{{ col }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="y_col">Y Axis:</label>
+                    <select name="y_col" id="y_col">
+                        {% for col in columns %}
+                        <option value="{{ col }}" {% if col == request.form.y_col %}selected{% endif %}>{{ col }}</option>
+                        {% endfor %}
+                    </select>
+                    <label for="plot_type">Plot Type:</label>
+                    <select name="plot_type" id="plot_type">
+                        <option value="bar" {% if request.form.plot_type == 'bar' %}selected{% endif %}>Bar Chart</option>
+                        <option value="line" {% if request.form.plot_type == 'line' %}selected{% endif %}>Line Chart</option>
+                    </select>
+                    <button type="submit">Plot</button>
+                </form>
+                <div>
+                    <canvas id="chartCanvas" width="600" height="400"></canvas>
+                </div>
+                <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+                <script id="chart-data-json" type="application/json">{{ data|tojson|safe }}</script>
+                <script id="chart-columns-json" type="application/json">{{ columns|tojson|safe }}</script>
+                <script>
+                const xCol = "{{ request.form.x_col|default('') }}";
+                const yCol = "{{ request.form.y_col|default('') }}";
+                const plotType = "{{ request.form.plot_type|default('bar') }}";
+                const chartData = JSON.parse(document.getElementById('chart-data-json').textContent);
+                const chartColumns = JSON.parse(document.getElementById('chart-columns-json').textContent);
+                if (xCol && yCol && chartColumns.includes(xCol) && chartColumns.includes(yCol)) {
+                    const xIdx = chartColumns.indexOf(xCol);
+                    const yIdx = chartColumns.indexOf(yCol);
+                    // Group by xCol and sum yCol
+                    const groupMap = {};
+                    chartData.forEach(row => {
+                        const xVal = row[xIdx];
+                        let yVal = row[yIdx];
+                        // Try to convert yVal to number
+                        yVal = typeof yVal === 'number' ? yVal : parseFloat(yVal);
+                        if (!isNaN(yVal)) {
+                            if (groupMap[xVal] === undefined) {
+                                groupMap[xVal] = 0;
+                            }
+                            groupMap[xVal] += yVal;
+                        }
+                    });
+                    const labels = Object.keys(groupMap);
+                    const values = labels.map(l => groupMap[l]);
+                    const ctx = document.getElementById('chartCanvas').getContext('2d');
+                    new Chart(ctx, {
+                        type: plotType,
+                        data: {
+                            labels: labels,
+                            datasets: [{
+                                label: yCol + ' (sum) by ' + xCol,
+                                data: values,
+                                backgroundColor: plotType === 'bar' ? 'rgba(54, 162, 235, 0.5)' : 'rgba(255, 99, 132, 0.2)',
+                                borderColor: plotType === 'bar' ? 'rgba(54, 162, 235, 1)' : 'rgba(255, 99, 132, 1)',
+                                borderWidth: 1,
+                                fill: false
+                            }]
+                        },
+                        options: {
+                            responsive: false,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
+                </script>
+            {% endif %}
+            <table border="1">
+                <thead>
+                    <tr>
+                        {% for col in columns %}
+                        <th>{{ col }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for row in data %}
+                    <tr>
+                        {% for item in row %}
+                        <td>{{ item }}</td>
+                        {% endfor %}
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+</body>
+</html>

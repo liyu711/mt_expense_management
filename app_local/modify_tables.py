@@ -1,0 +1,249 @@
+
+from flask import Flask, render_template, Blueprint, request
+from backend.modify_table_local import add_entry
+from backend import upload_budgets_local
+import pandas as pd
+import os
+from backend.connect_local import connect_local, select_all_from_table
+
+modify_tables = Blueprint('modify_tables', __name__, template_folder='templates')
+
+# Map route to table and form fields
+modify_table_config = {
+    'modify_department': {
+        'title': 'Modify Department',
+        'table_name': 'departments',
+        'fields': [
+            {'name': 'Department', 'type': 'text', 'label': 'Department Name'}
+        ],
+        'merge_on': 'name',
+        'columns': ['category']
+    },
+    'modify_po': {
+        'title': 'Modify PO',
+        'table_name': 'pos',
+        'fields': [
+            {'name': 'PO', 'type': 'text', 'label': 'PO Name'}
+        ],
+        'merge_on': 'name',
+        'columns': ['name']
+    },
+    'modify_porject_category': {
+        'title': 'Modify Project Category',
+        'table_name': 'project_categories',
+        'fields': [
+            {'name': 'category', 'type': 'text', 'label': 'Project Category'}
+        ],
+        'merge_on': 'category',
+        'columns': ['category']
+    },
+    'modify_project': {
+        'title': 'Modify Project',
+        'table_name': 'projects',
+        'fields': [
+            {'name': 'name', 'type': 'text', 'label': 'Project Name'},
+            {'name': 'category', 'type': 'select', 'label': 'Category Name', 'options': []}
+        ],
+        'merge_on': 'name',
+        'columns': ['name', 'category_id']
+    },
+    'modify_io': {
+        'title': 'Modify IO',
+        'table_name': 'ios',
+        'fields': [
+            {'name': 'IO', 'type': 'text', 'label': 'IO Number'},
+            {'name': 'project_name', 'type': 'select', 'label': 'Project Name', 'options': []}
+        ],
+        'merge_on': 'IO_num',
+        'columns': ['IO_num', 'project_id']
+    },
+    'modify_staff_categories': {
+        'title': 'Modify Staff Categories',
+        'table_name': 'human_resource_categories',
+        'fields': [
+            {'name': 'category', 'type': 'text', 'label': 'Staff Category'},
+            {'name': 'expense', 'type': 'number', 'label': 'Unit Expense'}
+        ],
+        'merge_on': 'name',
+        'columns': ['name', 'value']
+    },
+    'add_user': {
+        'title': 'Add User',
+        'table_name': 'users',
+        'fields': [
+            {'name': 'username', 'type': 'text', 'label': 'Username'},
+            {'name': 'password', 'type': 'password', 'label': 'Password'},
+            {'name': 'user_type', 'type': 'text', 'label': 'User Type'}
+        ],
+        'merge_on': 'name'
+    },
+    'delete_user': {
+        'title': 'Delete User',
+        'table_name': 'users',
+        'fields': [
+            {'name': 'username', 'type': 'text', 'label': 'Username'}
+        ],
+        'merge_on': 'name'
+    },
+    'modify_user_type': {
+        'title': 'Modify User Type',
+        'table_name': 'users',
+        'fields': [
+            {'name': 'username', 'type': 'text', 'label': 'Username'},
+            {'name': 'user_type', 'type': 'text', 'label': 'New User Type'}
+        ],
+        'merge_on': 'name'
+    },
+    'upload_budget':{
+        'title': 'Upload budget',
+        'table_name': 'budgets',
+        'fields': [
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []},
+            {'name': 'human_resource_expense', 'type':'number', 'label': 'Personnel budget'},
+            {'name': 'non_personnel_expense', 'type':'number', 'label': 'Non-personnel budget'}
+        ],
+        'merge_on': 'IO_num',
+        'columns': ['IO_num', 'project_id']
+    },
+    'capex_forecast': {
+        'title': 'Capex Forecast',
+        'table_name': 'capex_forecasts',
+        'fields': [
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'cap_year', 'type': 'select', 'label': 'Capex Year', 'options': []},
+            {'name': 'project_name', 'type': 'select', 'label': 'Project Name', 'options': []},
+            {'name': 'capex_description', 'type': 'text', 'label': 'Capex Description'},
+            {'name': 'capex_forecast', 'type': 'number', 'label': 'Capex Forecast'},
+            {'name': 'cost_center', 'type': 'text', 'label': 'Cost Center'}
+        ],
+        'merge_on': 'capex_description',
+        'columns': ['po_id', 'department_id', 'cap_year', 'project_id', 'capex_description', 'capex_forecast', 'cost_center']
+    },
+    'capex_budget': {
+        'title': 'Capex Budget',
+        'table_name': 'capex_budgets',
+        'fields': [
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'cap_year', 'type': 'select', 'label': 'Capex Year', 'options': []},
+            {'name': 'project_name', 'type': 'select', 'label': 'Project Name', 'options': []},
+            {'name': 'capex_description', 'type': 'text', 'label': 'Capex Description'},
+            {'name': 'approved_budget', 'type': 'number', 'label': 'Approved Budget (K CNY)'}
+        ],
+        'merge_on': 'capex_description',
+        'columns': ['po_id', 'department_id',  'project_id', 'cap_year','capex_description', 'budget']
+    },
+}
+
+# Generic route for all admin table modifications
+
+
+@modify_tables.route('/<action>', methods=['GET', 'POST'])
+def modify_table_router(action):
+
+    config = modify_table_config.get(action)
+    if not config:
+        return f"Unknown modification: {action}", 404
+
+
+    # Helper: fetch options from DB
+    def fetch_options(table, col='name'):
+        try:
+            db = connect_local()
+            cursor, cnxn = db.connect_to_db()
+            df = select_all_from_table(cursor, cnxn, table)
+            return df[col].dropna().unique().tolist() if col in df.columns else []
+        except Exception:
+            return []
+
+    # Populate dropdowns for upload_budget
+    if action == 'upload_budget':
+        po_options = fetch_options('pos', 'name')
+        dept_options = fetch_options('departments', 'name')
+        year_options = [str(y) for y in range(2020, 2031)]
+        for field in config['fields']:
+            if field['name'] == 'po':
+                field['options'] = po_options
+            if field['name'] == 'department':
+                field['options'] = dept_options
+            if field['name'] == 'fiscal_year':
+                field['options'] = year_options
+
+    # Populate dropdowns for capex_forecast and capex_budget
+    if action in ['capex_forecast', 'capex_budget']:
+        po_options = fetch_options('pos', 'name')
+        dept_options = fetch_options('departments', 'name')
+        project_options = fetch_options('projects', 'name')
+        year_options = [str(y) for y in range(2020, 2031)]
+        for field in config['fields']:
+            if field['name'] == 'po':
+                field['options'] = po_options
+            if field['name'] == 'department':
+                field['options'] = dept_options
+            if field['name'] == 'project_name':
+                field['options'] = project_options
+            if field['name'] == 'cap_year':
+                field['options'] = year_options
+
+    # If this is the modify_project form, fetch category options from DB
+    if action == 'modify_project':
+        options = []
+        try:
+            db = connect_local()
+            cursor, cnxn = db.connect_to_db()
+            df = select_all_from_table(cursor, cnxn, 'project_categories')
+            options = df['category'].tolist() if 'category' in df.columns else []
+        except Exception as e:
+            options = []
+        # Update the config's field options
+        for field in config['fields']:
+            if field['name'] == 'category' and field['type'] == 'select':
+                field['options'] = options
+
+    # If this is the modify_io form, fetch project names for dropdown
+    if action == 'modify_io':
+        project_options = []
+        try:
+            db = connect_local()
+            cursor, cnxn = db.connect_to_db()
+            df = select_all_from_table(cursor, cnxn, 'projects')
+            project_options = df['name'].tolist() if 'name' in df.columns else []
+        except Exception as e:
+            project_options = []
+        for field in config['fields']:
+            if field['name'] == 'project_name' and field['type'] == 'select':
+                field['options'] = project_options
+
+    if request.method == 'POST':
+        form_data = dict(request.form)
+        table_name = form_data.pop('table_name', config['table_name'])
+        # Only use fields defined in config
+        field_names = [f['name'] for f in config['fields']]
+        row = {k: v for k, v in form_data.items() if k in field_names}
+        if action == 'upload_budget':
+            # Custom upload_budget logic goes here
+            print('Received upload_budget form:', row)
+            # You can add your own database logic here
+            df_upload = pd.DataFrame([row])
+            df_upload.columns = ['PO', 'Department', 'fiscal_year', 'human_resource_expense', 'non_personnel_expense']
+            print(df_upload)
+            upload_budgets_local(df_upload)
+
+            msg = f"Budget uploaded: {row}"
+            return msg
+        else:
+            # Default: use add_entry for other actions
+            df_upload = pd.DataFrame([row])
+            merge_columns = modify_table_config.get(action).get('columns', list(row.keys()))
+            merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
+            res = add_entry(df_upload, table_name, merge_columns, merge_on)
+
+    return render_template(
+        'pages/modify_table.html',
+        title=config['title'],
+        table_name=config['table_name'],
+        fields=config['fields']
+    )

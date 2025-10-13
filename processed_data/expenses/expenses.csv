@@ -1,0 +1,158 @@
+IO,CO object name,Cost Element,Fiscal Year,From Period,Cost element name,Val.in rep.cur,Name
+2000000441,VHBU APL for Software,7299300,2025,7,Invent'y Consump. CC,195,"套件,5/8 I/O,Dry Contact Relays,IND570"
+2000000447,VHBU APL for Railway Scale,9422010,2025,7,Assessment Other Exp,-25,VHBU R&D  VHBU R&D to IO
+2000000472,TBU-Terminal automation MOL,7250050,2025,7,R&D Suppl. & Mat'ls,"3,569",温箱检修（含配件更换）
+2000000485,BPBU-Bench-Portable MOL,7250050,2025,7,R&D Suppl. & Mat'ls,823,研发材料费
+2000000539,SMBU-IND-New-MOL,7250050,2025,7,R&D Suppl. & Mat'ls,165,W25Q16JLSNIG
+2000000542,T&L-Logistics Scale R&D maintenance,9422010,2025,7,Assessment Other Exp,"52,660",T&L TEAM  T&L team to IO
+2000000545,CFBU-Floor-MOL,7220100,2025,7,Hotel Accommodations,500,住宿费－国内一级城市
+2000000546,CFBU-Floor-CAS,7250050,2025,7,R&D Suppl. & Mat'ls,"1,559",31077743A01.1转接板
+2000000755,VHBU APL for Truck Scale,7250050,2025,7,R&D Suppl. & Mat'ls,496,WAX958 配套稀料
+2000000757,VHBU APL for Accessory,9422010,2025,7,Assessment Other Exp,0,POVEHR&D  POVEH R&D to IO
+2000000764,VHBU Assistant,9422010,2025,7,Assessment Other Exp,-796,VHBU R&D  VHBU R&D to IO
+2000000863,VHBU Truck Scale ETO,9422010,2025,7,Assessment Other Exp,-648,VHBU R&D  VHBU R&D to IO
+2000000864,VHBU Railroad Scale ETO,9422010,2025,7,Assessment Other Exp,-85,VHBU R&D  VHBU R&D to IO
+2000000865,VHBU Software ETO,9422010,2025,7,Assessment Other Exp,-86,VHBU R&D  VHBU R&D to IO
+2000000920,VHBU Accessary ETO,9422010,2025,7,Assessment Other Exp,-70,VHBU R&D  VHBU R&D to IO
+2000000980,MTCS Prototype Expense Collection,7299300,2025,7,Invent'y Consump. CC,"-45,124",MTCT PCB Prototype Material Consumption 202507
+2000000981,MTCZ Prototype Expense Collection,7299300,2025,7,Invent'y Consump. CC,"-12,113",MTCT PCB Prototype Material Consumption 202507
+2000000983,OHCT Prototype Expense Collection,7299300,2025,7,Invent'y Consump. CC,"-24,996",MTCT PCB Prototype Material Consumption 202507
+2000001160,OEM LC PM,9422010,2025,7,Assessment Other Exp,"64,150",POSI S    MTCZ-R&D Admin-POSI S
+2000001340,PCB R&D,9422010,2025,7,Assessment Other Exp,"40,195",PCB-LAYOUTPCB-Layout design
+2000002260,POLC R&D transmit projects in CT,7299300,2025,7,Invent'y Consump. CC,50,键盘 Profibus DP ACT350
+2000002772,VSBU APL for AVS,7299300,2025,7,Invent'y Consump. CC,"1,607",室内控制柜 AVS-R 4红绿灯
+2000002773,VSBU AVS ETO,9422010,2025,7,Assessment Other Exp,"2,956",VSBU-AXLE VSBU-AXLE R&D to IO
+2000002775,VSBU APL for AWS,7250050,2025,7,R&D Suppl. & Mat'ls,425,VTS511非标盖板及止动锁片
+2000002776,VSBU AWS ETO,9422010,2025,7,Assessment Other Exp,9,VSBU-AVS RVSBU-AVS R&D to IO
+2000002941,TBU-Peripheral MOL,7250100,2025,7,R&D Professional Fee,"14,839",MTCT-APR320代工厂福建实达 CSA认证审核费用-2025年第三季度
+2000002942,TBU-Terminal ETO,9422010,2025,7,Assessment Other Exp,0,POSI R&D  POSI R&D team to IO
+2000003061,TBU A08 Singularity MTCT,9422010,2025,7,Assessment Other Exp,"-8,702",POSI R&D  POSI R&D team to IO
+2000003063,BUSI terminal management,9422010,2025,7,Assessment Other Exp,"-5,175",POSI R&D  POSI R&D team to IO
+2000003260,MTCT VHBU IP Related work,9422010,2025,7,Assessment Other Exp,0,POVEHR&D  POVEH R&D to IO
+2000003922,OEM WM ETO,7250050,2025,7,R&D Suppl. & Mat'ls,"10,948",REQ2025060273
+2000003924,OEM MM series MOL,7250050,2025,7,R&D Suppl. & Mat'ls,4,REQ2025070418
+2000003925,OEM PM series MOL,9422010,2025,7,Assessment Other Exp,107,MTCZ LWBD MTCZ LWBD R&D
+2000003927,OEM APW series MOL,7250100,2025,7,R&D Professional Fee,"14,839",2025第三季度MTCZ工厂CSA认证审核费用
+2000003931,OEM RapidCal,7250050,2025,7,R&D Suppl. & Mat'ls,658,REQ2025064690
+2000004600,T&L VFSXXX Project,9422010,2025,7,Assessment Other Exp,0,T&L TEAM  T&L team to IO
+2000004710,PCB -Rainin material purch&PCBA prototyp,9210010,2025,7,Settlement Material,13,ORD 2000004710
+2000005041,PCB -PI material purch&PCBA prototyp,7299300,2025,7,Invent'y Consump. CC,"-41,308",MTCT PCB Prototype Material Consumption 202507
+2000005102,TBU-IND700 Project 1,9422010,2025,7,Assessment Other Exp,0,POSI R&D  POSI R&D team to IO
+2000005280,MTCT BUSI Terminal manual MOL,7250050,2025,7,R&D Suppl. & Mat'ls,80,CPA00003_C_平台秤CPA_CN
+2000005281,MTCT BUSI Terminal Ex MOL,7250050,2025,7,R&D Suppl. & Mat'ls,"1,398",30646449C
+2000005302,BUSI terminal initiative,9422010,2025,7,Assessment Other Exp,"-2,758",POSI R&D  POSI R&D team to IO
+2000005303,BUSI terminal Leave,9422010,2025,7,Assessment Other Exp,"-5,195",POSI R&D  POSI R&D team to IO
+2000005304,BUSI terminal training,9422010,2025,7,Assessment Other Exp,-330,POSI R&D  POSI R&D team to IO
+2000005342,MTCT BUSI IND560X Replacement program,7299060,2025,7,Patent Expense,"1,200",2025 202030203285.5
+2000005743,T&L- TLW155 Project,9422010,2025,7,Assessment Other Exp,0,T&L TEAM  T&L team to IO
+2000005843,BUSI terminal pre-study,7250050,2025,7,R&D Suppl. & Mat'ls,"1,702",Mikroe# MIKROE-5543
+2000005980,TBU-IND590,7250050,2025,7,R&D Suppl. & Mat'ls,"2,268",30926298
+2000006300,T&L- TLW130 Project,9422010,2025,7,Assessment Other Exp,0,T&L TEAM  T&L team to IO
+2000006463,TBU-Terminal Application Platform,9422010,2025,7,Assessment Other Exp,0,POSI R&D  POSI R&D team to IO
+2000006640,Saturn PCBA Shift,7299300,2025,7,Invent'y Consump. CC,-135,MTCT PCB Prototype Material Consumption 202507
+2000006740,BUSI Bench APR110 Project,7250100,2025,7,R&D Professional Fee,"-6,313",超三年期清理
+2000006761,OEM LC PM allocation,9422010,2025,7,Assessment Other Exp,"7,702",POLC      POLC Automation
+2000006762,OEM WM PM allocation,9422010,2025,7,Assessment Other Exp,"23,106",POLC      POLC Automation
+2000006763,OEM APW PM allocation,9422010,2025,7,Assessment Other Exp,"53,915",POLC      POLC Automation
+2000006764,OEM tranm. PM allocation,9422010,2025,7,Assessment Other Exp,"69,319",POLC      POLC Automation
+2000006783,OEM SWC516 NG PM,7250050,2025,7,R&D Suppl. & Mat'ls,79,REQ2025062850
+2000006784,OEM SG APW,9422010,2025,7,Assessment Other Exp,214,MTCZ LWBD MTCZ LWBD R&D
+2000006785,OEM Pre-study WM,7250050,2025,7,R&D Suppl. & Mat'ls,406,研发领料账号调整
+2000006787,OEM Pre-study APW,7250050,2025,7,R&D Suppl. & Mat'ls,"2,147",REQ2025061416
+2000006790,OEM Admin WM,7250100,2025,7,R&D Professional Fee,"3,649",OEM Jira&Confluence年费摊销
+2000006791,OEM Admin APW,9422010,2025,7,Assessment Other Exp,"1,285",MTCZ LWBD MTCZ LWBD R&D
+2000006792,OEM Academy MOL,7250050,2025,7,R&D Suppl. & Mat'ls,475,REQ2025054970
+2000007260,MTCT POVEH - Digital SVC,9422010,2025,7,Assessment Other Exp,-56,VHBU R&D  VHBU R&D to IO
+2000007383,OEM Level Detection,7250050,2025,7,R&D Suppl. & Mat'ls,390,REQ2025063013
+2000007424,TBU-IND700 Phase 2,7250050,2025,7,R&D Suppl. & Mat'ls,35,研发材料费
+2000007520,T&L- TLW100 Project,9422010,2025,7,Assessment Other Exp,0,T&L TEAM  T&L team to IO
+2000007521,T&L- TLW450-C Project,9422010,2025,7,Assessment Other Exp,0,T&L TEAM  T&L team to IO
+2000007660,TBU-IND400 Allo. In,7250100,2025,7,R&D Professional Fee,"14,839",MTCT工厂CSA认证审核费用-2025年第三季度
+2000007683,NGP TERMINAL - IND400,7299900,2025,7,Other Misc Expense,"-161,152",Below OP费用结转- Neusoft cost charge for IND400/IND59
+2000007701,NGP TERMINAL Allo. Out,9422010,2025,7,Assessment Other Exp,0,POSI R&D  POSI R&D team to IO
+2000007766,TBU-IND500x Project Phase 2,7250100,2025,7,R&D Professional Fee,"13,000",IND500x Phase2 EMC取证测试费用
+2000007780,MTCT BUSI PDT SmartFlex project,7250050,2025,7,R&D Suppl. & Mat'ls,"2,552","30919726印制板,DS,LCD Display_Board,MIX"
+2000008284,CAT R&D Maintanance in CT,9422010,2025,7,Assessment Other Exp,"-7,735",TECH.D    Technical Documentation Suppor
+2000008300,T&L- TLW360 EP,7250050,2025,7,R&D Suppl. & Mat'ls,460,铸铝接线盒
+2000008320,MTCT POVEH - DataMaster Globalization,9422010,2025,7,Assessment Other Exp,-510,VHBU R&D  VHBU R&D to IO
+2000008400,MTCZ R&D WI Training,9422010,2025,7,Assessment Other Exp,"-3,517",WE CC TO  Weighing Instrument TO IO
+2000008401,MTCZ R&D WI Admin,9422010,2025,7,Assessment Other Exp,"-9,338",WE CC TO  Weighing Instrument TO IO
+2000008641,BPBU IND400 combi,7250050,2025,7,R&D Suppl. & Mat'ls,1,30915944
+2000008760,MTCT POVEH - Pre-Study,9422010,2025,7,Assessment Other Exp,-310,VHBU R&D  VHBU R&D to IO
+2000008761,MTCT POVEH - Training,7220100,2025,7,Hotel Accommodations,130,国内跨城补贴
+2000008762,MTCT POVEH - Vacation,9422010,2025,7,Assessment Other Exp,-696,VHBU R&D  VHBU R&D to IO
+2000008763,MTCT POVEH - Initiative,7250100,2025,7,R&D Professional Fee,"36,327",VEH  Jira Confluence续费202506-202606
+2000008841,OEM SPD12002,7250050,2025,7,R&D Suppl. & Mat'ls,2,REQ2025065043
+2000008920,CFBU-PJA5 US & AP Phase Ⅱ,7250050,2025,7,R&D Suppl. & Mat'ls,"2,868",RRC-SMB-UBC-DIS
+2000009140,TBU-IND400 Phase Ⅱ,7250050,2025,7,R&D Suppl. & Mat'ls,1,30852843
+2000009181,MTCT POVEH - VTS520,7220100,2025,7,Hotel Accommodations,130,国内跨城补贴
+2000009280,BPBU IND256xx Project,9422010,2025,7,Assessment Other Exp,"-2,404",505060212 BUSI Scale Mec.&Sys.
+2000009300,BPBU PBK/PFK Secondary Production,7299300,2025,7,Invent'y Consump. CC,156,数据线 Wiring harness M12 6 60mm
+2000009321,OEM Next Gen MM,7250050,2025,7,R&D Suppl. & Mat'ls,"4,768",REQ2025062528
+2000009581,OEM SWP331D Proejct,7250050,2025,7,R&D Suppl. & Mat'ls,4,REQ2025072588
+2000009582,IW R&D Pre-study,9430210,2025,7,Engineering Labor,"1,127",
+2000009583,IW R&D Training,9430210,2025,7,Engineering Labor,902,
+2000009584,IW R&D Leave,9430210,2025,7,Engineering Labor,"1,804",
+2000009585,IW R&D Initiative,9430210,2025,7,Engineering Labor,225,
+2000009586,IW R&D Management,9430210,2025,7,Engineering Labor,451,
+2000009680,VHBU VTS302/202E Truck Scale,7220100,2025,7,Hotel Accommodations,130,国内跨城补贴
+2000009800,LIME support of MOL IND570,9422010,2025,7,Assessment Other Exp,"-4,006",POSI R&D  POSI R&D team to IO
+2000009801,LIME support of MOL RPA455,9422010,2025,7,Assessment Other Exp,-39,505060212 BUSI Scale Mec.&Sys.
+2000009802,LIME support of MOL GSP30/60/150,9422010,2025,7,Assessment Other Exp,-729,505060212 BUSI Scale Mec.&Sys.
+2000009860,MTCT VEH-T&L Support,9422010,2025,7,Assessment Other Exp,-97,VHBU R&D  VHBU R&D to IO
+2000009861,MTCT VEH-VTS-G Truck Scale,9422010,2025,7,Assessment Other Exp,0,VHBU R&D  VHBU R&D to IO
+2000009981,TBU-IND400 Battery DC Pallet truck,7250050,2025,7,R&D Suppl. & Mat'ls,"1,775",电源模块PIC120.241D
+2000010021,IW AC2.0 WM,7250050,2025,7,R&D Suppl. & Mat'ls,"4,366",REQ2025062879
+2000010040,T&L Product Management,9422010,2025,7,Assessment Other Exp,184,SI COMPETESI Competence team to IO
+2000010041,TBU CAT product management,9422010,2025,7,Assessment Other Exp,738,SI COMPETESI Competence team to IO
+2000010042,TBU product management,9422010,2025,7,Assessment Other Exp,"2,766",SI COMPETESI Competence team to IO
+2000010043,BP product management,9422010,2025,7,Assessment Other Exp,"136,427",BPBU PM TEBPBU PM team to IO
+2000010044,SM product management,9422010,2025,7,Assessment Other Exp,"58,469",BPBU PM TEBPBU PM team to IO
+2000010045,CF product management,9422010,2025,7,Assessment Other Exp,"1,296",CFBU PM TECFBU PM team to IO
+2000010047,TBU technical support,9422010,2025,7,Assessment Other Exp,"64,563",TBU PM TEATBU PM team to IO
+2000010048,BP technical support,9422010,2025,7,Assessment Other Exp,"25,825",TBU PM TEATBU PM team to IO
+2000010049,CF technical support,9422010,2025,7,Assessment Other Exp,"19,369",TBU PM TEATBU PM team to IO
+2000010050,SM technical support,9422010,2025,7,Assessment Other Exp,"6,456",TBU PM TEATBU PM team to IO
+2000010051,VEH technical support,9422010,2025,7,Assessment Other Exp,"6,456",TBU PM TEATBU PM team to IO
+2000010052,T&L technical support,9422010,2025,7,Assessment Other Exp,"6,456",TBU PM TEATBU PM team to IO
+2000010054,TBU Competence,9422010,2025,7,Assessment Other Exp,"110,995",POIND R&D POIND R&D
+2000010055,BP Competence,9422010,2025,7,Assessment Other Exp,"33,298",POIND R&D POIND R&D
+2000010056,CF Competence,9422010,2025,7,Assessment Other Exp,"33,298",POIND R&D POIND R&D
+2000010057,SM Competence,9422010,2025,7,Assessment Other Exp,"11,099",POIND R&D POIND R&D
+2000010058,T&L Competence,9422010,2025,7,Assessment Other Exp,"11,099",POIND R&D POIND R&D
+2000010059,VEH Competence,9422010,2025,7,Assessment Other Exp,"22,199",POIND R&D POIND R&D
+2000010060,TBU CAT POIND Management,9422010,2025,7,Assessment Other Exp,"19,777",IND PO HEAIND PO Head
+2000010061,TBU POIND Management,9422010,2025,7,Assessment Other Exp,"118,665",IND PO HEAIND PO Head
+2000010062,BP POIND Management,9422010,2025,7,Assessment Other Exp,"59,332",IND PO HEAIND PO Head
+2000010063,CF POIND Management,9422010,2025,7,Assessment Other Exp,"59,332",IND PO HEAIND PO Head
+2000010064,SM POIND Management,9422010,2025,7,Assessment Other Exp,"39,555",IND PO HEAIND PO Head
+2000010065,T&L POIND Management,9422010,2025,7,Assessment Other Exp,"19,777",IND PO HEAIND PO Head
+2000010066,VEH POIND Management,9422010,2025,7,Assessment Other Exp,"79,110",IND PO HEAIND PO Head
+2000010068,TBU_Public support,9422010,2025,7,Assessment Other Exp,"112,477",POSI R&D-FPOSI R&D-from allocation
+2000010069,BP_Public support,9422010,2025,7,Assessment Other Exp,"49,990",POSI R&D-FPOSI R&D-from allocation
+2000010070,CF_Public support,9422010,2025,7,Assessment Other Exp,"49,990",POSI R&D-FPOSI R&D-from allocation
+2000010071,SM_Public support,9422010,2025,7,Assessment Other Exp,"24,995",POSI R&D-FPOSI R&D-from allocation
+2000010072,T&L_Public support,9422010,2025,7,Assessment Other Exp,"12,497",POSI R&D-FPOSI R&D-from allocation
+2000010073,TBU_PCB Design,9422010,2025,7,Assessment Other Exp,"30,146",PCB-LAYOUTPCB-Layout design
+2000010074,BP_PCB Design,9422010,2025,7,Assessment Other Exp,"5,024",PCB-LAYOUTPCB-Layout design
+2000010075,CF_PCB Design,9422010,2025,7,Assessment Other Exp,"5,024",PCB-LAYOUTPCB-Layout design
+2000010076,SM_PCB Design,9422010,2025,7,Assessment Other Exp,"10,049",PCB-LAYOUTPCB-Layout design
+2000010077,VEH_PCB Design,9422010,2025,7,Assessment Other Exp,"5,024",PCB-LAYOUTPCB-Layout design
+2000010078,T&L_PCB Design,9422010,2025,7,Assessment Other Exp,"5,024",PCB-LAYOUTPCB-Layout design
+2000010079,BPBU-BP ETO,9422010,2025,7,Assessment Other Exp,"33,924",SI ENG.   SI Engineering team
+2000010080,VEH_Truck Scale_Public support,9422010,2025,7,Assessment Other Exp,"28,871",VEH R&D-FRPOVEH R&D-from allocation
+2000010081,VEH_Rail_Public support,9422010,2025,7,Assessment Other Exp,"5,249",VEH R&D-FRPOVEH R&D-from allocation
+2000010082,VEH_AVS_Public support,9422010,2025,7,Assessment Other Exp,"9,449",VEH R&D-FRPOVEH R&D-from allocation
+2000010083,VEH_WIM_Public support,9422010,2025,7,Assessment Other Exp,"6,299",VEH R&D-FRPOVEH R&D-from allocation
+2000010084,VEH_Accessorie_Public support,9422010,2025,7,Assessment Other Exp,"2,625",VEH R&D-FRPOVEH R&D-from allocation
+2000010085,VEH_Truck Scale_Product management,9422010,2025,7,Assessment Other Exp,"203,136",PM-VEH    POVEH PM-VEH
+2000010086,VEH_Rail_Product management,9422010,2025,7,Assessment Other Exp,"36,934",PM-VEH    POVEH PM-VEH
+2000010087,VEH_AVS_Product management,9422010,2025,7,Assessment Other Exp,"66,481",PM-VEH    POVEH PM-VEH
+2000010088,VEH_WIM_Product management,9422010,2025,7,Assessment Other Exp,"44,321",PM-VEH    POVEH PM-VEH
+2000010089,VEH_Accessorie_Product management,9422010,2025,7,Assessment Other Exp,"18,467",PM-VEH    POVEH PM-VEH
+2000010100,BPBU-NBP Phase 1,7250050,2025,7,R&D Suppl. & Mat'ls,541,橡胶板样品
+2000010101,TBU CAT Products Manual Support,9422010,2025,7,Assessment Other Exp,-240,POSI R&D  POSI R&D team to IO
+2000010103,CFBU-NFP Package 1 Project,9422010,2025,7,Assessment Other Exp,-985,505060212 BUSI Scale Mec.&Sys.
+2000010140,BPBU-IW MO Boost Plan,7299300,2025,7,Invent'y Consump. CC,8,键盘 BBA320 (ETO)
+2000010280,WKC 154/E LOONG,7220250,2025,7,Other Transportation,82,火车
+2000010300,CFBU-PJA5 EU NADI Project,7250050,2025,7,R&D Suppl. & Mat'ls,"1,999",30857343包装箱 PJA5 540

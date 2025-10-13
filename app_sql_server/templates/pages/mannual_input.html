@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<h1>Enter your input:</h1>
+
+{% for input in input_types %}
+<div id = {{ input + '_div' }}>
+    <h1>{{ titles[input] }}</h1>
+    <form method="POST" action={{ "/upload_" + input }}>
+    {% for name in display_names[input] %}
+        <div class="form-group">
+            <label for="{{ field|replace(' ', '_') }}">{{ name }}</label>
+            <input type="text" name="{{ upload_columns[input][loop.index -1] }}" required>
+        </div>
+    {% endfor %}
+    <button type="submit">Submit</button>
+    </form>
+</div>
+{% endfor %}

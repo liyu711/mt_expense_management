@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cost Analysis Dashboard</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Roboto', sans-serif;
+            margin: 0;
+            background-color: #f0f2f5;
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+        }
+        .sidebar {
+            width: 250px;
+            background-color: #ffffff;
+            padding: 20px;
+            box-shadow: 2px 0 5px rgba(0,0,0,0.1);
+            display: flex;
+            flex-direction: column;
+        }
+        .sidebar-header {
+            font-size: 1.2em;
+            font-weight: 700;
+            margin-bottom: 30px;
+            color: #333;
+        }
+        .sidebar ul {
+            list-style: none;
+            padding: 0;
+        }
+        .sidebar ul li {
+            margin-bottom: 10px;
+        }
+        .sidebar ul li a {
+            text-decoration: none;
+            color: #555;
+            padding: 10px 15px;
+            display: block;
+            border-radius: 5px;
+            transition: background-color 0.2s;
+        }
+        .sidebar ul li a:hover, .sidebar ul li a.active {
+            background-color: #e0e0e0;
+            color: #000;
+        }
+        .main-content {
+            flex-grow: 1;
+            padding: 20px;
+            overflow-y: auto;
+        }
+        .header {
+            background-color: #ffffff;
+            padding: 15px 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+        }
+        .header-title {
+            font-size: 1.5em;
+            font-weight: 700;
+            color: #333;
+        }
+        .controls {
+            display: flex;
+            gap: 10px;
+        }
+        .controls select, .controls input, .controls button {
+            padding: 8px 12px;
+            border-radius: 5px;
+            border: 1px solid #ccc;
+        }
+        .controls button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        .kpi-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .kpi-card {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+        }
+        .kpi-card h4 {
+            margin-top: 0;
+            color: #666;
+            font-size: 0.9em;
+        }
+        .kpi-card .value {
+            font-size: 1.8em;
+            font-weight: 700;
+            color: #333;
+        }
+        .kpi-card .change {
+            font-size: 0.8em;
+            color: green;
+        }
+        .chart-section, .table-section {
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            margin-bottom: 20px;
+        }
+        .chart-placeholder {
+            height: 300px;
+            background-color: #f9f9f9;
+            border: 1px dashed #ccc;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #888;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 15px;
+        }
+        table th, table td {
+            border: 1px solid #eee;
+            padding: 10px;
+            text-align: left;
+        }
+        table th {
+            background-color: #f5f5f5;
+            font-weight: 700;
+            color: #333;
+        }
+        table td {
+            color: #555;
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <div class="sidebar-header">METTLER TOLEDO</div>
+        <ul>
+            <li><a href="#" class="active">PPC VMC Simulation</a></li>
+            <li><a href="#">Cost Analysis</a></li>
+            <li><a href="#">Cost Element Ana</a></li>
+            <li><a href="#">Adjusted Sales</a></li>
+            <li><a href="#">Depreciation Anal</a></li>
+            <li><a href="#">Production Effic...</a></li>
+        </ul>
+        <div class="sidebar-header" style="margin-top: 30px;">Data Management</div>
+        <ul>
+            <li><a href="#">Save Budget Data</a></li>
+        </ul>
+        <div class="sidebar-header" style="margin-top: 30px;">Quality Analysis</div>
+        <ul>
+            <li><a href="#">QA</a></li>
+        </ul>
+    </aside>
+
+    <div class="main-content">
+        <header class="header">
+            <div class="header-title">PPC VMC Simulation</div>
+            <div class="controls">
+                <select>
+                    <option>VEH</option>
+                </select>
+                <select>
+                    <option>2025</option>
+                </select>
+                <select>
+                    <option>Aug</option>
+                </select>
+                <button>Analyze</button>
+                <button>Reset</button>
+                <button>Generate Report</button>
+            </div>
+        </header>
+
+        <section class="kpi-cards">
+            <div class="kpi-card">
+                <h4>Adjusted Sales</h4>
+                <div class="value">24301.60</div>
+                <div class="change">5.87%</div>
+            </div>
+            <div class="kpi-card">
+                <h4>Volume Increase</h4>
+                <div class="value">5.87%</div>
+                <div class="change">--</div>
+            </div>
+            <div class="kpi-card">
+                <h4>VMC Productivity</h4>
+                <div class="value">23.50</div>
+                <div class="change">5.23%</div>
+            </div>
+            <div class="kpi-card">
+                <h4>PPC Productivity</h4>
+                <div class="value">23.29</div>
+                <div class="change">-25.3%</div>
+            </div>
+            <div class="kpi-card">
+                <h4>VMC Target</h4>
+                <div class="value">6.28%</div>
+                <div class="change">--</div>
+            </div>
+            <div class="kpi-card">
+                <h4>PPC Target</h4>
+                <div class="value">4.29%</div>
+                <div class="change">--</div>
+            </div>
+        </section>
+
+        <section class="chart-section">
+            <h3>VEH 2025 Productivity Simulation</h3>
+            <div class="chart-placeholder">
+                [Placeholder for Interactive Chart]
+            </div>
+        </section>
+
+        <section class="table-section">
+            <h3>2025 POIND Budget</h3>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Month</th>
+                        <th>Volume YTD</th>
+                        <th>VMC Productivity</th>
+                        <th>PPC Productivity YTD</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Jan</td><td>4.2%</td><td>16.7%</td><td>-13.3%</td><td>Actual</td></tr>
+                    <tr><td>Feb</td><td>-1.4%</td><td>7.5%</td><td>-7.2%</td><td>Actual</td></tr>
+                    <tr><td>Mar</td><td>4.8%</td><td>12.5%</td><td>9.6%</td><td>Actual</td></tr>
+                    <tr><td>Apr</td><td>-5.3%</td><td>-13.8%</td><td>-4.7%</td><td>Actual</td></tr>
+                    <tr><td>May</td><td>1.0%</td><td>12.1%</td><td>37.8%</td><td>Actual</td></tr>
+                    <tr><td>Jun</td><td>-23.4%</td><td>--</td><td>-23.41%</td><td>Actual</td></tr>
+                    <tr><td>Jul</td><td>14.1%</td><td>-26.1%</td><td>--</td><td>Actual</td></tr>
+                    <tr><td>Aug</td><td>-6.7%</td><td>-4.3%</td><td>-19.9%</td><td>Actual</td></tr>
+                    <tr><td>Sep</td><td>1.7%</td><td>-4.3%</td><td>--</td><td>Budget</td></tr>
+                    <!-- Add more rows as needed -->
+                </tbody>
+            </table>
+        </section>
+    </div>
+</body>
+</html>

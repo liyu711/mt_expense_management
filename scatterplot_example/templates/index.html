@@ -1,0 +1,16 @@
+<!-- templates/index.html -->
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Interactive Scatter Plot</title>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+</head>
+<body>
+    <h1>Interactive Scatter Plot</h1>
+    <div id="plotly-graph"></div>
+    <script>
+        var graph = {{ graph_json | safe }};
+        Plotly.newPlot('plotly-graph', graph.data, graph.layout);
+    </script>
+</body>
+</html>

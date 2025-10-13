@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manual Input</title>
+    <style>
+        .form-group {
+            display: flex;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+        .form-group label {
+            flex: 1 1 33%;
+            max-width: 33%;
+            min-width: 120px;
+            text-align: left;
+            margin-right: 12px;
+        }
+        .form-group select,
+        .form-group input[type="text"] {
+            flex: 2 1 67%;
+            max-width: 67%;
+            min-width: 0;
+        }
+        .nav-menu {
+            display: flex;
+            gap: 20px;
+            background: #f0f0f0;
+            padding: 10px 20px;
+            border-bottom: 1px solid #ccc;
+        }
+        .nav-menu button {
+            background: none;
+            border: none;
+            font-size: 1.1em;
+            cursor: pointer;
+            padding: 8px 16px;
+        }
+        .nav-menu button.active {
+            border-bottom: 2px solid #007bff;
+            color: #007bff;
+            font-weight: bold;
+        }
+        .input-section {
+            display: none;
+        }
+        .input-section.active {
+            display: block;
+        }
+    </style>
+    <script>
+        // No JS needed: forecast form is always visible on /manual_input
+    </script>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div style="padding: 24px 0 0 0;">
+    <div id="forecast_merged_div" style="padding-left: 24px; display: block;">
+            <h1>Forecast Input (Personnel & Non-Personnel)</h1>
+            <form method="POST" action="/upload_forecast">
+                <div class="form-group">
+                    <label for="PO">PO</label>
+                    <select name="PO" required>
+                        <option value="">Select PO</option>
+                        {% for po in pos %}
+                        <option value="{{ po }}">{{ po }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="IO">IO</label>
+                    <select name="IO" required>
+                        <option value="">Select IO</option>
+                        {% for io in ios %}
+                        <option value="{{ io }}">{{ io }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="Department">Department</label>
+                    <select name="Department" required>
+                        <option value="">Select Department</option>
+                        {% for dept in departments %}
+                        <option value="{{ dept }}">{{ dept }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="Project_Category">Project Category</label>
+                    <select name="Project_Category" required>
+                        <option value="">Select Project Category</option>
+                        {% for cat in project_categories %}
+                        <option value="{{ cat }}">{{ cat }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="Project_Name">Project Name</label>
+                    <select name="Project_Name" required>
+                        <option value="">Select Project Name</option>
+                        {% for proj in projects %}
+                        <option value="{{ proj }}">{{ proj }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="fiscal_year">Fiscal Year</label>
+                    <select name="fiscal_year" required>
+                        <option value="">Select Year</option>
+                        {% for y in range(2020, 2036) %}
+                        <option value="{{ y }}">{{ y }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="Human_resource_category">Human Resource Category</label>
+                    <select name="Human_resource_category">
+                        <option value="">Select Human Resource Category</option>
+                        {% for hrc in human_resource_categories %}
+                        <option value="{{ hrc }}">{{ hrc }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="Human_resource_FTE">Human Resource FTE</label>
+                    <input type="text" name="Human_resource_FTE">
+                </div>
+                <div class="form-group">
+                    <label for="Personnel_cost">Personnel Expense</label>
+                    <input type="text" name="Personnel_cost">
+                </div>
+                <div class="form-group">
+                    <label for="Non_personnel_cost">Non-personnel Expense</label>
+                    <input type="text" name="Non_personnel_cost">
+                </div>
+                <button type="submit">Submit</button>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

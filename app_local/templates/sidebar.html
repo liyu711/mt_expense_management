@@ -1,0 +1,241 @@
+<div class="sidebar-nav">
+    <div class="nav-group">
+        <div class="nav-link nav-group-title collapsible" id="admin-options-toggle">
+            Administrator’s options
+            <span class="collapse-arrow" id="admin-arrow">&#9654;</span>
+        </div>
+        <div class="nav-sublinks collapsible-content" id="admin-options-content" style="display:none;">
+            <div class="nav-link nav-subgroup-title">Modify table parameters</div>
+            <a href="/modify_department" class="nav-link nav-sublink{% if request.path == '/modify_department' %} active{% endif %}">Department</a>
+            <a href="/modify_po" class="nav-link nav-sublink{% if request.path == '/modify_po' %} active{% endif %}">PO</a>
+            <a href="/modify_porject_category" class="nav-link nav-sublink{% if request.path == '/modify_porject_category' %} active{% endif %}">Project Category</a>
+            <a href="/modify_staff_categories" class="nav-link nav-sublink{% if request.path == '/modify_staff_categories' %} active{% endif %}">Staff categories</a>
+            <div class="nav-link nav-subgroup-title">Modify users</div>
+            <a href="/add_user" class="nav-link nav-sublink{% if request.path == '/add_user' %} active{% endif %}">Add user</a>
+            <a href="/delete_user" class="nav-link nav-sublink{% if request.path == '/delete_user' %} active{% endif %}">Delete user</a>
+            <a href="/modify_user_type" class="nav-link nav-sublink{% if request.path == '/modify_user_type' %} active{% endif %}">Modify user type</a>
+        </div>
+    </div>
+    <div class="nav-group">
+        <div class="nav-link nav-group-title collapsible" id="create-options-toggle">
+            Create Expense Forecast
+            <span class="collapse-arrow" id="create-arrow">&#9654;</span>
+        </div>
+        <div class="nav-sublinks collapsible-content" id="create-options-content" style="display:none;">
+            <a href="/modify_project" class="nav-link nav-sublink{% if request.path == '/modify_project' %} active{% endif %}">Create Project</a>
+            <a href="/modify_io" class="nav-link nav-sublink{% if request.path == '/modify_io' %} active{% endif %}">Create IO</a>
+            <a href="/manual_input" class="nav-link nav-sublink{% if request.path == '/manual_input' %} active{% endif %}" id="create-forecast-link">Create forecast</a>
+            <a href="/capex_forecast" class="nav-link nav-sublink{% if request.path == '/capex_forecast' %} active{% endif %}">Capex forecast</a>
+        </div>
+    </div>
+
+    <div class="nav-group">
+        <div class="nav-link nav-group-title collapsible" id="create-budgets-toggle">
+            Create Budgets
+            <span class="collapse-arrow" id="create-budgets-arrow">&#9654;</span>
+        </div>
+        <div class="nav-sublinks collapsible-content" id="create-budgets-content" style="display:none;">
+            <a href="/upload_budget" class="nav-link nav-sublink{% if request.path == '/upload_budget' %} active{% endif %}" id="nav-upload-budget">Create budget</a>
+            <a href="/capex_budget" class="nav-link nav-sublink{% if request.path == '/capex_budget' %} active{% endif %}">Capex budget</a>
+        </div>
+    </div>
+
+    <div class="nav-group">
+        <div class="nav-link nav-group-title collapsible" id="data-visualization-toggle">
+            Data Visualization
+            <span class="collapse-arrow" id="data-visualization-arrow">&#9654;</span>
+        </div>
+        <div class="nav-sublinks collapsible-content" id="data-visualization-content" style="display:none;">
+            <a href="/select" class="nav-link nav-sublink{% if request.path == '/select' %} active{% endif %}" id="nav-select">Display PO projects</a>
+            <a href="/data_visualization" class="nav-link nav-sublink{% if request.path == '/data_visualization' %} active{% endif %}">Data visualization</a>
+        </div>
+    </div>
+
+    <!-- Remaining links moved to end -->
+    <a href="/file_upload" class="nav-link{% if request.path == '/file_upload' %} active{% endif %}" id="nav-file-upload">Upload actual expenditures (file upload)</a>
+    <a href="/upload_history" class="nav-link{% if request.path == '/upload_history' %} active{% endif %}">Upload history entries</a>
+    <div class="nav-group">
+        <div class="nav-link nav-group-title">Display department projects</div>
+        <a href="/view_department_projects" class="nav-link nav-sublink{% if request.path == '/view_department_projects' %} active{% endif %}">View project as table</a>
+    </div>
+</div>
+<script>
+// Collapsible admin options (preserve state on nav-sublink click)
+document.addEventListener('DOMContentLoaded', function() {
+    // Admin options collapsible
+    var adminToggle = document.getElementById('admin-options-toggle');
+    var adminContent = document.getElementById('admin-options-content');
+    var adminArrow = document.getElementById('admin-arrow');
+    var adminExpanded = localStorage.getItem('adminOptionsExpanded') === 'true';
+    function setAdminState(expanded) {
+        if (expanded) {
+            adminContent.style.display = 'block';
+            adminArrow.style.transform = 'rotate(90deg)';
+        } else {
+            adminContent.style.display = 'none';
+            adminArrow.style.transform = 'rotate(0deg)';
+        }
+        localStorage.setItem('adminOptionsExpanded', expanded);
+    }
+    if (adminToggle && adminContent && adminArrow) {
+        setAdminState(adminExpanded);
+        adminArrow.style.transition = 'transform 0.2s';
+        adminToggle.addEventListener('click', function(e) {
+            if (e.target === adminToggle || e.target === adminArrow) {
+                var isExpanded = adminContent.style.display === 'block';
+                setAdminState(!isExpanded);
+            }
+        });
+    }
+
+    // Create options collapsible
+    var createToggle = document.getElementById('create-options-toggle');
+    var createContent = document.getElementById('create-options-content');
+    var createArrow = document.getElementById('create-arrow');
+    var createExpanded = localStorage.getItem('createOptionsExpanded') === 'true';
+    function setCreateState(expanded) {
+        if (expanded) {
+            createContent.style.display = 'block';
+            createArrow.style.transform = 'rotate(90deg)';
+        } else {
+            createContent.style.display = 'none';
+            createArrow.style.transform = 'rotate(0deg)';
+        }
+        localStorage.setItem('createOptionsExpanded', expanded);
+    }
+    if (createToggle && createContent && createArrow) {
+        setCreateState(createExpanded);
+        createArrow.style.transition = 'transform 0.2s';
+        createToggle.addEventListener('click', function(e) {
+            if (e.target === createToggle || e.target === createArrow) {
+                var isExpanded = createContent.style.display === 'block';
+                setCreateState(!isExpanded);
+            }
+        });
+    }
+
+    // Create Budgets collapsible
+    var createBudgetsToggle = document.getElementById('create-budgets-toggle');
+    var createBudgetsContent = document.getElementById('create-budgets-content');
+    var createBudgetsArrow = document.getElementById('create-budgets-arrow');
+    var createBudgetsExpanded = localStorage.getItem('createBudgetsExpanded') === 'true';
+    function setCreateBudgetsState(expanded) {
+        if (expanded) {
+            createBudgetsContent.style.display = 'block';
+            createBudgetsArrow.style.transform = 'rotate(90deg)';
+        } else {
+            createBudgetsContent.style.display = 'none';
+            createBudgetsArrow.style.transform = 'rotate(0deg)';
+        }
+        localStorage.setItem('createBudgetsExpanded', expanded);
+    }
+    if (createBudgetsToggle && createBudgetsContent && createBudgetsArrow) {
+        setCreateBudgetsState(createBudgetsExpanded);
+        createBudgetsArrow.style.transition = 'transform 0.2s';
+        createBudgetsToggle.addEventListener('click', function(e) {
+            if (e.target === createBudgetsToggle || e.target === createBudgetsArrow) {
+                var isExpanded = createBudgetsContent.style.display === 'block';
+                setCreateBudgetsState(!isExpanded);
+            }
+        });
+    }
+
+    // Data Visualization collapsible
+    var dataVizToggle = document.getElementById('data-visualization-toggle');
+    var dataVizContent = document.getElementById('data-visualization-content');
+    var dataVizArrow = document.getElementById('data-visualization-arrow');
+    var dataVizExpanded = localStorage.getItem('dataVisualizationExpanded') === 'true';
+    function setDataVizState(expanded) {
+        if (expanded) {
+            dataVizContent.style.display = 'block';
+            dataVizArrow.style.transform = 'rotate(90deg)';
+        } else {
+            dataVizContent.style.display = 'none';
+            dataVizArrow.style.transform = 'rotate(0deg)';
+        }
+        localStorage.setItem('dataVisualizationExpanded', expanded);
+    }
+    if (dataVizToggle && dataVizContent && dataVizArrow) {
+        setDataVizState(dataVizExpanded);
+        dataVizArrow.style.transition = 'transform 0.2s';
+        dataVizToggle.addEventListener('click', function(e) {
+            if (e.target === dataVizToggle || e.target === dataVizArrow) {
+                var isExpanded = dataVizContent.style.display === 'block';
+                setDataVizState(!isExpanded);
+            }
+        });
+    }
+});
+</script>
+<style>
+.sidebar-nav {
+    position: fixed;
+    left: 0;
+    top: 0;
+    width: 220px;
+    height: 100vh;
+    background: #f8f9fa;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 32px 0 0 0;
+    border-right: 1px solid #ddd;
+    z-index: 100;
+    overflow-y: auto;
+}
+.collapsible {
+    cursor: pointer;
+    user-select: none;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+.collapse-arrow {
+    font-size: 1em;
+    margin-left: 8px;
+    transition: transform 0.2s;
+}
+.nav-link {
+    display: block;
+    width: 100%;
+    padding: 16px 16px 16px 32px;
+    color: #333;
+    text-decoration: none;
+    font-size: 1.1em;
+    transition: background 0.2s, color 0.2s;
+    box-sizing: border-box;
+}
+.nav-group {
+    width: 100%;
+}
+.nav-group-title {
+    font-weight: bold;
+    font-size: 1.05em;
+    padding: 12px 16px 4px 32px;
+    color: #555;
+    background: none;
+    cursor: default;
+}
+.nav-subgroup-title {
+    font-weight: 500;
+    font-size: 1em;
+    padding: 8px 16px 4px 48px;
+    color: #666;
+    background: none;
+    cursor: default;
+}
+.nav-sublinks {
+    width: 100%;
+}
+.nav-sublink {
+    padding-left: 64px;
+    font-size: 1em;
+}
+.nav-link:hover, .nav-link.active {
+    background: #007bff;
+    color: #fff;
+}
+body {
+    margin-left: 220px;
+}
+</style>

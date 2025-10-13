@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Home</title>
+    <style>
+    body {
+        margin-left: 220px;
+    }
+    </style>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div style="padding: 24px;">
+        <h1>Home</h1>
+        <form id="resetForm" action="/reset" method="POST">
+            <button name="trigger_warning" type="button" onclick="showModal()">Reset database</button>
+        </form>
+        <!-- Modal Popup -->
+        <div id="confirmModal" style="display:none; position:fixed; top:0; left:0; width:100vw; height:100vh; background:rgba(0,0,0,0.4); z-index:1000; align-items:center; justify-content:center;">
+            <div style="background:#fff; padding:32px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.2); max-width:350px; margin:auto; text-align:center;">
+                <h3>Confirm Reset</h3>
+                <p>Are you sure you want to reset the database?</p>
+                <div style="margin-top:24px; display:flex; gap:16px; justify-content:center;">
+                    <button onclick="submitReset()" style="background:#d9534f; color:#fff; border:none; padding:8px 16px; border-radius:4px;">Reset Database</button>
+                    <button onclick="goHome()" style="background:#007bff; color:#fff; border:none; padding:8px 16px; border-radius:4px;">Go Home</button>
+                </div>
+            </div>
+        </div>
+        <script>
+        function showModal() {
+            document.getElementById('confirmModal').style.display = 'flex';
+        }
+        function submitReset() {
+            document.getElementById('resetForm').submit();
+        }
+        function goHome() {
+            window.location.href = '/home';
+        }
+        // Hide modal when clicking outside
+        if (document.getElementById('confirmModal')) {
+            document.getElementById('confirmModal').addEventListener('click', function(e) {
+                if (e.target === this) {
+                    this.style.display = 'none';
+                }
+            });
+        }
+        </script>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <ul class="flashes">
+                    {% for category, message in messages %}
+                        <li class="alert alert-{{ category }}">{{ message }}</li>
+                    {% endfor %}
+                </ul>
+            {% endif %}
+        {% endwith %}
+    </div>
+</body>
+</html>

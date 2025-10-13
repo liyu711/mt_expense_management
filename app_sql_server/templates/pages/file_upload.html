@@ -1,0 +1,18 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>File Upload</title>
+</head>
+<body>
+    <h1>Upload a File</h1>
+    <form action="/file_upload" method="POST" enctype="multipart/form-data">
+        <input type="file" name="file">
+        <select name="my_dropdown" id="my_dropdown">
+            {% for option in options %}
+                <option value="{{ option }}" {% if option == selected_option %}selected{% endif %}>{{ option }}</option>
+            {% endfor %}
+        </select>
+        <input type="submit" value="Upload">
+    </form>
+</body>
+</html>
