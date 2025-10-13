@@ -9,8 +9,9 @@
         <label for="table_name">Table Name:</label>
         <select id="table_name" name="table_name">
             {% for option in options %}
+                {% set label = display_names[option] if display_names is defined and option in display_names else option %}
                 <option value="{{ option }}" {% if option == selected_option %}selected{% endif %}>
-                    {{ option }}
+                    {{ label }}
                 </option>
             {% endfor %}
         </select>

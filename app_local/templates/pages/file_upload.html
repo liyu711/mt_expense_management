@@ -10,8 +10,10 @@
         <form action="/file_upload" method="POST" enctype="multipart/form-data">
             <input type="file" name="file">
             <select name="my_dropdown" id="my_dropdown">
+                {# Expecting an optional `display_names` dict passed to the template mapping option -> label #}
                 {% for option in options %}
-                    <option value="{{ option }}" {% if option == selected_option %}selected{% endif %}>{{ option }}</option>
+                    {% set label = display_names[option] if display_names is defined and option in display_names else option %}
+                    <option value="{{ option }}" {% if option == selected_option %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
             <input type="submit" value="Upload">

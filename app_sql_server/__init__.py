@@ -4,6 +4,7 @@ import os
 from backend.connect_pyodbc import \
     connect_to_sql, select_all_from_table, initialize_database, close_connection
 from backend.select_data import select_projects
+from backend.display_names import DISPLAY_NAMES
 from backend.upload_expenses import upload_expenses_df
 from werkzeug.utils import secure_filename
 from backend.login import valid_login
@@ -69,7 +70,7 @@ def select():
             data = df.values.tolist()
             columns = df.columns.tolist()
             
-    return render_template('pages/select.html', options=options, selected_option=selected_option, data=data, columns=columns)
+    return render_template('pages/select.html', options=options, selected_option=selected_option, data=data, columns=columns, display_names=DISPLAY_NAMES)
 
 @app.route("/test")
 def testpage():

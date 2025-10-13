@@ -7,6 +7,7 @@ from werkzeug.utils import secure_filename
 from backend.login import valid_login
 import pandas as pd
 import os
+from backend.display_names import DISPLAY_NAMES
 
 upload_requests = Blueprint('upload_requests', __name__, template_folder='templates')
 
@@ -41,7 +42,7 @@ def workstation_page():
             else:
                 return f'File {selected_option} invalid'
             
-    return render_template("pages/file_upload.html", options=options, selected_option=selected_option)
+    return render_template("pages/file_upload.html", options=options, selected_option=selected_option, display_names=DISPLAY_NAMES)
 
 @upload_requests.route('/upload', methods=['POST'])
 def upload_file():

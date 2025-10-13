@@ -1,6 +1,7 @@
 
 from flask import Flask, flash, render_template, request, redirect, url_for, Blueprint
 from backend.connect_local import connect_local, select_all_from_table
+from backend.display_names import DISPLAY_NAMES
 
 
 select_data = Blueprint('select_data', __name__, template_folder='templates')
@@ -116,4 +117,5 @@ def select():
         page=page,
         total_pages=total_pages,
         per_page=per_page
+        , display_names=DISPLAY_NAMES
     )
