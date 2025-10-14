@@ -19,10 +19,18 @@ def select():
     per_page = 50  # You can adjust this value for more/less rows per page
     total_pages = 1
 
+    # all the avaliable options
+    # options = [
+    #     'projects', 'departments', 'POs', 'cost_elements', 'budgets', 'expenses', 'fundings',
+    #     'project_categories', 'co_object_names', 'IOs', 'IO_CE_connection', 'human_resource_categories',
+    #     'human_resource_expense', 'project_forecasts_nonpc', 'project_forecasts_pc',
+    #     'capex_forecasts', 'capex_budgets', 'capex_expenses'
+    # ]
+
     options = [
-        'projects', 'departments', 'POs', 'cost_elements', 'budgets', 'expenses', 'fundings',
-        'project_categories', 'co_object_names', 'IOs', 'IO_CE_connection', 'human_resource_categories',
-        'human_resource_expense', 'project_forecasts_nonpc', 'project_forecasts_pc',
+        'projects', 'departments', 'POs', 'budgets', 'expenses', 'fundings',
+        'project_categories', 'IOs', 'human_resource_categories',
+        'project_forecasts_nonpc', 'project_forecasts_pc',
         'capex_forecasts', 'capex_budgets', 'capex_expenses'
     ]
 
