@@ -11,7 +11,13 @@ ENV PYTHONUNBUFFERED 1
 
 # Install system dependencies (if needed) and curl for health checks
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev curl \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        libpq-dev \
+        curl \
+        unixodbc \
+        unixodbc-dev \
+        libodbc1 \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements and install
@@ -20,6 +26,8 @@ RUN pip install --upgrade pip \
     && pip install --no-cache-dir -r /app/requirements.txt
 
 # Copy application code
+# Copy the full project into the image. Build context should be the repository root
+# so this will include the `backend/` folder alongside `app_local/`.
 COPY . /app
 
 # Expose port
