@@ -3,6 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <title>Select Data</title>
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
 </head>
 <body>
     {% include 'sidebar.html' %}
@@ -102,7 +104,7 @@
                 }
                 </script>
             {% endif %}
-            <table border="1">
+            <table border="1" id="data_table" class="display" style="width:100%">
                 <thead>
                     <tr>
                         {% for col in columns %}
@@ -120,6 +122,25 @@
                     {% endfor %}
                 </tbody>
             </table>
+            <!-- jQuery and DataTables JS -->
+            <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+            <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+            <script>
+            // Initialize DataTable for the table with id data_table
+            document.addEventListener('DOMContentLoaded', function() {
+                // Use jQuery to ensure DataTables loads correctly
+                $(document).ready(function() {
+                    $('#data_table').DataTable({
+                        // Customize as needed: pagination, searching, ordering are enabled by default
+                        paging: true,
+                        searching: true,
+                        ordering: true,
+                        // Adjust page length options if desired
+                        lengthMenu: [ [10, 25, 50, 100], [10, 25, 50, 100] ]
+                    });
+                });
+            });
+            </script>
         {% endif %}
     </div>
 </body>
