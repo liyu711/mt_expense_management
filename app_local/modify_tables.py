@@ -241,9 +241,38 @@ def modify_table_router(action):
             merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
             res = add_entry(df_upload, table_name, merge_columns, merge_on)
 
+    # After handling POST (or on GET), fetch table contents to display below the form
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        df_table = select_all_from_table(cursor, cnxn, config['table_name'])
+        # Map id columns to names similarly to select_data
+        id_name_map = {
+            'department_id': ('departments', 'id', 'name', 'Department'),
+            'po_id': ('POs', 'id', 'name', 'PO'),
+            'PO_id': ('POs', 'id', 'name', 'PO'),
+            'project_id': ('projects', 'id', 'name', 'Project'),
+            'io_id': ('IOs', 'id', 'IO_num', 'IO'),
+            'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
+        }
+        for id_col, (ref_table, ref_id, ref_name, new_col_name) in id_name_map.items():
+            if id_col in df_table.columns:
+                ref_df = select_all_from_table(cursor, cnxn, ref_table)
+                ref_dict = dict(zip(ref_df[ref_id], ref_df[ref_name]))
+                df_table[new_col_name] = df_table[id_col].map(ref_dict)
+        drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df_table.columns]
+        df_table = df_table.drop(columns=drop_cols)
+        columns = df_table.columns.tolist()
+        data = df_table.values.tolist()
+    except Exception:
+        columns = []
+        data = []
+
     return render_template(
         'pages/modify_table.html',
         title=config['title'],
         table_name=config['table_name'],
-        fields=config['fields']
+        fields=config['fields'],
+        columns=columns if 'columns' in locals() else [],
+        data=data if 'data' in locals() else []
     )

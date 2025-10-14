@@ -46,6 +46,24 @@
         .input-section.active {
             display: block;
         }
+        /* Page flex layout: top (rest) 10%, each table 45% */
+        .page-wrapper {
+            display: flex;
+            flex-direction: column;
+            height: calc(100vh - 0px); /* adjust if you have headers */
+            box-sizing: border-box;
+        }
+        .page-top {
+            flex: 0 0 10vh; /* 10% of viewport height */
+            padding-left: 24px;
+            box-sizing: border-box;
+        }
+        .table-container {
+            flex: 0 0 45vh; /* each table takes 45% of viewport height */
+            padding-left: 24px;
+            box-sizing: border-box;
+            overflow: auto; /* allow scrolling inside each table area */
+        }
     </style>
     <script>
         // No JS needed: forecast form is always visible on /manual_input
@@ -53,10 +71,19 @@
 </head>
 <body>
     {% include 'sidebar.html' %}
-    <div style="padding: 24px 0 0 0;">
-    <div id="forecast_merged_div" style="padding-left: 24px; display: block;">
+    <div class="page-wrapper">
+        <div class="page-top">
+            <!-- Add button to open modal for manual forecast input -->
+            <button id="add_button" type="button">Add</button>
+        </div>
+
+    <!-- Modal for forecast input (hidden by default) -->
+    <div id="forecastModal" class="modal" aria-hidden="true" role="dialog">
+        <div class="modal-overlay" id="forecastModalOverlay"></div>
+        <div class="modal-content">
+            <button class="modal-close" id="forecastModalClose" aria-label="Close">&times;</button>
             <h1>Forecast Input (Personnel & Non-Personnel)</h1>
-            <form method="POST" action="/upload_forecast">
+            <form method="POST" action="/upload_forecast" id="upload_forecast">
                 <div class="form-group">
                     <label for="PO">PO</label>
                     <select name="PO" required>
@@ -132,9 +159,95 @@
                     <label for="Non_personnel_cost">Non-personnel Expense</label>
                     <input type="text" name="Non_personnel_cost">
                 </div>
-                <button type="submit">Submit</button>
+                <div style="margin-top:12px;">
+                    <button type="submit">Submit</button>
+                    <button type="button" id="forecastModalCancel">Cancel</button>
+                </div>
             </form>
         </div>
+    </div>
+
+    <!-- Display project_forecasts_nonpc table -->
+    {% if pf_nonpc_columns and pf_nonpc_data %}
+    <div class="table-container">
+        <h3>Project Forecasts (non-personnel)</h3>
+        <table id="pf_nonpc_table" class="display" style="width:100%" border="1">
+            <thead>
+                <tr>
+                    {% for col in pf_nonpc_columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in pf_nonpc_data %}
+                <tr>
+                    {% for item in row %}
+                    <td>{{ item }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Display project_forecasts_pc table -->
+    {% if pf_pc_columns and pf_pc_data %}
+    <div class="table-container">
+        <h3>Project Forecasts (personnel)</h3>
+        <table id="pf_pc_table" class="display" style="width:100%" border="1">
+            <thead>
+                <tr>
+                    {% for col in pf_pc_columns %}
+                    <th>{{ col }}</th>
+                    {% endfor %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in pf_pc_data %}
+                <tr>
+                    {% for item in row %}
+                    <td>{{ item }}</td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% endif %}
+
+    <!-- Include DataTables and init scripts -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <script>
+    $(document).ready(function(){
+        if($('#pf_nonpc_table').length) $('#pf_nonpc_table').DataTable({paging:true, searching:true, ordering:true, lengthMenu:[[10,25,50,100],[10,25,50,100]]});
+        if($('#pf_pc_table').length) $('#pf_pc_table').DataTable({paging:true, searching:true, ordering:true, lengthMenu:[[10,25,50,100],[10,25,50,100]]});
+
+        // modal handlers
+        var addBtn = document.getElementById('add_button');
+        var modal = document.getElementById('forecastModal');
+        var modalClose = document.getElementById('forecastModalClose');
+        var modalOverlay = document.getElementById('forecastModalOverlay');
+        var modalCancel = document.getElementById('forecastModalCancel');
+        function openModal(){ modal.style.display='block'; modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden'; }
+        function closeModal(){ modal.style.display='none'; modal.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+        addBtn && addBtn.addEventListener('click', openModal);
+        modalClose && modalClose.addEventListener('click', closeModal);
+        modalOverlay && modalOverlay.addEventListener('click', closeModal);
+        modalCancel && modalCancel.addEventListener('click', closeModal);
+        document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
+    });
+    </script>
+    <style>
+        /* Modal styles reused */
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; }
+        .modal-overlay { position: absolute; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.4); }
+        .modal-content { position: relative; max-width: 760px; margin: 60px auto; background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 2010; }
+        .modal-close { position: absolute; right: 10px; top: 8px; font-size: 24px; background: transparent; border: none; cursor: pointer; }
+    </style>
     </div>
 </body>
 </html>

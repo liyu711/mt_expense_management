@@ -68,6 +68,43 @@ def render_mannual_input():
     projects = select_all_from_table(cursor, cnxn, 'projects')['name']
     project_categories = select_all_from_table(cursor, cnxn, "project_categories")['category']
     human_resource_categories = select_all_from_table(cursor, cnxn, "human_resource_categories")['name']
+    # Fetch forecast table contents to show below the Add button
+    try:
+        df_nonpc = select_all_from_table(cursor, cnxn, 'project_forecasts_nonpc')
+    except Exception:
+        df_nonpc = None
+    try:
+        df_pc = select_all_from_table(cursor, cnxn, 'project_forecasts_pc')
+    except Exception:
+        df_pc = None
+
+    # map id columns to readable names (same mapping used elsewhere)
+    id_name_map = {
+        'department_id': ('departments', 'id', 'name', 'Department'),
+        'po_id': ('POs', 'id', 'name', 'PO'),
+        'PO_id': ('POs', 'id', 'name', 'PO'),
+        'project_id': ('projects', 'id', 'name', 'Project'),
+        'io_id': ('IOs', 'id', 'IO_num', 'IO'),
+        'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
+    }
+    def map_and_prepare(df):
+        if df is None:
+            return [], []
+        try:
+            for id_col, (ref_table, ref_id, ref_name, new_col_name) in id_name_map.items():
+                if id_col in df.columns:
+                    ref_df = select_all_from_table(cursor, cnxn, ref_table)
+                    ref_dict = dict(zip(ref_df[ref_id], ref_df[ref_name]))
+                    df[new_col_name] = df[id_col].map(ref_dict)
+            drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df.columns]
+            df2 = df.drop(columns=drop_cols)
+            return df2.columns.tolist(), df2.values.tolist()
+        except Exception:
+            return [], []
+
+    pf_nonpc_columns, pf_nonpc_data = map_and_prepare(df_nonpc)
+    pf_pc_columns, pf_pc_data = map_and_prepare(df_pc)
+
     return render_template("pages/mannual_input.html", 
                            input_types = input_types, 
                            titles = titles, 
@@ -78,7 +115,11 @@ def render_mannual_input():
                            ios = io,
                            projects = projects,
                            project_categories=project_categories,
-                           human_resource_categories= human_resource_categories
+                           human_resource_categories= human_resource_categories,
+                           pf_nonpc_columns=pf_nonpc_columns,
+                           pf_nonpc_data=pf_nonpc_data,
+                           pf_pc_columns=pf_pc_columns,
+                           pf_pc_data=pf_pc_data
                            )
 
 
