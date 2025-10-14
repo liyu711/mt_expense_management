@@ -9,8 +9,11 @@ from app_local.upload_file import upload_requests
 from app_local.manual_upload import manual_upload
 from app_local.select_data import select_data
 from app_local.modify_tables import modify_tables
+from app_local.data_vis import data_vis
 from backend.connect_local import \
     connect_local, initialize_database, close_connection, select_all_from_table
+
+conn = connect_local()
 
 app = Flask(__name__)
 app.secret_key = os.urandom(24)
@@ -19,6 +22,7 @@ app.register_blueprint(upload_requests)
 app.register_blueprint(manual_upload)
 app.register_blueprint(select_data)
 app.register_blueprint(modify_tables)
+app.register_blueprint(data_vis)
 
 
 @app.route('/', methods=['GET', 'POST'])

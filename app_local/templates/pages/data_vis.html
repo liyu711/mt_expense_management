@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Data Visualization</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div style="margin-left:50px;">
+        <h2>Data Visualization</h2>
+        <form id="chart-form" method="POST">
+            <label for="table_name">Table:</label>
+            <select id="table_name" name="table_name">
+                {% for option in options %}
+                    {% set label = display_names[option] if display_names is defined and option in display_names else option %}
+                    <option value="{{ option }}" {% if option == selected_option %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <label for="x_col">X Axis:</label>
+            <select name="x_col" id="x_col">
+                {% for col in columns %}
+                <option value="{{ col }}" {% if col == x_col %}selected{% endif %}>{{ col }}</option>
+                {% endfor %}
+            </select>
+            <label for="y_col">Y Axis:</label>
+            <select name="y_col" id="y_col">
+                {% for col in columns %}
+                <option value="{{ col }}" {% if col == y_col %}selected{% endif %}>{{ col }}</option>
+                {% endfor %}
+            </select>
+            <label for="plot_type">Plot Type:</label>
+            <select name="plot_type" id="plot_type">
+                <option value="bar" {% if plot_type == 'bar' %}selected{% endif %}>Bar Chart</option>
+                <option value="line" {% if plot_type == 'line' %}selected{% endif %}>Line Chart</option>
+            </select>
+            <button type="submit">Plot</button>
+        </form>
+
+        <div>
+            <canvas id="chartCanvas" width="800" height="400"></canvas>
+        </div>
+
+        <script id="chart-data-json" type="application/json">{{ data|tojson|safe }}</script>
+        <script id="chart-columns-json" type="application/json">{{ columns|tojson|safe }}</script>
+        <script>
+        (function() {
+            const xCol = "{{ x_col|default('') }}";
+            const yCol = "{{ y_col|default('') }}";
+            const plotType = "{{ plot_type|default('bar') }}";
+            const chartData = JSON.parse(document.getElementById('chart-data-json').textContent || '[]');
+            const chartColumns = JSON.parse(document.getElementById('chart-columns-json').textContent || '[]');
+            if (xCol && yCol && chartColumns.includes(xCol) && chartColumns.includes(yCol)) {
+                const xIdx = chartColumns.indexOf(xCol);
+                const yIdx = chartColumns.indexOf(yCol);
+                const groupMap = {};
+                chartData.forEach(row => {
+                    const xVal = row[xIdx];
+                    let yVal = row[yIdx];
+                    yVal = typeof yVal === 'number' ? yVal : parseFloat(yVal);
+                    if (!isNaN(yVal)) {
+                        if (groupMap[xVal] === undefined) groupMap[xVal] = 0;
+                        groupMap[xVal] += yVal;
+                    }
+                });
+                const labels = Object.keys(groupMap);
+                const values = labels.map(l => groupMap[l]);
+                const ctx = document.getElementById('chartCanvas').getContext('2d');
+                new Chart(ctx, {
+                    type: plotType,
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: yCol + ' (sum) by ' + xCol,
+                            data: values,
+                            backgroundColor: plotType === 'bar' ? 'rgba(54, 162, 235, 0.5)' : 'rgba(255, 99, 132, 0.2)',
+                            borderColor: plotType === 'bar' ? 'rgba(54, 162, 235, 1)' : 'rgba(255, 99, 132, 1)',
+                            borderWidth: 1,
+                            fill: false
+                        }]
+                    },
+                    options: { responsive: false, scales: { y: { beginAtZero: true } } }
+                });
+            }
+        })();
+        </script>
+    </div>
+</body>
+</html>
