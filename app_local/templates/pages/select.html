@@ -21,7 +21,8 @@
             </select>
             <button type="submit">Retrieve Data</button>
         </form>
-        {% if data %}
+        <!-- canvas for plotting the data, currently removed -->
+        <!-- {% if data %}
             {% set chart_tables = [
                 'budgets', 'expenses', 'fundings', 'human_resource_expense', 'project_forecasts_nonpc', 'project_forecasts_pc',
                 'capex_forecasts', 'capex_budgets', 'capex_expenses'] %}
@@ -103,7 +104,7 @@
                     });
                 }
                 </script>
-            {% endif %}
+            {% endif %} -->
             <table border="1" id="data_table" class="display" style="width:100%">
                 <thead>
                     <tr>
