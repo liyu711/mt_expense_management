@@ -1,0 +1,2 @@
+docker build -t mt-expense-app-local -f .\app_local\Dockerfile .
+docker run --rm -p 8000:8000 -e FLASK_ENV=development mt-expense-app-local

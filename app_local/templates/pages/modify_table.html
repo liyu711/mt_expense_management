@@ -124,14 +124,40 @@
                             {% endfor %}
                         </tbody>
                     </table>
-                    <!-- jQuery and DataTables JS -->
+                    <!-- jQuery and DataTables JS (CDN with local fallback) -->
                     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+                    <script>
+                        if (typeof jQuery === 'undefined') {
+                            var s = document.createElement('script');
+                            s.src = "{{ url_for('static', filename='vendor/jquery-3.7.1.min.js') }}";
+                            document.head.appendChild(s);
+                        }
+                    </script>
                     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+                    <script>
+                        (function ensureDataTables(){
+                            if (window.jQuery && (!jQuery.fn || !jQuery.fn.dataTable)) {
+                                var s = document.createElement('script');
+                                s.src = "{{ url_for('static', filename='vendor/jquery.dataTables.min.js') }}";
+                                document.head.appendChild(s);
+                            }
+                        })();
+                    </script>
                     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
                     <script>
-                    $(document).ready(function() {
-                        $('#modify_data_table').DataTable({ paging: true, searching: true, ordering: true, lengthMenu: [[10,25,50,100],[10,25,50,100]] });
-                    });
+                    (function initModifyTable(retries){
+                        retries = retries || 20;
+                        function init(){
+                            if (window.jQuery && window.jQuery.fn && window.jQuery.fn.dataTable) {
+                                $('#modify_data_table').DataTable({ paging: true, searching: true, ordering: true, lengthMenu: [[10,25,50,100],[10,25,50,100]] });
+                            } else if (retries > 0) {
+                                setTimeout(function(){ initModifyTable(retries - 1); }, 200);
+                            } else {
+                                console.warn('DataTables not available for modify table.');
+                            }
+                        }
+                        if (document.readyState === 'complete' || document.readyState === 'interactive') init(); else document.addEventListener('DOMContentLoaded', init);
+                    })();
                     </script>
                 {% endif %}
                 </div>
