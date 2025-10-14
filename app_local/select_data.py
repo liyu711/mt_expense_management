@@ -6,6 +6,100 @@ from backend.display_names import DISPLAY_NAMES
 
 select_data = Blueprint('select_data', __name__, template_folder='templates')
 
+
+def transform_table(df, table_name, cursor, cnxn):
+    """Apply table-specific joins, renames and reorder columns according to UI rules.
+
+    - projects: join project_categories on category_id=id -> 'Project Category'
+    - departments: rename 'name' -> 'Department Name'
+    - budgets: rename human_resource_expense -> 'Personnel Budget', non_personnel_expense -> 'Non-personnel Budget'
+    - expenses: join co_object_names on co_object_id=id -> 'Cost Element Name'; drop cost_element_id; rename co_element_name -> 'Cost Element Name'
+    - project_categories: rename 'category' -> 'Project Category'
+    - IOs: rename 'IO_num' -> 'IO number'
+    - global: rename fiscal_year -> 'Fiscal Year', cap_year -> 'Capital Year'
+    - reorder: if 'id' exists, move PO and Department-related columns to directly after id
+    """
+    if df is None:
+        return df
+
+    # Make a copy of column order
+    cols = list(df.columns)
+
+    try:
+        # projects: category_id -> Project Category
+        if table_name == 'projects' and 'category_id' in df.columns:
+            ref_df = select_all_from_table(cursor, cnxn, 'project_categories')
+            ref_dict = dict(zip(ref_df['id'], ref_df['category']))
+            df['Project Category'] = df['category_id'].map(ref_dict)
+            if 'category_id' in df.columns:
+                df = df.drop(columns=['category_id'])
+
+        # departments: rename name -> Department Name
+        if table_name == 'departments' and 'name' in df.columns:
+            df = df.rename(columns={'name': 'Department Name'})
+
+        # budgets renames
+        if table_name == 'budgets':
+            if 'human_resource_expense' in df.columns:
+                df = df.rename(columns={'human_resource_expense': 'Personnel Budget'})
+            if 'non_personnel_expense' in df.columns:
+                df = df.rename(columns={'non_personnel_expense': 'Non-personnel Budget'})
+
+        # expenses: map co_object_id -> Cost Element Name, drop cost_element_id, rename co_element_name
+        if table_name == 'expenses':
+            if 'co_object_id' in df.columns:
+                ref_df = select_all_from_table(cursor, cnxn, 'co_object_names')
+                # expect ref_df has 'id' and 'name'
+                ref_dict = dict(zip(ref_df['id'], ref_df['name']))
+                df['Cost Element Name'] = df['co_object_id'].map(ref_dict)
+                df = df.drop(columns=['co_object_id'])
+            if 'cost_element_id' in df.columns:
+                df = df.drop(columns=['cost_element_id'])
+            if 'co_element_name' in df.columns:
+                df = df.rename(columns={'co_element_name': 'Cost Element Name'})
+
+        # project_categories: category -> Project Category
+        if table_name == 'project_categories' and 'category' in df.columns:
+            df = df.rename(columns={'category': 'Project Category'})
+
+        # IOs: rename IO_num -> IO number
+        if table_name == 'IOs' and 'IO_num' in df.columns:
+            df = df.rename(columns={'IO_num': 'IO number'})
+
+        # Global renames
+        if 'fiscal_year' in df.columns:
+            df = df.rename(columns={'fiscal_year': 'Fiscal Year'})
+        if 'cap_year' in df.columns:
+            df = df.rename(columns={'cap_year': 'Capital Year'})
+
+        # Reorder: place PO and Department-related columns after 'id' when present
+        current_cols = list(df.columns)
+        new_order = []
+        if 'id' in current_cols:
+            new_order.append('id')
+        # Candidate names for PO/Department columns (after id)
+        candidates = ['PO', 'PO_id', 'Department', 'Department Name', 'department']
+        for c in candidates:
+            if c in current_cols and c not in new_order:
+                new_order.append(c)
+        # Append the rest of the columns preserving order
+        for c in current_cols:
+            if c not in new_order:
+                new_order.append(c)
+
+        # Reindex dataframe columns if any change
+        if new_order and new_order != current_cols:
+            # Only keep columns that exist (defensive)
+            new_order = [c for c in new_order if c in df.columns]
+            df = df.loc[:, new_order]
+
+    except Exception:
+        # Non-fatal: if any mapping fails, return df as-is
+        return df
+
+    return df
+
+
 @select_data.route('/select', methods=['GET', 'POST'])
 def select():
     conn = connect_local()
@@ -66,6 +160,8 @@ def select():
             # Prefer to show names instead of IDs in columns
             drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df.columns]
             df = df.drop(columns=drop_cols)
+            # Apply table-specific transforms (joins, renames, reorder)
+            df = transform_table(df, selected_option, cursor, cnxn)
             columns = df.columns.tolist()
             # Pagination
             total_rows = len(df)
@@ -102,6 +198,8 @@ def select():
                     df[new_col_name] = df[id_col].map(ref_dict)
             drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df.columns]
             df = df.drop(columns=drop_cols)
+            # Apply table-specific transforms (joins, renames, reorder)
+            df = transform_table(df, selected_option, cursor, cnxn)
             columns = df.columns.tolist()
             total_rows = len(df)
             total_pages = max(1, (total_rows + per_page - 1) // per_page)

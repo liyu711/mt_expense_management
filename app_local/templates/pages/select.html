@@ -113,6 +113,14 @@
                         {% endfor %}
                     </tr>
                 </thead>
+                <tfoot>
+                    <tr>
+                        {# Empty footer cells - DataTables will populate these with select filters #}
+                        {% for col in columns %}
+                        <th></th>
+                        {% endfor %}
+                    </tr>
+                </tfoot>
                 <tbody>
                     {% for row in data %}
                     <tr>
@@ -127,17 +135,45 @@
             <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
             <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
             <script>
-            // Initialize DataTable for the table with id data_table
+            // Initialize DataTable for the table with id data_table and add per-column select filters
             document.addEventListener('DOMContentLoaded', function() {
-                // Use jQuery to ensure DataTables loads correctly
                 $(document).ready(function() {
-                    $('#data_table').DataTable({
-                        // Customize as needed: pagination, searching, ordering are enabled by default
+                    var table = $('#data_table').DataTable({
                         paging: true,
                         searching: true,
                         ordering: true,
-                        // Adjust page length options if desired
-                        lengthMenu: [ [10, 25, 50, 100], [10, 25, 50, 100] ]
+                        lengthMenu: [ [10, 25, 50, 100], [10, 25, 50, 100] ],
+                        initComplete: function () {
+                            // Whitelist of columns that should get a select filter
+                            var allowedCols = ['Fiscal Year', 'cap_year', 'department', 'PO', 'category', 'category_id', 'Department', 'IO', 'Project Category'];
+                            // For each column, add a select filter in the footer only if the column is in the whitelist
+                            this.api().columns().every(function () {
+                                var column = this;
+                                var colTitle = $(column.header()).text().trim();
+                                // If this column is not in the allowed list, leave the footer cell empty
+                                if (allowedCols.indexOf(colTitle) === -1) {
+                                    $(column.footer()).empty();
+                                    return;
+                                }
+
+                                var footerCell = $(column.footer());
+                                // Create a select element
+                                var select = $('<select><option value="">(All)</option></select>')
+                                    .appendTo(footerCell.empty())
+                                    .on('change', function () {
+                                        var val = $.fn.dataTable.util.escapeRegex($(this).val());
+                                        // Use exact match when possible
+                                        column.search(val ? '^' + val + '$' : '', true, false).draw();
+                                    });
+
+                                // Populate the select with unique, sorted values from the column
+                                column.data().unique().sort().each(function (d, j) {
+                                    if (d === null || d === undefined) d = '';
+                                    var text = (typeof d === 'object') ? JSON.stringify(d) : d;
+                                    select.append('<option value="' + text + '">' + text + '</option>');
+                                });
+                            });
+                        }
                     });
                 });
             });
