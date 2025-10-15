@@ -126,7 +126,7 @@
                     <tr>
                     {% for item in row %}
                     {% set colname = columns[loop.index0] if columns|length > loop.index0 else '' %}
-                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname|lower == 'po' or colname|lower == 'io' or colname == 'Month' or colname|lower == 'month' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year') %}
+                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname == 'IO number' or colname == 'IO Number' or colname|lower == 'po' or colname|lower == 'io' or colname|lower == 'io number' or colname == 'Month' or colname|lower == 'month' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year' or colname == 'Capital Year' or colname|lower == 'capital year' or colname|lower == 'capital_year') %}
                         <td>{{ item|as_int }}</td>
                     {% else %}
                         <td>{{ item|one_decimal }}</td>
@@ -173,7 +173,7 @@
                                 lengthMenu: [ [10, 25, 50, 100], [10, 25, 50, 100] ],
                                 initComplete: function () {
                                     // Whitelist of columns that should get a select filter
-                                    var allowedCols = ['fiscal_year', 'cap_year', 'department', 'PO', 'category', 'category_id', 'Department', 'IO', 'Project Category'];
+                                    var allowedCols = ['fiscal_year', 'cap_year', 'department', 'PO', 'category', 'category_id', 'Department', 'IO', 'IO number', 'Project Category', 'Capital Year'];
                                     // For each column, add a select filter in the footer only if the column is in the whitelist
                                     this.api().columns().every(function () {
                                         var column = this;

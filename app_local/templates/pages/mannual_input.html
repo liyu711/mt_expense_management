@@ -148,7 +148,7 @@
                     </select>
                 </div>
                 <div class="form-group">
-                    <label for="Human_resource_FTE">Human Resource FTE</label>
+                    <label for="Human_resource_FTE">Working Time(FTE)</label>
                     <input type="number" step="0.1" name="Human_resource_FTE" id="Human_resource_FTE" value="0" onblur="if(this.value!==''){this.value = parseFloat(this.value).toFixed(1)}">
                 </div>
                 <div class="form-group">
@@ -184,7 +184,7 @@
                 <tr>
                     {% for item in row %}
                     {% set colname = pf_nonpc_columns[loop.index0] if pf_nonpc_columns|length > loop.index0 else '' %}
-                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname|lower == 'po' or colname|lower == 'io' or colname == 'Month' or colname|lower == 'month' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year') %}
+                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname == 'IO number' or colname == 'IO Number' or colname|lower == 'po' or colname|lower == 'io' or colname|lower == 'io number' or colname == 'Month' or colname|lower == 'month' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year' or colname == 'Capital Year' or colname|lower == 'capital year' or colname|lower == 'capital_year') %}
                         <td>{{ item|as_int }}</td>
                     {% else %}
                         <td>{{ item|one_decimal }}</td>

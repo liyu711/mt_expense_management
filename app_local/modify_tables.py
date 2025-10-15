@@ -267,14 +267,8 @@ def modify_table_router(action):
         db = connect_local()
         cursor, cnxn = db.connect_to_db()
         df_table = select_all_from_table(cursor, cnxn, config['table_name'])
-        # Apply the same table-specific transforms as select view so projects
-        # show project category name instead of category_id, and other renames
-        try:
-            df_table = transform_table(df_table, config['table_name'], cursor, cnxn)
-        except Exception:
-            # non-fatal: if transform fails, continue with raw df_table
-            pass
-        # Map id columns to names similarly to select_data
+        # Map id columns to names similarly to select_data (do this BEFORE transform_table
+        # so the select/modify views match the same column names and ordering)
         id_name_map = {
             'department_id': ('departments', 'id', 'name', 'Department'),
             'po_id': ('POs', 'id', 'name', 'PO'),
@@ -289,10 +283,17 @@ def modify_table_router(action):
                 ref_dict = dict(zip(ref_df[ref_id], ref_df[ref_name]))
                 df_table[new_col_name] = df_table[id_col].map(ref_dict)
         drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df_table.columns]
-        df_table = df_table.drop(columns=drop_cols)
-        # For projects table, rename 'name' -> 'Project Name' to match select view
-        if config['table_name'] == 'projects' and 'name' in df_table.columns:
-            df_table = df_table.rename(columns={'name': 'Project Name'})
+        if drop_cols:
+            df_table = df_table.drop(columns=drop_cols)
+
+        # Now apply the same table-specific transforms as select view so projects
+        # show project category name instead of category_id, and other renames
+        try:
+            df_table = transform_table(df_table, config['table_name'], cursor, cnxn)
+        except Exception:
+            # non-fatal: if transform fails, continue with raw df_table
+            pass
+
         columns = df_table.columns.tolist()
         data = df_table.values.tolist()
     except Exception:

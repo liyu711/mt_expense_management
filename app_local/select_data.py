@@ -57,6 +57,22 @@ def transform_table(df, table_name, cursor, cnxn):
             if 'funding_for' in df.columns:
                 df = df.rename(columns={'funding_for': 'Funding For'})
 
+        # capex_forecasts: friendly display names
+        if table_name == 'capex_forecasts':
+            if 'capex_description' in df.columns:
+                df = df.rename(columns={'capex_description': 'Description'})
+            if 'capex_forecast' in df.columns:
+                df = df.rename(columns={'capex_forecast': 'CapEx Forecast'})
+            if 'cost_center' in df.columns:
+                df = df.rename(columns={'cost_center': 'Cost Center'})
+
+        # capex_budgets: friendly display names
+        if table_name == 'capex_budgets':
+            if 'capex_description' in df.columns:
+                df = df.rename(columns={'capex_description': 'Description'})
+            if 'budget' in df.columns:
+                df = df.rename(columns={'budget': 'Budget'})
+
         # project_forecasts_nonpc: rename non_personnel_expense -> Non-personnel Expense
         if table_name == 'project_forecasts_nonpc' and 'non_personnel_expense' in df.columns:
             df = df.rename(columns={'non_personnel_expense': 'Non-personnel Expense'})
@@ -115,9 +131,9 @@ def transform_table(df, table_name, cursor, cnxn):
         if table_name in ('pos', 'POs') and 'name' in df.columns:
             df = df.rename(columns={'name': 'PO Name'})
 
-        # IOs: rename IO_num -> IO number
-        if table_name == 'IOs' and 'IO_num' in df.columns:
-            df = df.rename(columns={'IO_num': 'IO number'})
+        # IOs: rename IO_num -> IO Number (apply for 'IOs' and 'ios')
+        if table_name in ('IOs', 'ios') and 'IO_num' in df.columns:
+            df = df.rename(columns={'IO_num': 'IO Number'})
 
         # Global renames
         if 'fiscal_year' in df.columns:
