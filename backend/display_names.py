@@ -10,13 +10,13 @@ DISPLAY_NAMES = {
     # Additional common display names used in select pages
     'projects': 'Project List',
     'departments': 'Department List',
-    'POs': 'Purchase Orders',
-    'cost_elements': 'Cost Elements',
+    'POs': 'PO List',
+    'cost_elements': 'Cost Elements List',
     'project_categories': 'Project Categories',
     'co_object_names': 'CO Object Names',
     'IOs': 'List of IOs and Corresponding Projects',
     'IO_CE_connection': 'IO-CE Connection',
-    'human_resource_categories': 'Human Resource Categories and Unit Expenditure',
-    'human_resource_expense': 'Human Resource Categories',
+    'human_resource_categories': 'Staff Categories',
+    'human_resource_expense': 'Staff Cost(KCNY)',
     'concat': 'Concatenated View'
 }

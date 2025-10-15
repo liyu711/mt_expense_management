@@ -55,8 +55,8 @@ def transform_table(df, table_name, cursor, cnxn):
         # project_forecasts_pc: map human_resource_category_id -> Staff Category (name)
         if table_name == 'project_forecasts_pc':
             # rename FTE and personnel expense columns for display
-            if 'human_resource_fte' in df.columns:
-                df = df.rename(columns={'human_resource_fte': 'Working-hours(FTE)'})
+            if 'huamn_resource_fte' in df.columns:
+                df = df.rename(columns={'huamn_resource_fte': 'Working Time (FTE)'})
             if 'personnel_expense' in df.columns:
                 df = df.rename(columns={'personnel_expense': 'Personnel Expense'})
 
@@ -72,7 +72,7 @@ def transform_table(df, table_name, cursor, cnxn):
                 if 'Staff Category' in df.columns:
                     df = df.drop(columns=['name'])
                 else:
-                    df = df.rename(columns={'name': 'Staff Category'})
+                    df = df.rename(columns={'name': 'StaffW Category'})
 
         # expenses: map co_object_id -> Cost Element Name, drop cost_element_id, rename co_element_name
         if table_name == 'expenses':
@@ -90,6 +90,10 @@ def transform_table(df, table_name, cursor, cnxn):
         # project_categories: category -> Project Category
         if table_name == 'project_categories' and 'category' in df.columns:
             df = df.rename(columns={'category': 'Project Category'})
+
+        # human_resource_categories: rename name -> Staff Category
+        if table_name == 'human_resource_categories' and 'name' in df.columns:
+            df = df.rename(columns={'name': 'Staff Category'})
 
         # IOs: rename IO_num -> IO number
         if table_name == 'IOs' and 'IO_num' in df.columns:

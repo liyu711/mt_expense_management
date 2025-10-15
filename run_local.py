@@ -69,14 +69,14 @@ upload_pc_forecasts_local(df_pc)
 
 cnxn.commit()
 
-# upload_expenses_local(df_expense)
-# upload_budgets_local(df_budgets)
+upload_expenses_local(df_expense)
+upload_budgets_local(df_budgets)
 
-# upload_fundings_local(df_funding)
-# upload_capex_forecasts_local(df_capex_forecast)
+upload_fundings_local(df_funding)
+upload_capex_forecasts_local(df_capex_forecast)
 
-# upload_capex_budget_local(df_capex_budget)
-# upload_capex_expense_local(df_capex_expense)
+upload_capex_budget_local(df_capex_budget)
+upload_capex_expense_local(df_capex_expense)
 
 
 # upload_pc_forecasts_local_m(df_pc)
