@@ -3,6 +3,7 @@ from flask import Flask, flash, render_template, request, redirect, url_for, Blu
 from werkzeug.utils import secure_filename
 from backend.login import valid_login
 from backend.connect_local import connect_local, select_columns_from_table, select_all_from_table
+from app_local.select_data import transform_table
 
 from backend import \
     upload_nonpc_forecasts_local_m, upload_pc_forecasts_local_m,\
@@ -87,7 +88,7 @@ def render_mannual_input():
         'io_id': ('IOs', 'id', 'IO_num', 'IO'),
         'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
     }
-    def map_and_prepare(df):
+    def map_and_prepare(df, table_name=None):
         if df is None:
             return [], []
         try:
@@ -98,12 +99,17 @@ def render_mannual_input():
                     df[new_col_name] = df[id_col].map(ref_dict)
             drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df.columns]
             df2 = df.drop(columns=drop_cols)
+            # Apply the same transforms used in the select view so naming and ordering match
+            try:
+                df2 = transform_table(df2, table_name or '', cursor, cnxn)
+            except Exception:
+                pass
             return df2.columns.tolist(), df2.values.tolist()
         except Exception:
             return [], []
 
-    pf_nonpc_columns, pf_nonpc_data = map_and_prepare(df_nonpc)
-    pf_pc_columns, pf_pc_data = map_and_prepare(df_pc)
+    pf_nonpc_columns, pf_nonpc_data = map_and_prepare(df_nonpc, 'project_forecasts_nonpc')
+    pf_pc_columns, pf_pc_data = map_and_prepare(df_pc, 'project_forecasts_pc')
 
     return render_template("pages/mannual_input.html", 
                            input_types = input_types, 

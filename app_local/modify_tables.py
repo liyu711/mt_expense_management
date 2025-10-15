@@ -5,6 +5,7 @@ from backend import upload_budgets_local
 import pandas as pd
 import os
 from backend.connect_local import connect_local, select_all_from_table
+from app_local.select_data import transform_table
 
 modify_tables = Blueprint('modify_tables', __name__, template_folder='templates')
 
@@ -266,6 +267,13 @@ def modify_table_router(action):
         db = connect_local()
         cursor, cnxn = db.connect_to_db()
         df_table = select_all_from_table(cursor, cnxn, config['table_name'])
+        # Apply the same table-specific transforms as select view so projects
+        # show project category name instead of category_id, and other renames
+        try:
+            df_table = transform_table(df_table, config['table_name'], cursor, cnxn)
+        except Exception:
+            # non-fatal: if transform fails, continue with raw df_table
+            pass
         # Map id columns to names similarly to select_data
         id_name_map = {
             'department_id': ('departments', 'id', 'name', 'Department'),
@@ -282,6 +290,9 @@ def modify_table_router(action):
                 df_table[new_col_name] = df_table[id_col].map(ref_dict)
         drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df_table.columns]
         df_table = df_table.drop(columns=drop_cols)
+        # For projects table, rename 'name' -> 'Project Name' to match select view
+        if config['table_name'] == 'projects' and 'name' in df_table.columns:
+            df_table = df_table.rename(columns={'name': 'Project Name'})
         columns = df_table.columns.tolist()
         data = df_table.values.tolist()
     except Exception:

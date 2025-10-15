@@ -33,6 +33,9 @@ def transform_table(df, table_name, cursor, cnxn):
             df['Project Category'] = df['category_id'].map(ref_dict)
             if 'category_id' in df.columns:
                 df = df.drop(columns=['category_id'])
+        # For projects table, rename 'name' -> 'Project Name' for display consistency
+        if table_name == 'projects' and 'name' in df.columns:
+            df = df.rename(columns={'name': 'Project Name'})
 
         # departments: rename name -> Department Name
         if table_name == 'departments' and 'name' in df.columns:
@@ -44,6 +47,32 @@ def transform_table(df, table_name, cursor, cnxn):
                 df = df.rename(columns={'human_resource_expense': 'Personnel Budget'})
             if 'non_personnel_expense' in df.columns:
                 df = df.rename(columns={'non_personnel_expense': 'Non-personnel Budget'})
+
+        # project_forecasts_nonpc: rename non_personnel_expense -> Non-personnel Expense
+        if table_name == 'project_forecasts_nonpc' and 'non_personnel_expense' in df.columns:
+            df = df.rename(columns={'non_personnel_expense': 'Non-personnel Expense'})
+
+        # project_forecasts_pc: map human_resource_category_id -> Staff Category (name)
+        if table_name == 'project_forecasts_pc':
+            # rename FTE and personnel expense columns for display
+            if 'human_resource_fte' in df.columns:
+                df = df.rename(columns={'human_resource_fte': 'Working-hours(FTE)'})
+            if 'personnel_expense' in df.columns:
+                df = df.rename(columns={'personnel_expense': 'Personnel Expense'})
+
+            if 'human_resource_category_id' in df.columns:
+                ref_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+                # expect ref_df has 'id' and 'name'
+                ref_dict = dict(zip(ref_df['id'], ref_df['name']))
+                df['Staff Category'] = df['human_resource_category_id'].map(ref_dict)
+                # drop the id column to prefer friendly name display
+                df = df.drop(columns=['human_resource_category_id'])
+            # If the DataFrame itself has a 'name' column (ambiguous), prefer Staff Category label
+            if 'name' in df.columns:
+                if 'Staff Category' in df.columns:
+                    df = df.drop(columns=['name'])
+                else:
+                    df = df.rename(columns={'name': 'Staff Category'})
 
         # expenses: map co_object_id -> Cost Element Name, drop cost_element_id, rename co_element_name
         if table_name == 'expenses':
@@ -71,27 +100,101 @@ def transform_table(df, table_name, cursor, cnxn):
             df = df.rename(columns={'fiscal_year': 'Fiscal Year'})
         if 'cap_year' in df.columns:
             df = df.rename(columns={'cap_year': 'Capital Year'})
-
         # Reorder: place PO and Department-related columns after 'id' when present
         current_cols = list(df.columns)
-        new_order = []
-        if 'id' in current_cols:
-            new_order.append('id')
-        # Candidate names for PO/Department columns (after id)
-        candidates = ['PO', 'PO_id', 'Department', 'Department Name', 'department']
-        for c in candidates:
-            if c in current_cols and c not in new_order:
-                new_order.append(c)
-        # Append the rest of the columns preserving order
-        for c in current_cols:
-            if c not in new_order:
-                new_order.append(c)
 
-        # Reindex dataframe columns if any change
-        if new_order and new_order != current_cols:
-            # Only keep columns that exist (defensive)
-            new_order = [c for c in new_order if c in df.columns]
-            df = df.loc[:, new_order]
+        # Special-case reorder for project_forecasts_nonpc:
+        # Put Department (or Department Name), then IO, then Project Category directly after id
+        if table_name == 'project_forecasts_nonpc':
+            new_order = []
+            if 'id' in current_cols:
+                new_order.append('id')
+
+            # Prefer the display name if present
+            dept_candidates = ['Department Name', 'Department', 'department']
+            dept = next((c for c in dept_candidates if c in current_cols), None)
+            io_candidates = ['IO', 'IO number']
+            io_col = next((c for c in io_candidates if c in current_cols), None)
+            pc_col = 'Project Category' if 'Project Category' in current_cols else None
+
+            if dept and dept not in new_order:
+                new_order.append(dept)
+            if io_col and io_col not in new_order:
+                new_order.append(io_col)
+            if pc_col and pc_col not in new_order:
+                new_order.append(pc_col)
+
+            # Append remaining columns preserving original order
+            for c in current_cols:
+                if c not in new_order:
+                    new_order.append(c)
+
+            if new_order and new_order != current_cols:
+                new_order = [c for c in new_order if c in df.columns]
+                df = df.loc[:, new_order]
+        # Special-case reorder for project_forecasts_pc: place IO, Project, Project Category, Staff Category after Fiscal Year
+        elif table_name == 'project_forecasts_pc':
+            # We'll keep original order up to Fiscal Year (inclusive), then inject the desired columns,
+            # then append the remaining columns in original order.
+            desired_after_fy = ['IO', 'IO number', 'Project', 'Project Category', 'Staff Category']
+            # prefer display name 'Fiscal Year' but fall back to raw 'fiscal_year' if necessary
+            fy_name = 'Fiscal Year' if 'Fiscal Year' in current_cols else ('fiscal_year' if 'fiscal_year' in current_cols else None)
+            new_order = []
+            if fy_name:
+                # append columns up to and including Fiscal Year
+                for c in current_cols:
+                    new_order.append(c)
+                    if c == fy_name:
+                        break
+                # Before inserting IO/Project/etc, ensure PO and Department (if present)
+                # are preserved and placed before the injected block so they are not moved behind.
+                po_col = next((c for c in ['PO', 'PO_id'] if c in current_cols), None)
+                dept_col = next((c for c in ['Department Name', 'Department', 'department'] if c in current_cols), None)
+                if po_col and po_col not in new_order:
+                    new_order.append(po_col)
+                if dept_col and dept_col not in new_order:
+                    new_order.append(dept_col)
+
+                # then append desired cols (choose the first matching variant for IO)
+                io_col = next((c for c in ['IO', 'IO number'] if c in current_cols), None)
+                if io_col and io_col not in new_order:
+                    new_order.append(io_col)
+                if 'Project' in current_cols and 'Project' not in new_order:
+                    new_order.append('Project')
+                if 'Project Category' in current_cols and 'Project Category' not in new_order:
+                    new_order.append('Project Category')
+                if 'Staff Category' in current_cols and 'Staff Category' not in new_order:
+                    new_order.append('Staff Category')
+            else:
+                # if no Fiscal Year present, fall back to generic behavior
+                if 'id' in current_cols:
+                    new_order.append('id')
+            # Append the rest preserving order
+            for c in current_cols:
+                if c not in new_order:
+                    new_order.append(c)
+            if new_order and new_order != current_cols:
+                new_order = [c for c in new_order if c in df.columns]
+                df = df.loc[:, new_order]
+        else:
+            new_order = []
+            if 'id' in current_cols:
+                new_order.append('id')
+            # Candidate names for PO/Department columns (after id)
+            candidates = ['PO', 'PO_id', 'Department', 'Department Name', 'department']
+            for c in candidates:
+                if c in current_cols and c not in new_order:
+                    new_order.append(c)
+            # Append the rest of the columns preserving order
+            for c in current_cols:
+                if c not in new_order:
+                    new_order.append(c)
+
+            # Reindex dataframe columns if any change
+            if new_order and new_order != current_cols:
+                # Only keep columns that exist (defensive)
+                new_order = [c for c in new_order if c in df.columns]
+                df = df.loc[:, new_order]
 
     except Exception:
         # Non-fatal: if any mapping fails, return df as-is
