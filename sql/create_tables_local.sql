@@ -63,8 +63,15 @@ CREATE TABLE IO_CE_connection(
 
 CREATE TABLE human_resource_categories(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    value FLOAT NOT NULL
+    name TEXT NOT NULL
+);
+
+CREATE TABLE human_resource_cost(
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER,
+    cost REAL,
+    year INTEGER,
+    FOREIGN KEY (category_id) REFERENCES human_resource_categories(id)
 );
 
 CREATE TABLE project_forecasts_nonpc(

@@ -62,10 +62,20 @@ modify_table_config = {
         'table_name': 'human_resource_categories',
         'fields': [
             {'name': 'category', 'type': 'text', 'label': 'Staff Category'},
-            {'name': 'expense', 'type': 'number', 'label': 'Unit Expense'}
         ],
         'merge_on': 'name',
-        'columns': ['name', 'value']
+        'columns': ['name']
+    },
+    'modify_staff_cost': {
+        'title': 'Modify Staff Cost',
+        'table_name': 'human_resource_cost',
+        'fields': [
+            {'name': 'staff_category', 'type': 'select', 'label': 'Staff Category', 'options': []},
+            {'name': 'year', 'type': 'select', 'label': 'Year', 'options': []},
+            {'name': 'cost', 'type': 'number', 'label': 'Cost'}
+        ],
+        'merge_on': 'category_id',
+        'columns': ['category_id', 'year', 'cost']
     },
     'add_user': {
         'title': 'Add User',
@@ -202,6 +212,16 @@ def modify_table_router(action):
         for field in config['fields']:
             if field['name'] == 'category' and field['type'] == 'select':
                 field['options'] = options
+
+    # If this is the modify_staff_cost form, populate staff category and year options
+    if action == 'modify_staff_cost':
+        staff_options = fetch_options('human_resource_categories', 'name')
+        year_options = [str(y) for y in range(2020, 2031)]
+        for field in config['fields']:
+            if field['name'] == 'staff_category' and field['type'] == 'select':
+                field['options'] = staff_options
+            if field['name'] == 'year' and field['type'] == 'select':
+                field['options'] = year_options
 
     # If this is the modify_io form, fetch project names for dropdown
     if action == 'modify_io':

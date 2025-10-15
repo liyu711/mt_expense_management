@@ -84,7 +84,8 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
     df_upload_fin.drop(['IO', 'IO_num', 'project_id_y'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'io_id', 'project_id_x': 'project_id'}, inplace=True)
     df_upload_fin = pd.merge(df_upload_fin, pos_merged, left_on='PO', right_on='name', how='left')
-    df_upload_fin.drop(['PO', 'name', 'value'], axis=1, inplace=True)
+    # df_upload_fin.drop(['PO', 'name', 'value'], axis=1, inplace=True)
+    df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'po_id', 'Fiscal Year': 'fiscal_year'}, inplace=True)
     
     df_upload_fin.rename(columns={'Human resource FTE': 'huamn_resource_fte', 'Personnel cost': 'personnel_expense'}, inplace=True)

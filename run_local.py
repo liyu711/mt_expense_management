@@ -59,13 +59,15 @@ department_row = add_entry(df_department, 'departments',['category'], 'name')
 po_row = add_entry(df_po, "pos", ['name'], 'name')
 category_row = add_entry(df_project_category, "project_categories", ['category'], 'category')
 projects_row = add_entry(df_projects, "projects", ['name', 'category_id'], 'name')
-add_entry(df_hr, "human_resource_categories", ['name', 'value'], 'name')
+add_entry(df_hr, "human_resource_categories", ['name'], 'name')
 add_entry(df_io, "ios", ['IO_num', 'project_id'], 'IO_num')
 
 # io_row = add_entry(df_io, 'ios', )
 
 upload_nonpc_forecasts_local(df_nonpc)
 upload_pc_forecasts_local(df_pc)
+
+cnxn.commit()
 
 # upload_expenses_local(df_expense)
 # upload_budgets_local(df_budgets)

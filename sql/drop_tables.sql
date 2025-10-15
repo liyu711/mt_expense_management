@@ -9,7 +9,7 @@ drop table if exists expenses;
 drop table if exists capex_budgets;
 drop table if exists capex_expenses;
 drop table if exists capex_forecasts;
-drop table if exists human_resource_expense;
+drop table if exists human_resource_cost;
 drop table if exists human_resource_categories;
 drop table if exists IO_CE_connection;
 

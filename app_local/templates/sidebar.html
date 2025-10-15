@@ -6,6 +6,7 @@
         </div>
         <div class="nav-sublinks collapsible-content" id="admin-options-content" style="display:none;">
             <div class="nav-link nav-subgroup-title">Modify Attribute Tables</div>
+            <a href="/home" class="nav-link nav-sublink{% if request.path == '/home' %} active{% endif %}">Home</a>
             <a href="/modify_department" class="nav-link nav-sublink{% if request.path == '/modify_department' %} active{% endif %}">Department</a>
             <a href="/modify_po" class="nav-link nav-sublink{% if request.path == '/modify_po' %} active{% endif %}">PO</a>
             <a href="/modify_porject_category" class="nav-link nav-sublink{% if request.path == '/modify_porject_category' %} active{% endif %}">Project Category</a>
@@ -18,7 +19,7 @@
     </div>
     <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="create-options-toggle">
-            Create Expense Forecast
+            Create Forecast
             <span class="collapse-arrow" id="create-arrow">&#9654;</span>
         </div>
         <div class="nav-sublinks collapsible-content" id="create-options-content" style="display:none;">
@@ -52,7 +53,16 @@
     </div>
 
     <!-- Remaining links moved to end -->
-    <a href="/file_upload" class="nav-link{% if request.path == '/file_upload' %} active{% endif %}" id="nav-file-upload">Upload actual expenditures or history files</a>
+    <div class="nav-group">
+        <div class="nav-link nav-group-title collapsible" id="finance-toggle">
+            Finance
+            <span class="collapse-arrow" id="finance-arrow">&#9654;</span>
+        </div>
+        <div class="nav-sublinks collapsible-content" id="finance-content" style="display:none;">
+            <a href="/modify_staff_cost" class="nav-link nav-sublink{% if request.path == '/modify_staff_cost' %} active{% endif %}">Modify Staff Cost</a>
+            <a href="/file_upload" class="nav-link nav-sublink{% if request.path == '/file_upload' %} active{% endif %}" id="nav-file-upload">Upload actual expenditures or history files</a>
+        </div>
+    </div>
     <div class="nav-group">
         <div class="nav-link nav-group-title">Display department projects</div>
         <a href="/view_department_projects" class="nav-link nav-sublink{% if request.path == '/view_department_projects' %} active{% endif %}">View project as table</a>
@@ -161,6 +171,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target === dataVizToggle || e.target === dataVizArrow) {
                 var isExpanded = dataVizContent.style.display === 'block';
                 setDataVizState(!isExpanded);
+            }
+        });
+    }
+
+    // Finance collapsible
+    var financeToggle = document.getElementById('finance-toggle');
+    var financeContent = document.getElementById('finance-content');
+    var financeArrow = document.getElementById('finance-arrow');
+    var financeExpanded = localStorage.getItem('financeExpanded') === 'true';
+    function setFinanceState(expanded) {
+        if (expanded) {
+            financeContent.style.display = 'block';
+            financeArrow.style.transform = 'rotate(90deg)';
+        } else {
+            financeContent.style.display = 'none';
+            financeArrow.style.transform = 'rotate(0deg)';
+        }
+        localStorage.setItem('financeExpanded', expanded);
+    }
+    if (financeToggle && financeContent && financeArrow) {
+        setFinanceState(financeExpanded);
+        financeArrow.style.transition = 'transform 0.2s';
+        financeToggle.addEventListener('click', function(e) {
+            if (e.target === financeToggle || e.target === financeArrow) {
+                var isExpanded = financeContent.style.display === 'block';
+                setFinanceState(!isExpanded);
             }
         });
     }
