@@ -88,7 +88,7 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
     df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'po_id', 'Fiscal Year': 'fiscal_year'}, inplace=True)
     
-    df_upload_fin.rename(columns={'Human resource FTE': 'huamn_resource_fte', 'Personnel cost': 'personnel_expense'}, inplace=True)
+    df_upload_fin.rename(columns={'Human resource FTE': 'human_resource_fte', 'Personnel cost': 'personnel_expense'}, inplace=True)
     # df_upload_fin['fiscal_year'] =pd.to_datetime(df_upload_fin['fiscal_year'], format='%Y')
     # df_upload_fin.to_sql("project_forecasts_pc", con=engine, if_exists='append', index=False)
     # close_connection(cursor, cnxn)

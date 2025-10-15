@@ -118,6 +118,20 @@ modify_table_config = {
         'merge_on': 'IO_num',
         'columns': ['IO_num', 'project_id']
     },
+    'modify_funding': {
+        'title': 'Modify Funding',
+        'table_name': 'fundings',
+        'fields': [
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []},
+            {'name': 'funding', 'type': 'number', 'label': 'Funding (K CNY)'},
+            {'name': 'funding_from', 'type': 'text', 'label': 'Funding From'},
+            {'name': 'funding_for', 'type': 'text', 'label': 'Funding For'}
+        ],
+        'merge_on': 'funding',
+        'columns': ['po_id', 'department_id', 'fiscal_year', 'funding', 'funding_from', 'funding_for']
+    },
     'capex_forecast': {
         'title': 'Capex Forecast',
         'table_name': 'capex_forecasts',
@@ -181,6 +195,19 @@ def modify_table_router(action):
             if field['name'] == 'department':
                 field['options'] = dept_options
             if field['name'] == 'fiscal_year':
+                field['options'] = year_options
+
+    # Populate dropdowns for modify_funding (PO, Department, Fiscal Year)
+    if action == 'modify_funding':
+        po_options = fetch_options('pos', 'name')
+        dept_options = fetch_options('departments', 'name')
+        year_options = [str(y) for y in range(2020, 2031)]
+        for field in config['fields']:
+            if field['name'] == 'po' and field.get('type') == 'select':
+                field['options'] = po_options
+            if field['name'] == 'department' and field.get('type') == 'select':
+                field['options'] = dept_options
+            if field['name'] == 'fiscal_year' and field.get('type') == 'select':
                 field['options'] = year_options
 
     # Populate dropdowns for capex_forecast and capex_budget
@@ -258,6 +285,42 @@ def modify_table_router(action):
         else:
             # Default: use add_entry for other actions
             df_upload = pd.DataFrame([row])
+            # Special handling for modify_funding: map PO and Department names to their local ids
+            if action == 'modify_funding':
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    pos_df = select_all_from_table(cursor, cnxn, 'pos')
+                    dept_df = select_all_from_table(cursor, cnxn, 'departments')
+                    po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+                    dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+                    # create id columns
+                    df_upload['po_id'] = df_upload.get('po').map(po_map) if 'po' in df_upload.columns else None
+                    df_upload['department_id'] = df_upload.get('department').map(dept_map) if 'department' in df_upload.columns else None
+                    # ensure fiscal_year is int when possible
+                    if 'fiscal_year' in df_upload.columns:
+                        try:
+                            df_upload['fiscal_year'] = df_upload['fiscal_year'].astype(int)
+                        except Exception:
+                            pass
+                    # reorder/keep only the expected columns for the fundings table
+                    expected_cols = modify_table_config.get(action).get('columns', [])
+                    # Only keep columns that exist in df_upload to avoid KeyError
+                    keep_cols = [c for c in expected_cols if c in df_upload.columns]
+                    if keep_cols:
+                        df_upload = df_upload[keep_cols]
+                except Exception:
+                    # Fallback: try a simple rename if mapping failed
+                    try:
+                        df_upload.rename(columns={'po': 'po_id', 'department': 'department_id'}, inplace=True)
+                        if 'fiscal_year' in df_upload.columns:
+                            try:
+                                df_upload['fiscal_year'] = df_upload['fiscal_year'].astype(int)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
             merge_columns = modify_table_config.get(action).get('columns', list(row.keys()))
             merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
             res = add_entry(df_upload, table_name, merge_columns, merge_on)
