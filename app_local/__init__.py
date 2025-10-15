@@ -25,6 +25,31 @@ app.register_blueprint(modify_tables)
 app.register_blueprint(data_vis)
 
 
+# Jinja filter to render numbers with 1 decimal when possible
+def one_decimal(value):
+    try:
+        # attempt to coerce to float
+        n = float(value)
+        # format with one decimal and return as string
+        return f"{n:.1f}"
+    except Exception:
+        # not a number, return as-is
+        return value
+
+app.jinja_env.filters['one_decimal'] = one_decimal
+
+
+def as_int(value):
+    try:
+        # Coerce to float first (handles numeric strings), then to int
+        n = float(value)
+        return str(int(n))
+    except Exception:
+        return value
+
+app.jinja_env.filters['as_int'] = as_int
+
+
 @app.route('/', methods=['GET', 'POST'])
 def login():
     error = None

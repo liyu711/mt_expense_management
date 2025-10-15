@@ -67,7 +67,7 @@
                             {% endfor %}
                         </select>
                     {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
-                        <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" required>
+                        <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" required{% if field.type == 'number' %} step="0.1" onblur="if(this.value!==''){this.value = parseFloat(this.value).toFixed(1)}"{% endif %}>
                     {% endif %}
                 </div>
             {% endfor %}
@@ -118,7 +118,12 @@
                             {% for row in data %}
                             <tr>
                                 {% for item in row %}
-                                <td>{{ item }}</td>
+                                {% set colname = columns[loop.index0] if columns|length > loop.index0 else '' %}
+                                {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname|lower == 'po' or colname|lower == 'io') %}
+                                    <td>{{ item|as_int }}</td>
+                                {% else %}
+                                    <td>{{ item|one_decimal }}</td>
+                                {% endif %}
                                 {% endfor %}
                             </tr>
                             {% endfor %}

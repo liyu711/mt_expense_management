@@ -1,5 +1,5 @@
 
-from flask import Flask, flash, render_template, request, redirect, url_for, Blueprint
+from flask import Flask, flash, render_template, request, redirect, url_for, Blueprint, jsonify
 from werkzeug.utils import secure_filename
 from backend.login import valid_login
 from backend.connect_local import connect_local, select_columns_from_table, select_all_from_table
@@ -121,6 +121,53 @@ def render_mannual_input():
                            pf_pc_columns=pf_pc_columns,
                            pf_pc_data=pf_pc_data
                            )
+
+
+@manual_upload.route('/api/hr_cost', methods=['GET'])
+def api_hr_cost():
+    """Return the cost for a given human resource category name and year.
+    Query params: category (name), year (int)
+    Returns JSON: {"cost": <float>|null}
+    """
+    category = request.args.get('category')
+    year = request.args.get('year')
+    if not category or not year:
+        return jsonify({'cost': None}), 200
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        # find category id
+        cursor.execute("SELECT id FROM human_resource_categories WHERE name = ?", (category,))
+        row = cursor.fetchone()
+        if not row:
+            return jsonify({'cost': None}), 200
+        category_id = row[0]
+        # find cost for that category and year
+        try:
+            cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (category_id, int(year)))
+            r2 = cursor.fetchone()
+        except Exception:
+            r2 = None
+
+        # Fallback: some rows may have category_id stored as the category name (string). Try that too.
+        if not r2:
+            try:
+                cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (category, int(year)))
+                r2 = cursor.fetchone()
+            except Exception:
+                r2 = None
+
+        if not r2:
+            return jsonify({'cost': None}), 200
+        return jsonify({'cost': r2[0]}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try:
+            cursor.close()
+            cnxn.close()
+        except:
+            pass
 
 
 @manual_upload.route("/upload_forecast_nonpc", methods=['POST'])

@@ -124,9 +124,14 @@
                 <tbody>
                     {% for row in data %}
                     <tr>
-                        {% for item in row %}
-                        <td>{{ item }}</td>
-                        {% endfor %}
+                    {% for item in row %}
+                    {% set colname = columns[loop.index0] if columns|length > loop.index0 else '' %}
+                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname|lower == 'po' or colname|lower == 'io') %}
+                        <td>{{ item|as_int }}</td>
+                    {% else %}
+                        <td>{{ item|one_decimal }}</td>
+                    {% endif %}
+                    {% endfor %}
                     </tr>
                     {% endfor %}
                 </tbody>
