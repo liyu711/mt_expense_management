@@ -48,6 +48,15 @@ def transform_table(df, table_name, cursor, cnxn):
             if 'non_personnel_expense' in df.columns:
                 df = df.rename(columns={'non_personnel_expense': 'Non-personnel Budget'})
 
+        # fundings: friendly column names
+        if table_name == 'fundings':
+            if 'funding' in df.columns:
+                df = df.rename(columns={'funding': 'Funding'})
+            if 'funding_from' in df.columns:
+                df = df.rename(columns={'funding_from': 'Funding From'})
+            if 'funding_for' in df.columns:
+                df = df.rename(columns={'funding_for': 'Funding For'})
+
         # project_forecasts_nonpc: rename non_personnel_expense -> Non-personnel Expense
         if table_name == 'project_forecasts_nonpc' and 'non_personnel_expense' in df.columns:
             df = df.rename(columns={'non_personnel_expense': 'Non-personnel Expense'})
@@ -74,18 +83,25 @@ def transform_table(df, table_name, cursor, cnxn):
                 else:
                     df = df.rename(columns={'name': 'StaffW Category'})
 
-        # expenses: map co_object_id -> Cost Element Name, drop cost_element_id, rename co_element_name
+        # expenses: map co_object_id -> CO Object Name, drop cost_element_id, rename co_element_name
         if table_name == 'expenses':
             if 'co_object_id' in df.columns:
                 ref_df = select_all_from_table(cursor, cnxn, 'co_object_names')
                 # expect ref_df has 'id' and 'name'
                 ref_dict = dict(zip(ref_df['id'], ref_df['name']))
-                df['Cost Element Name'] = df['co_object_id'].map(ref_dict)
+                df['CO Object Name'] = df['co_object_id'].map(ref_dict)
                 df = df.drop(columns=['co_object_id'])
             if 'cost_element_id' in df.columns:
                 df = df.drop(columns=['cost_element_id'])
             if 'co_element_name' in df.columns:
-                df = df.rename(columns={'co_element_name': 'Cost Element Name'})
+                df = df.rename(columns={'co_element_name': 'CO Object Name'})
+            # Display-friendly names for expenses table
+            if 'from_period' in df.columns:
+                # rename the period column to Month for display
+                df = df.rename(columns={'from_period': 'Month'})
+            if 'expense_value' in df.columns:
+                # rename expense value to Expenditure
+                df = df.rename(columns={'expense_value': 'Expenditure'})
 
         # project_categories: category -> Project Category
         if table_name == 'project_categories' and 'category' in df.columns:
@@ -94,6 +110,10 @@ def transform_table(df, table_name, cursor, cnxn):
         # human_resource_categories: rename name -> Staff Category
         if table_name == 'human_resource_categories' and 'name' in df.columns:
             df = df.rename(columns={'name': 'Staff Category'})
+
+        # pos/POs: rename name -> PO Name for PO display
+        if table_name in ('pos', 'POs') and 'name' in df.columns:
+            df = df.rename(columns={'name': 'PO Name'})
 
         # IOs: rename IO_num -> IO number
         if table_name == 'IOs' and 'IO_num' in df.columns:
