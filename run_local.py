@@ -230,13 +230,6 @@ upload_capex_forecasts_local(df_capex_forecast)
 upload_capex_budget_local(df_capex_budget)
 upload_capex_expense_local(df_capex_expense)
 
-
-# upload_pc_forecasts_local_m(df_pc)
-# upload_budgets_local_m(df_budgets)
-# upload_capex_forecast_m(df_capex_forecast)
-# upload_capex_budgets_local_m(df_capex_budget)
-
-
 def temp_get_all_table_columns():
     cursor.execute("SELECT name FROM sqlite_master WHERE type='table';")
     tables = cursor.fetchall()
