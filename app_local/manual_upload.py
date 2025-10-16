@@ -11,7 +11,6 @@ from backend import \
     upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local
 from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_df, upload_nonpc_forecasts_local_m
 import pandas as pd
-import os
 
 manual_upload = Blueprint('manual_upload', __name__, template_folder='templates')
 input_types = [
@@ -63,8 +62,60 @@ titles = {
 def render_mannual_input():
     conn = connect_local()
     engine, cursor, cnxn = conn.connect_to_db(engine=True)
-    departments = select_all_from_table(cursor, cnxn, 'departments')['name']
-    po = select_all_from_table(cursor, cnxn, 'pos')['name']
+    # load departments with their po_id so the UI can filter departments by selected PO
+    depts_df = select_all_from_table(cursor, cnxn, 'departments')
+    if depts_df is None:
+        departments = []
+    else:
+        departments = []
+        # iterate defensively over rows and normalize keys
+        for _, r in depts_df.iterrows():
+            name = None
+            if 'name' in r.index and pd.notna(r['name']):
+                name = r['name']
+            elif 'Department' in r.index and pd.notna(r['Department']):
+                name = r['Department']
+            elif 'Name' in r.index and pd.notna(r['Name']):
+                name = r['Name']
+
+            # try several possible column names for po id
+            po_id = None
+            for key in ('po_id', 'PO_id', 'poId', 'po', 'PO'):
+                if key in r.index and pd.notna(r[key]):
+                    try:
+                        po_id = int(r[key])
+                    except Exception:
+                        try:
+                            po_id = int(str(r[key]))
+                        except Exception:
+                            po_id = None
+                    break
+
+            dept_id = None
+            if 'id' in r.index and pd.notna(r['id']):
+                try:
+                    dept_id = int(r['id'])
+                except Exception:
+                    dept_id = None
+
+            departments.append({'id': dept_id, 'name': name, 'po_id': po_id})
+
+    # load POs as list of objects with id & name so template can expose data-po-id
+    pos_df = select_all_from_table(cursor, cnxn, 'pos')
+    if pos_df is None:
+        po = []
+    else:
+        po = []
+        for _, r in pos_df.iterrows():
+            pname = r['name'] if 'name' in r.index and pd.notna(r['name']) else (r.get('Name') if 'Name' in r.index else None)
+            pid = None
+            if 'id' in r.index and pd.notna(r['id']):
+                try:
+                    pid = int(r['id'])
+                except Exception:
+                    pid = None
+            po.append({'id': pid, 'name': pname})
+
     io = select_all_from_table(cursor, cnxn, "ios")['IO_num']
     projects = select_all_from_table(cursor, cnxn, 'projects')['name']
     project_categories = select_all_from_table(cursor, cnxn, "project_categories")['category']

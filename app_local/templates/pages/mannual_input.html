@@ -86,10 +86,10 @@
             <form method="POST" action="/upload_forecast" id="upload_forecast">
                 <div class="form-group">
                     <label for="PO">PO</label>
-                    <select name="PO" required>
+                    <select name="PO" id="po_select" required>
                         <option value="">Select PO</option>
                         {% for po in pos %}
-                        <option value="{{ po }}">{{ po }}</option>
+                        <option value="{{ po.name }}" data-po-id="{{ po.id }}">{{ po.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -104,10 +104,11 @@
                 </div>
                 <div class="form-group">
                     <label for="Department">Department</label>
-                    <select name="Department" required>
+                    <select name="Department" id="department_select" required>
                         <option value="">Select Department</option>
                         {% for dept in departments %}
-                        <option value="{{ dept }}">{{ dept }}</option>
+                        {# dept is dict with keys id, name, po_id #}
+                        <option value="{{ dept.name }}" data-po-id="{{ dept.po_id }}">{{ dept.name }}</option>
                         {% endfor %}
                     </select>
                 </div>
@@ -250,6 +251,43 @@
         modalCancel && modalCancel.addEventListener('click', closeModal);
         document.addEventListener('keydown', function(e){ if(e.key==='Escape') closeModal(); });
     });
+    </script>
+    <script>
+    // Filter departments based on selected PO
+    (function(){
+        function filterDepartments(){
+            var poSelect = document.getElementById('po_select');
+            var deptSelect = document.getElementById('department_select');
+            if(!poSelect || !deptSelect) return;
+            var selectedPoId = poSelect.options[poSelect.selectedIndex] ? poSelect.options[poSelect.selectedIndex].getAttribute('data-po-id') : null;
+            // iterate all dept options and show/hide
+            for(var i=0;i<deptSelect.options.length;i++){
+                var opt = deptSelect.options[i];
+                var optPo = opt.getAttribute('data-po-id');
+                // keep the placeholder option
+                if(opt.value === ''){ opt.style.display = ''; continue; }
+                if(!selectedPoId || selectedPoId === '' || optPo === null || optPo === '' ){
+                    // if no PO selected, show all departments
+                    opt.style.display = '';
+                } else {
+                    // compare as strings
+                    if(String(optPo) === String(selectedPoId)){
+                        opt.style.display = '';
+                    } else {
+                        opt.style.display = 'none';
+                        // if the currently selected option is hidden, reset selection
+                        if(deptSelect.value === opt.value){ deptSelect.value = ''; }
+                    }
+                }
+            }
+        }
+        var poSelectEl = document.getElementById('po_select');
+        if(poSelectEl) poSelectEl.addEventListener('change', filterDepartments);
+        // initial filter on load
+        document.addEventListener('DOMContentLoaded', filterDepartments);
+        // also run after DataTables init
+        setTimeout(filterDepartments, 50);
+    })();
     </script>
     <script>
     (function(){

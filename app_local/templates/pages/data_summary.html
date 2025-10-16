@@ -10,15 +10,90 @@
     <div style="margin-left:50px;padding:20px;">
         <h2 style="margin-top:20px;">Expense Summary</h2>
         <form method="POST" id="summaryForm">
-            <label for="table_name">Choose PO</label>
-            <select name="table_name" id="table_name">
-                <option value="">-- select --</option>
-                {% for t in tables %}
-                <option value="{{ t }}" {% if selected_table == t %}seleccted{% endif %}>{{ display_names.get(t, t) }}</option>
-                {% endfor %}
+            <label for="po">Choose PO</label>
+            <select name="po" id="po">
+                <option value="">-- select PO --</option>
+                <option value="All" {% if selected_po == 'All' %}selected{% endif %}>All</option>
+                {% if pos %}
+                    {% for p in pos %}
+                        <option value="{{ p.name }}" data-po-id="{{ p.id }}" {% if selected_po and selected_po == p.name %}selected{% endif %}>{{ p.name }}</option>
+                    {% endfor %}
+                {% endif %}
             </select>
-            <button type="submit">Show summary</button>
-        </form>
+            
+            <label for="department">Choose Department</label>
+            <select name="department" id="department">
+                <option value="">-- select Department --</option>
+                <option value="All" {% if selected_department == 'All' %}selected{% endif %}>All</option>
+                {% if departments %}
+                    {% for d in departments %}
+                        <option value="{{ d }}" {% if selected_department and selected_department == d %}selected{% endif %}>{{ d }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
 
+            <label for="io">Choose IO</label>
+            <select name="io" id="io">
+                <option value="">-- select IO --</option>
+                <option value="All" {% if selected_io == 'All' %}selected{% endif %}>All</option>
+                {% if ios %}
+                    {% for i in ios %}
+                        <option value="{{ i }}" {% if selected_io and selected_io == i %}selected{% endif %}>{{ i }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+
+            <label for="project">Choose Project</label>
+            <select name="project" id="project">
+                <option value="">-- select Project --</option>
+                <option value="All" {% if selected_project == 'All' %}selected{% endif %}>All</option>
+                {% if projects %}
+                    {% for proj in projects %}
+                        <option value="{{ proj }}" {% if selected_project and selected_project == proj %}selected{% endif %}>{{ proj }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+
+            <label for="fiscal_year">Choose Fiscal Year</label>
+            <select name="fiscal_year" id="fiscal_year">
+                <option value="">-- select Year --</option>
+                <option value="All" {% if selected_year == 'All' %}selected{% endif %}>All</option>
+                {% if fiscal_years %}
+                    {% for y in fiscal_years %}
+                        <option value="{{ y }}" {% if selected_year and selected_year == y %}selected{% endif %}>{{ y }}</option>
+                    {% endfor %}
+                {% endif %}
+            </select>
+            <button type="submit">Retrieve data</button>
+        </form>
+</form>
+
+        {% if results_list %}
+            <hr>
+            <h3>Results</h3>
+            {% for res in results_list %}
+                <div style="margin-top:18px;">
+                    <h4>{{ res.title }}</h4>
+                    <table class="display" style="width:100%" border="1">
+                        <thead>
+                            <tr>
+                                {% for col in res.columns %}
+                                    <th>{{ col }}</th>
+                                {% endfor %}
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in res.data %}
+                                <tr>
+                                    {% for item in row %}
+                                        <td>{{ item }}</td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            {% endfor %}
+        {% endif %}
 </body>
 </html>
