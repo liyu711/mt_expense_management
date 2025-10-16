@@ -126,7 +126,7 @@
                     <tr>
                     {% for item in row %}
                     {% set colname = columns[loop.index0] if columns|length > loop.index0 else '' %}
-                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname == 'IO number' or colname == 'IO Number' or colname|lower == 'po' or colname|lower == 'io' or colname|lower == 'io number' or colname == 'Month' or colname|lower == 'month' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year' or colname == 'Capital Year' or colname|lower == 'capital year' or colname|lower == 'capital_year') %}
+                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname == 'IO number' or colname == 'IO Number' or colname|lower == 'po' or colname|lower == 'io' or colname|lower == 'io number' or colname == 'Month' or colname|lower == 'month' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year' or colname == 'Capital Year' or colname|lower == 'capital year' or colname|lower == 'capital_year' or colname == 'Year' or colname|lower == 'year') %}
                         <td>{{ item|as_int }}</td>
                     {% else %}
                         <td>{{ item|one_decimal }}</td>

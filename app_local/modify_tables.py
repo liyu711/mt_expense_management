@@ -1,5 +1,5 @@
 
-from flask import Flask, render_template, Blueprint, request
+from flask import Flask, render_template, Blueprint, request, redirect, url_for
 from backend.modify_table_local import add_entry
 from backend import upload_budgets_local
 import pandas as pd
@@ -403,3 +403,46 @@ def modify_table_router(action):
         columns=columns if 'columns' in locals() else [],
         data=data if 'data' in locals() else []
     )
+
+
+@modify_tables.route('/change_staff_cost', methods=['POST'])
+def change_staff_cost():
+    """Handle modify action to change an existing staff cost entry.
+
+    Expects form fields: staff_category, year, cost
+    Updates human_resource_cost.cost WHERE category_id = mapped id AND year = provided year.
+    """
+    form = dict(request.form)
+    staff_category = form.get('staff_category')
+    year = form.get('year')
+    cost = form.get('cost')
+
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        # map staff category name to id
+        hr_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+        hr_map = dict(zip(hr_df['name'], hr_df['id'])) if 'name' in hr_df.columns and 'id' in hr_df.columns else {}
+        cat_id = hr_map.get(staff_category)
+        # coerce types
+        try:
+            year_val = int(year) if year not in (None, '') else None
+        except Exception:
+            year_val = None
+        try:
+            cost_val = float(cost) if cost not in (None, '') else None
+        except Exception:
+            cost_val = None
+
+        if cat_id is None or year_val is None or cost_val is None:
+            # invalid request; redirect back with no change
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
+
+        # perform update
+        cursor.execute("UPDATE human_resource_cost SET cost = ? WHERE category_id = ? AND year = ?", (cost_val, int(cat_id), int(year_val)))
+        cnxn.commit()
+    except Exception:
+        # ignore errors and redirect back
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))

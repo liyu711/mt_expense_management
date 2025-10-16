@@ -74,3 +74,22 @@ def data_vis_page():
 
             
     return render_template('pages/data_vis.html', options=options, selected_option=selected_option, data=data, columns=columns, x_col=x_col, y_col=y_col, plot_type=plot_type, display_names=DISPLAY_NAMES)
+
+
+@data_vis.route('/data_summary', methods=['GET', 'POST'])
+def data_summary():
+    conn = connect_local()
+    cursor, cnxn = conn.connect_to_db()
+
+    # list of tables we care about for summary
+    tables = [
+        'projects', 'departments', 'POs', 'budgets', 'expenses', 'fundings',
+        'project_categories', 'IOs', 'human_resource_categories', 'project_forecasts_nonpc',
+        'project_forecasts_pc', 'human_resource_cost', 'capex_forecasts', 'capex_budgets', 'capex_expenses'
+    ]
+
+    # Build overall counts
+    
+    
+    
+    return render_template('pages/data_summary.html',tables=tables, display_names=DISPLAY_NAMES)
