@@ -186,12 +186,17 @@ initialize_database(cursor, cnxn, initial_values=False)
 # res = select_columns_from_table(cursor, "project_forecasts_nonpc", ['fiscal_year', 'department_id', 'project_id','project_category_id', 'io_id', 'po_id'])
 # print(res)
 
-df_po = df_nonpc[['PO']]
+# df_po = df_nonpc[['PO']]
+
 df_io = df_nonpc[['IO', 'Project Name']]
 df_department = df_nonpc[['Department']]
 df_project_category = df_nonpc[['Project Category']]
 df_projects = df_nonpc[['Project Name', 'Project Category']]
-
+# df_po.to_csv('processed_data/info/po_.csv', index= False)
+df_po = pd.read_csv('processed_data/info/po_.csv')
+# df_department = df_department.drop_duplicates()
+# df_department.to_csv('processed_data/info/departments_.csv', index= False)
+# df_department = pd.read_csv('processed_data/info/departments_.csv')
 
 department_row = add_entry(df_department, 'departments',['category'], 'name')
 po_row = add_entry(df_po, "pos", ['name'], 'name')

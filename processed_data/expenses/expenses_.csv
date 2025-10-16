@@ -1,101 +1,101 @@
 Department,fiscal_year,from_period,Order,CO object name,Cost element,Cost element name,Val.in rep.cur,Name
-OME,2024,12,2000003063,Project 26,7220100,Hotel Accommodations,2632.17,Expense 331
-VEH,2023,7,2000000864,Project 27,7220100,Hotel Accommodations,5471.84,Expense 712
-S&I,2022,10,2000002942,Project 78,7220250,Other Transportation,3245.18,Expense 518
-IW,2024,11,2000008284,Project 18,9430210,Engineering Labor,3738.72,Expense 464
-IW,2024,10,2000007660,Project 40,7250050,R&D Suppl. & Mat'ls,8025.14,Expense 405
-IW,2025,2,2000006788,Project 33,7299300,Invent'y Consump. CC,5103.1,Expense 600
-VEH,2023,11,2000006787,Project 59,9430210,Engineering Labor,4873.67,Expense 291
-IW,2022,11,2000006783,Project 88,9430210,Engineering Labor,8746.91,Expense 620
-S&I,2023,9,2000003061,Project 67,7299300,Invent'y Consump. CC,3481.6,Expense 326
-OME,2024,7,2000007382,Project 38,7250100,R&D Professional Fee,9901.57,Expense 402
-S&I,2023,4,2000002942,Project 11,9210010,Settlement Material,3994.43,Expense 245
-IW,2022,12,2000006790,Project 86,7299060,Patent Expense,7505.94,Expense 615
-S&I,2024,3,2000009300,Project 20,7220100,Hotel Accommodations,3391.13,Expense 712
-OME,2024,3,2000008920,Project 97,9422010,Assessment Other Exp,9028.86,Expense 600
-VEH,2025,3,2000003063,Project 76,7220250,Other Transportation,9890.57,Expense 824
-VEH,2025,6,2000002942,Project 4,7250050,R&D Suppl. & Mat'ls,9508.06,Expense 255
-VEH,2025,10,2000006791,Project 27,9430210,Engineering Labor,1220.66,Expense 601
-VEH,2023,10,2000007383,Project 67,7220100,Hotel Accommodations,6548.37,Expense 945
-OME,2022,1,2000000485,Project 57,7220100,Hotel Accommodations,7317.86,Expense 30
-IW,2025,11,2000008284,Project 94,7299300,Invent'y Consump. CC,7697.06,Expense 514
-VEH,2025,7,2000002772,Project 3,7220250,Other Transportation,3948.48,Expense 697
-VEH,2022,5,2000009582,Project 39,7299900,Other Misc Expense,3544.84,Expense 319
-S&I,2025,10,2000000552,Project 52,9430210,Engineering Labor,1884.38,Expense 438
-IW,2024,7,2000006790,Project 82,7299060,Patent Expense,8610.61,Expense 862
-OME,2025,8,2000008762,Project 60,7220250,Other Transportation,5906.01,Expense 926
-OME,2025,2,2000008284,Project 10,9422010,Assessment Other Exp,8629.69,Expense 557
-VEH,2024,11,2000007660,Project 74,7250100,R&D Professional Fee,1293.62,Expense 279
-VEH,2022,10,2000009981,Project 51,7220100,Hotel Accommodations,7126.07,Expense 709
-IW,2023,6,2000006791,Project 89,7220250,Other Transportation,6021.77,Expense 213
-S&I,2025,4,2000009680,Project 100,7250050,R&D Suppl. & Mat'ls,4386.35,Expense 685
-VEH,2023,8,2000006791,Project 96,9422010,Assessment Other Exp,7602.79,Expense 849
-VEH,2022,1,2000006792,Project 74,7220100,Hotel Accommodations,6610.84,Expense 521
-VEH,2025,1,2000000441,Project 78,9210010,Settlement Material,2956.38,Expense 596
-S&I,2024,11,2000006463,Project 92,7299900,Other Misc Expense,4264.28,Expense 322
-IW,2022,7,2000007383,Project 76,9210010,Settlement Material,5684.11,Expense 475
-OME,2022,10,2000009587,Project 72,7220100,Hotel Accommodations,2546.58,Expense 465
-OME,2023,11,2000000864,Project 26,7299060,Patent Expense,6320.35,Expense 949
-S&I,2025,2,2000006788,Project 34,7299900,Other Misc Expense,7672.2,Expense 31
-S&I,2023,10,2000009280,Project 60,9422010,Assessment Other Exp,4387.44,Expense 292
-VEH,2025,1,2000008762,Project 44,7299300,Invent'y Consump. CC,6418.58,Expense 945
-OME,2023,12,2000007660,Project 68,7220250,Other Transportation,4935.01,Expense 608
-VEH,2023,5,2000000863,Project 14,7250050,R&D Suppl. & Mat'ls,8682.79,Expense 895
-IW,2024,2,2000009280,Project 2,7250050,R&D Suppl. & Mat'ls,6937.59,Expense 861
-IW,2023,3,2000003931,Project 97,9210010,Settlement Material,5666.13,Expense 22
-IW,2025,6,2000009280,Project 26,7250050,R&D Suppl. & Mat'ls,7397.12,Expense 823
-VEH,2022,4,2000009582,Project 53,7299900,Other Misc Expense,4169.37,Expense 259
-VEH,2025,9,2000000552,Project 23,9210010,Settlement Material,7224.35,Expense 24
-S&I,2024,5,2000009001,Project 93,7299300,Invent'y Consump. CC,7440.19,Expense 600
-S&I,2024,1,-1,Project 51,7220250,Other Transportation,9492.99,Expense 394
-S&I,2022,8,2000003928,Project 36,9210010,Settlement Material,7854.74,Expense 281
-VEH,2024,1,2000003061,Project 67,9430210,Engineering Labor,7056.14,Expense 848
-IW,2022,12,2000002941,Project 13,7299060,Patent Expense,8777.38,Expense 95
-VEH,2024,1,2000009300,Project 26,9430210,Engineering Labor,6317.92,Expense 94
-OME,2022,6,2000009800,Project 36,9210010,Settlement Material,7548.18,Expense 404
-OME,2023,3,2000006787,Project 27,9430210,Engineering Labor,6891.0,Expense 613
-S&I,2022,4,2000006788,Project 23,9210010,Settlement Material,7393.45,Expense 112
-OME,2025,1,2000003924,Project 50,7299300,Invent'y Consump. CC,5721.64,Expense 991
-IW,2025,5,-1,Project 24,9430210,Engineering Labor,1543.55,Expense 408
-OME,2025,9,2000000447,Project 2,9422010,Assessment Other Exp,1930.47,Expense 263
-VEH,2024,5,2000009300,Project 26,9430210,Engineering Labor,6348.7,Expense 325
-OME,2022,9,2000009585,Project 32,7299300,Invent'y Consump. CC,8003.18,Expense 108
-VEH,2025,2,2000006463,Project 78,9430210,Engineering Labor,3147.61,Expense 819
-IW,2023,10,2000000863,Project 77,9422010,Assessment Other Exp,2195.89,Expense 10
-IW,2025,9,2000009582,Project 96,7250100,R&D Professional Fee,2469.37,Expense 701
-S&I,2022,4,2000000441,Project 47,7220250,Other Transportation,1337.25,Expense 959
-VEH,2023,9,2000006787,Project 59,7299900,Other Misc Expense,1834.1,Expense 185
-IW,2024,7,2000000764,Project 67,7250050,R&D Suppl. & Mat'ls,1031.84,Expense 982
-IW,2024,1,2000009587,Project 61,7250050,R&D Suppl. & Mat'ls,4601.05,Expense 981
-VEH,2025,12,2000009981,Project 37,7299900,Other Misc Expense,6934.39,Expense 991
-OME,2022,12,2000003063,Project 83,9210010,Settlement Material,5187.71,Expense 380
-OME,2022,8,2000006322,Project 16,9210010,Settlement Material,3992.91,Expense 731
-OME,2023,6,2000000863,Project 85,7299900,Other Misc Expense,3900.34,Expense 293
-IW,2023,11,2000009800,Project 63,7299060,Patent Expense,7276.22,Expense 368
-IW,2025,8,2000007382,Project 79,9422010,Assessment Other Exp,5630.04,Expense 567
-OME,2022,6,2000006221,Project 40,7299300,Invent'y Consump. CC,2687.4,Expense 724
-VEH,2022,4,2000009581,Project 96,7299060,Patent Expense,4269.45,Expense 445
-OME,2024,6,2000000863,Project 95,7299900,Other Misc Expense,6834.86,Expense 319
-VEH,2024,1,2000002941,Project 98,7250050,R&D Suppl. & Mat'ls,2689.61,Expense 925
-IW,2023,11,2000002942,Project 60,7250100,R&D Professional Fee,4076.22,Expense 671
-VEH,2024,10,2000009800,Project 59,7299900,Other Misc Expense,8147.88,Expense 191
-IW,2023,7,2000000539,Project 15,9210010,Settlement Material,3673.02,Expense 968
-OME,2025,8,2000003924,Project 22,9422010,Assessment Other Exp,5445.59,Expense 10
-IW,2023,1,2000009583,Project 9,9210010,Settlement Material,2459.01,Expense 745
-S&I,2023,2,2000009585,Project 56,7299060,Patent Expense,7986.14,Expense 738
-VEH,2025,10,2000006783,Project 38,7299300,Invent'y Consump. CC,3626.16,Expense 510
-OME,2025,1,2000008762,Project 29,7250100,R&D Professional Fee,4302.61,Expense 703
-VEH,2024,3,2000003928,Project 50,7299060,Patent Expense,2359.98,Expense 196
-VEH,2022,8,2000006787,Project 56,9210010,Settlement Material,4564.69,Expense 900
-OME,2024,6,2000005280,Project 82,9430210,Engineering Labor,6936.02,Expense 884
-VEH,2023,8,2000003925,Project 22,7299900,Other Misc Expense,9255.67,Expense 104
-VEH,2023,8,2000009001,Project 43,7299060,Patent Expense,5687.89,Expense 376
-S&I,2025,1,2000006322,Project 38,7299060,Patent Expense,9361.83,Expense 617
-OME,2024,4,2000006791,Project 87,7299060,Patent Expense,8949.71,Expense 666
-VEH,2022,3,2000006221,Project 56,9422010,Assessment Other Exp,7618.92,Expense 623
-S&I,2022,4,2000003928,Project 12,7250050,R&D Suppl. & Mat'ls,7416.29,Expense 640
-IW,2024,4,2000003931,Project 83,9422010,Assessment Other Exp,2871.54,Expense 457
-IW,2023,11,2000009585,Project 28,9430210,Engineering Labor,9996.45,Expense 211
-IW,2022,2,2000007382,Project 78,7220250,Other Transportation,1594.93,Expense 872
-IW,2025,12,2000009583,Project 93,7250050,R&D Suppl. & Mat'ls,7905.97,Expense 753
-IW,2023,12,2000005342,Project 24,9430210,Engineering Labor,3114.17,Expense 876
+DEPT_05,2025,3,2000009587,Project 24,9210010,Settlement Material,5247.98,Expense 332
+DEPT_05,2025,1,2000009582,Project 67,7299900,Other Misc Expense,6606.53,Expense 974
+DEPT_03,2025,6,2000009585,Project 9,9430210,Engineering Labor,6686.09,Expense 590
+DEPT_06,2023,5,2000003061,Project 87,9210010,Settlement Material,5316.47,Expense 260
+DEPT_06,2023,10,2000006463,Project 2,9210010,Settlement Material,9703.48,Expense 470
+DEPT_02,2022,11,2000006783,Project 71,7299060,Patent Expense,2441.05,Expense 86
+DEPT_04,2022,12,2000000864,Project 73,7250100,R&D Professional Fee,9552.73,Expense 383
+DEPT_02,2023,4,2000009981,Project 29,7299060,Patent Expense,7131.07,Expense 934
+DEPT_13,2022,5,2000002942,Project 44,9210010,Settlement Material,1264.86,Expense 356
+DEPT_02,2025,8,2000006791,Project 21,7220100,Hotel Accommodations,8668.96,Expense 825
+DEPT_10,2023,5,2000003061,Project 50,7299900,Other Misc Expense,7173.05,Expense 882
+DEPT_08,2025,6,2000009001,Project 63,9210010,Settlement Material,1709.27,Expense 496
+DEPT_15,2025,10,2000000441,Project 80,7250050,R&D Suppl. & Mat'ls,7715.87,Expense 526
+DEPT_11,2022,10,2000000447,Project 23,9422010,Assessment Other Exp,9017.04,Expense 474
+DEPT_07,2024,3,2000000485,Project 72,7250100,R&D Professional Fee,9372.63,Expense 448
+DEPT_02,2022,4,2000009581,Project 23,7250100,R&D Professional Fee,8013.06,Expense 139
+DEPT_04,2025,8,2000005342,Project 90,7220100,Hotel Accommodations,3349.54,Expense 471
+DEPT_11,2023,3,2000003931,Project 2,7220100,Hotel Accommodations,5614.85,Expense 914
+DEPT_07,2025,11,2000006792,Project 99,7299900,Other Misc Expense,1347.26,Expense 775
+DEPT_09,2024,12,2000006791,Project 90,9430210,Engineering Labor,5423.03,Expense 401
+DEPT_06,2025,12,2000009300,Project 65,7299900,Other Misc Expense,4892.99,Expense 676
+DEPT_05,2024,8,2000006792,Project 9,7220250,Other Transportation,2513.93,Expense 260
+DEPT_02,2025,8,2000003930,Project 86,7299900,Other Misc Expense,3667.58,Expense 548
+DEPT_06,2023,3,2000009321,Project 61,9422010,Assessment Other Exp,6327.65,Expense 909
+DEPT_06,2024,2,2000006221,Project 94,9430210,Engineering Labor,9640.49,Expense 309
+DEPT_13,2024,8,2000009300,Project 51,7220250,Other Transportation,4311.96,Expense 996
+DEPT_14,2024,6,2000003924,Project 24,9210010,Settlement Material,7045.51,Expense 509
+DEPT_10,2022,12,2000000863,Project 83,7250050,R&D Suppl. & Mat'ls,5120.9,Expense 608
+DEPT_14,2023,11,2000009582,Project 51,9430210,Engineering Labor,8833.38,Expense 104
+DEPT_15,2022,3,2000007383,Project 67,7299060,Patent Expense,2863.99,Expense 887
+DEPT_06,2025,7,2000005280,Project 19,7299300,Invent'y Consump. CC,4000.74,Expense 521
+DEPT_08,2025,10,2000006787,Project 85,7299900,Other Misc Expense,6065.8,Expense 722
+DEPT_11,2024,7,2000000447,Project 10,7299300,Invent'y Consump. CC,9394.67,Expense 836
+DEPT_14,2024,2,2000000485,Project 42,9210010,Settlement Material,7209.12,Expense 522
+DEPT_03,2022,9,2000005342,Project 32,7220100,Hotel Accommodations,8199.22,Expense 474
+DEPT_05,2024,12,2000003931,Project 39,7250100,R&D Professional Fee,2904.34,Expense 108
+DEPT_08,2022,2,2000002772,Project 96,7250100,R&D Professional Fee,7763.15,Expense 744
+DEPT_05,2022,2,2000000539,Project 44,7250050,R&D Suppl. & Mat'ls,7468.85,Expense 515
+DEPT_07,2023,3,2000000863,Project 26,7250100,R&D Professional Fee,3553.53,Expense 343
+DEPT_08,2025,7,2000005280,Project 65,7220250,Other Transportation,5215.66,Expense 597
+DEPT_12,2025,4,2000003925,Project 75,9210010,Settlement Material,5686.77,Expense 694
+DEPT_01,2024,10,2000006791,Project 74,7299900,Other Misc Expense,7685.29,Expense 523
+DEPT_06,2025,4,2000007383,Project 98,9422010,Assessment Other Exp,7986.34,Expense 581
+DEPT_12,2025,5,2000007660,Project 35,7220250,Other Transportation,7601.31,Expense 541
+DEPT_06,2022,1,2000007660,Project 82,9430210,Engineering Labor,9558.33,Expense 232
+DEPT_01,2022,2,2000009001,Project 80,7299300,Invent'y Consump. CC,4866.35,Expense 385
+DEPT_13,2022,11,2000008262,Project 91,7250100,R&D Professional Fee,7491.04,Expense 117
+DEPT_01,2025,3,2000000863,Project 63,7299900,Other Misc Expense,1635.4,Expense 200
+DEPT_07,2023,12,2000007383,Project 14,9210010,Settlement Material,6741.07,Expense 6
+DEPT_15,2025,3,2000009981,Project 18,7299900,Other Misc Expense,3134.67,Expense 329
+DEPT_02,2025,10,2000003928,Project 8,7220250,Other Transportation,9854.35,Expense 429
+DEPT_03,2022,3,2000008284,Project 14,7299900,Other Misc Expense,4094.81,Expense 971
+DEPT_08,2024,6,2000000447,Project 49,7220250,Other Transportation,7176.98,Expense 502
+DEPT_01,2025,4,2000003930,Project 31,7299060,Patent Expense,7935.82,Expense 264
+DEPT_03,2023,3,2000003924,Project 28,7250050,R&D Suppl. & Mat'ls,4537.75,Expense 920
+DEPT_06,2022,3,2000006791,Project 86,9210010,Settlement Material,7717.14,Expense 947
+DEPT_10,2025,3,2000007383,Project 6,9430210,Engineering Labor,5781.89,Expense 296
+DEPT_12,2023,1,-1,Project 7,9422010,Assessment Other Exp,6970.32,Expense 852
+DEPT_01,2025,11,2000009680,Project 37,7220250,Other Transportation,9317.29,Expense 926
+DEPT_13,2025,1,2000006790,Project 79,7220100,Hotel Accommodations,3783.88,Expense 787
+DEPT_01,2022,10,2000006463,Project 31,7250100,R&D Professional Fee,6707.05,Expense 176
+DEPT_01,2024,7,2000000441,Project 83,9430210,Engineering Labor,3429.33,Expense 15
+DEPT_01,2025,7,2000007660,Project 60,9422010,Assessment Other Exp,4883.6,Expense 120
+DEPT_11,2022,4,2000002942,Project 43,7299900,Other Misc Expense,8469.83,Expense 631
+DEPT_10,2025,1,2000009585,Project 48,9422010,Assessment Other Exp,7794.86,Expense 279
+DEPT_12,2024,11,2000008284,Project 72,7220100,Hotel Accommodations,5537.66,Expense 923
+DEPT_10,2024,5,2000006788,Project 29,9210010,Settlement Material,2301.32,Expense 899
+DEPT_01,2022,9,2000009981,Project 68,9210010,Settlement Material,3497.84,Expense 78
+DEPT_09,2023,9,2000006788,Project 81,7299060,Patent Expense,3386.92,Expense 12
+DEPT_05,2023,12,2000002942,Project 49,7299300,Invent'y Consump. CC,8638.94,Expense 818
+DEPT_06,2022,7,2000005342,Project 15,7299300,Invent'y Consump. CC,4158.23,Expense 292
+DEPT_06,2023,5,2000006783,Project 86,7250050,R&D Suppl. & Mat'ls,7813.13,Expense 300
+DEPT_10,2024,7,2000003931,Project 43,7250100,R&D Professional Fee,2817.84,Expense 235
+DEPT_11,2023,11,-1,Project 99,9210010,Settlement Material,6351.6,Expense 289
+DEPT_05,2023,2,2000002941,Project 9,7299900,Other Misc Expense,3213.07,Expense 600
+DEPT_09,2022,11,2000002772,Project 100,7299900,Other Misc Expense,9101.31,Expense 752
+DEPT_05,2024,10,2000009585,Project 47,9430210,Engineering Labor,5618.88,Expense 717
+DEPT_03,2023,5,2000006792,Project 39,7299900,Other Misc Expense,9170.53,Expense 883
+DEPT_08,2023,11,2000006783,Project 95,7299900,Other Misc Expense,2282.0,Expense 237
+DEPT_01,2024,1,-1,Project 30,7220100,Hotel Accommodations,9295.22,Expense 743
+DEPT_15,2023,6,2000000863,Project 69,7250100,R&D Professional Fee,7678.9,Expense 16
+DEPT_04,2025,8,2000009582,Project 84,7220100,Hotel Accommodations,1619.45,Expense 683
+DEPT_08,2024,2,2000007660,Project 76,7299300,Invent'y Consump. CC,2346.13,Expense 137
+DEPT_09,2024,4,2000009300,Project 16,9210010,Settlement Material,4641.24,Expense 112
+DEPT_05,2024,2,2000003924,Project 8,7299060,Patent Expense,6236.89,Expense 344
+DEPT_08,2024,6,2000003930,Project 78,7220250,Other Transportation,6991.89,Expense 330
+DEPT_06,2023,10,2000006787,Project 17,7250050,R&D Suppl. & Mat'ls,6579.02,Expense 676
+DEPT_12,2023,3,2000009981,Project 54,7299300,Invent'y Consump. CC,8827.5,Expense 898
+DEPT_03,2024,3,2000009587,Project 23,7250100,R&D Professional Fee,2068.74,Expense 483
+DEPT_06,2025,2,2000009581,Project 37,7299060,Patent Expense,7260.09,Expense 334
+DEPT_10,2023,1,2000007382,Project 56,9422010,Assessment Other Exp,3257.69,Expense 405
+DEPT_10,2023,2,2000000441,Project 43,7250100,R&D Professional Fee,5818.01,Expense 543
+DEPT_03,2024,2,2000009582,Project 77,9422010,Assessment Other Exp,9212.42,Expense 533
+DEPT_06,2023,7,2000006221,Project 42,9210010,Settlement Material,7930.86,Expense 748
+DEPT_10,2022,11,2000000539,Project 49,7299060,Patent Expense,5428.38,Expense 672
+DEPT_15,2022,12,2000009280,Project 19,7299300,Invent'y Consump. CC,4865.46,Expense 820
+DEPT_04,2022,2,2000006221,Project 72,9422010,Assessment Other Exp,5411.17,Expense 556
+DEPT_11,2023,11,2000000863,Project 56,7250100,R&D Professional Fee,2236.21,Expense 872
+DEPT_09,2025,3,2000002941,Project 38,7220100,Hotel Accommodations,6481.32,Expense 473
+DEPT_08,2025,3,2000002941,Project 54,7250100,R&D Professional Fee,8325.09,Expense 320
