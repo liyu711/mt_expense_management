@@ -14,7 +14,7 @@
             <select name="table_name" id="table_name">
                 <option value="">-- select --</option>
                 {% for t in tables %}
-                <option value="{{ t }}" {% if selected_table == t %}selected{% endif %}>{{ display_names.get(t, t) }}</option>
+                <option value="{{ t }}" {% if selected_table == t %}seleccted{% endif %}>{{ display_names.get(t, t) }}</option>
                 {% endfor %}
             </select>
             <button type="submit">Show summary</button>

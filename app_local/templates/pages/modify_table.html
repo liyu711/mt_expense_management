@@ -53,7 +53,9 @@
                 <h1>{{ title }}</h1>
                 <!-- Add and Modify buttons to trigger modal popups -->
                 <button id="add_button" type="button">Add</button>
+                {% if table_name == 'human_resource_cost' %}
                 <button id="modify_button" type="button">Modify</button>
+                {% endif %}
 
         <!-- <form method="POST" name="Modify_{{ table_name }}">
             <input type="hidden" name="table_name" value="{{ table_name }}">
@@ -105,7 +107,8 @@
             </div>
         </div>
 
-                    <!-- Modify modal: single instance that submits to /change_staff_cost -->
+                    <!-- Modify modal: single instance that submits to /change_staff_cost (render only for staff cost page) -->
+                    {% if table_name == 'human_resource_cost' %}
                     <div id="modifyModalChange" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modalTitleChange">
                         <div class="modal-overlay" id="modalOverlayChange"></div>
                         <div class="modal-content" role="document">
@@ -135,6 +138,7 @@
                             </form>
                         </div>
                     </div>
+                    {% endif %}
                 <!-- table container area -->
                 <div class="table-container">
                 {% if columns and data %}
