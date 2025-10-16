@@ -30,7 +30,7 @@ def upload_capex_budget_df(df_upload, engine, cursor, cnxn, type, clear=True):
         departments,
         'Department',
         'name',
-        ['Department', 'name'],
+        ['Department', 'name', 'po_id'],
         {'id': 'department_id'}
     )
 

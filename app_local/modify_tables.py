@@ -15,10 +15,12 @@ modify_table_config = {
         'title': 'Modify Department',
         'table_name': 'departments',
         'fields': [
-            {'name': 'Department', 'type': 'text', 'label': 'Department Name'}
+            {'name': 'Department', 'type': 'text', 'label': 'Department Name'},
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []}
         ],
-        'merge_on': 'name',
-        'columns': ['category']
+        # We'll merge on Department name and include po_id when present
+        'merge_on': 'Department',
+        'columns': ['Department', 'po_id']
     },
     'modify_po': {
         'title': 'Modify PO',
@@ -241,6 +243,13 @@ def modify_table_router(action):
             if field['name'] == 'category' and field['type'] == 'select':
                 field['options'] = options
 
+    # If this is the modify_department form, fetch PO options for dropdown
+    if action == 'modify_department':
+        po_options = fetch_options('pos', 'name')
+        for field in config['fields']:
+            if field['name'] == 'po' and field['type'] == 'select':
+                field['options'] = po_options
+
     # If this is the modify_staff_cost form, populate staff category and year options
     if action == 'modify_staff_cost':
         staff_options = fetch_options('human_resource_categories', 'name')
@@ -353,8 +362,24 @@ def modify_table_router(action):
                     except Exception:
                         pass
 
+            if action == 'modify_department':
+                # try:
+                db = connect_local()
+                cursor, cnxn = db.connect_to_db()
+                pos_df = select_all_from_table(cursor, cnxn, 'pos')
+                po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+                df_upload['po_id'] = df_upload.get('po').map(po_map) if 'po' in df_upload.columns else None
+                # Keep only expected columns
+                expected_cols = modify_table_config.get(action).get('columns', [])
+                keep_cols = [c for c in expected_cols if c in df_upload.columns]
+                if keep_cols:
+                    df_upload = df_upload[keep_cols]
+                
+            
+            print(df_upload)
             merge_columns = modify_table_config.get(action).get('columns', list(row.keys()))
             merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
+           
             res = add_entry(df_upload, table_name, merge_columns, merge_on)
 
     # After handling POST (or on GET), fetch table contents to display below the form

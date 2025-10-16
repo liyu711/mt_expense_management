@@ -60,7 +60,7 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
             departments,
             'department',
             'name',
-            ['department', 'name'],
+            ['department', 'name', 'po_id'],
             {'id': 'department_id'}
         )
 
@@ -99,7 +99,7 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
             departments,
             'department',
             'name',
-            ['department', 'name'],
+            ['department', 'name', 'po_id'],
             {'id': 'department_id'}
         )
 
@@ -124,7 +124,6 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
 
     # 3. Merge new data with current table
     if table_name == 'departments':
-        # Special case for departments (uses merge_departments)
         upload_df = merge_departments(cur_table, local_data)
     else:
         upload_df = merge_dataframes(cur_table, local_data, merge_columns, merge_on)

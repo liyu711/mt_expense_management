@@ -36,9 +36,9 @@ CREATE TABLE project_categories(
 
 CREATE TABLE departments(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
-    -- po_id INTEGER,
-    -- FOREIGN KEY (po_id) REFERENCES POs(id)
+    name TEXT NOT NULL,
+    po_id INTEGER,
+    FOREIGN KEY (po_id) REFERENCES POs(id)
 );
 
 CREATE TABLE projects(

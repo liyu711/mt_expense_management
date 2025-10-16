@@ -25,7 +25,7 @@ def upload_capex_forecasts_df(df_upload, engine, cursor, cnxn, type):
         departments,
         'Department',
         'name',
-        ['Department', 'name'],
+        ['Department', 'name', 'po_id'],
         {'id': 'department_id'}
     )
 

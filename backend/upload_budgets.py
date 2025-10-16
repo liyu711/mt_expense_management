@@ -38,7 +38,7 @@ def upload_budgets_df(df_upload, engine, cursor, cnxn, type, replace=True):
 
     departments = select_all_from_table(cursor, cnxn, "departments")
     df_upload = pd.merge(df_upload, departments, left_on="Department", right_on="name", how='left')
-    df_upload.drop(['Department', 'name'],axis=1, inplace=True)
+    df_upload.drop(['Department', 'name', 'po_id'],axis=1, inplace=True)
     df_upload.rename(columns={
         "id": "department_id",
         "Human Resources Budget": "human_resource_expense",
@@ -75,7 +75,7 @@ def upload_fundings_df(df_upload, engine, cursor, cnxn, type, replace=True):
         department,
         'Department',
         'name',
-        ['Department', 'name'],
+        ['Department', 'name', 'po_id'],
         {'id': 'department_id'}
     )
 

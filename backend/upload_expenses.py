@@ -66,7 +66,7 @@ def upload_expenses_df(file, engine, cursor, cnxn):
     io = select_all_from_table(cursor, cnxn, "IOs")
 
     df_upload = pd.merge(df_upload, departments, left_on="Department", right_on="name", how='left')
-    df_upload.drop(['Department', 'name'],axis=1, inplace=True)
+    df_upload.drop(['Department', 'name', 'po_id'],axis=1, inplace=True)
     df_upload.rename(columns={
         "id": "department_id",
         "Val.in rep.cur": "expense_value",

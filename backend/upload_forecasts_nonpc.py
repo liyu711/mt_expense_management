@@ -131,7 +131,7 @@ def upload_nonpc_forecasts_df2(df_upload, engine, cursor, cnxn, type):
 
     # upload expenses
     df_upload_fin = pd.merge(df_upload, merged_departments, left_on='Department', right_on='name', how='left')
-    df_upload_fin.drop(['name', 'Department'], axis=1, inplace=True)
+    df_upload_fin.drop(['name', 'Department','po_id'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'department_id'}, inplace=True)
 
     df_upload_fin = pd.merge(df_upload_fin, projects_merged, left_on='Project Name', right_on='name', how='left')

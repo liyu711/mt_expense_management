@@ -26,6 +26,7 @@ capex_forecast_path = "processed_data/forecasts/capex_forecasts_.csv"
 capex_budgets_path = "processed_data/budgets/capex_budgets_.csv"
 capex_expense_path = "processed_data/expenses/capex_expenses_.csv"
 hr_path = "processed_data/info/personnel_categories.csv"
+department_path = 'processed_data/info/departments.csv'
 
 df_nonpc = pd.read_csv(filepath_nonpc)
 df_pc = pd.read_csv(filepath_pc)
@@ -33,6 +34,7 @@ df_pc = df_pc.drop(['Personnel cost'],axis=1)
 df_expense = pd.read_csv(file_path_expenses)
 df_budgets = pd.read_csv(budget_path)
 df_funding = pd.read_csv(funding_path)
+df_departments = pd.read_csv(department_path)
 
 df_capex_forecast = pd.read_csv(capex_forecast_path)
 df_capex_budget = pd.read_csv(capex_budgets_path)
@@ -189,7 +191,7 @@ initialize_database(cursor, cnxn, initial_values=False)
 # df_po = df_nonpc[['PO']]
 
 df_io = df_nonpc[['IO', 'Project Name']]
-df_department = df_nonpc[['Department']]
+# df_department = df_nonpc[['Department']]
 df_project_category = df_nonpc[['Project Category']]
 df_projects = df_nonpc[['Project Name', 'Project Category']]
 # df_po.to_csv('processed_data/info/po_.csv', index= False)
@@ -197,9 +199,8 @@ df_po = pd.read_csv('processed_data/info/po_.csv')
 # df_department = df_department.drop_duplicates()
 # df_department.to_csv('processed_data/info/departments_.csv', index= False)
 # df_department = pd.read_csv('processed_data/info/departments_.csv')
-
-department_row = add_entry(df_department, 'departments',['category'], 'name')
 po_row = add_entry(df_po, "pos", ['name'], 'name')
+department_row = add_entry(df_departments, 'departments',['category'], 'name')
 category_row = add_entry(df_project_category, "project_categories", ['category'], 'category')
 projects_row = add_entry(df_projects, "projects", ['name', 'category_id'], 'name')
 add_entry(df_hr, "human_resource_categories", ['name'], 'name')
@@ -214,12 +215,11 @@ except Exception as e:
     print('Failed to generate/insert staff_cost_df into human_resource_cost:', e)
 add_entry(df_io, "ios", ['IO_num', 'project_id'], 'IO_num')
 
-# io_row = add_entry(df_io, 'ios', )
 
 upload_nonpc_forecasts_local(df_nonpc)
 upload_pc_forecasts_local(df_pc)
 
-cnxn.commit()
+# cnxn.commit()
 
 upload_expenses_local(df_expense)
 upload_budgets_local(df_budgets)

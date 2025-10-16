@@ -2,6 +2,7 @@ import pandas as pd
 
 def join_tables(left, right, left_col, right_col, drops, rename_dic):
     res = pd.merge(left, right, left_on=left_col, right_on=right_col, how='left')
+    print(res.columns)
     res.drop(drops, axis=1, inplace=True)
     res.rename(columns=rename_dic, inplace=True)
     return res
@@ -22,7 +23,7 @@ def merge_cost_elements(cloud, local, columns, merge_on):
 
 def merge_departments(cloud, local):
     local = local.drop_duplicates().reset_index(drop=True)
-    local.columns = ['name']
+    local.columns = ['name', 'po_id']
     # print(type(local))
     upload = local[~local['name'].isin(cloud['name'])]
     return upload
