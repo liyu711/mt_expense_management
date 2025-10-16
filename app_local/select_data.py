@@ -80,8 +80,9 @@ def transform_table(df, table_name, cursor, cnxn):
         # project_forecasts_pc: map human_resource_category_id -> Staff Category (name)
         if table_name == 'project_forecasts_pc':
             # rename FTE and personnel expense columns for display
-            if 'huamn_resource_fte' in df.columns:
-                df = df.rename(columns={'huamn_resource_fte': 'Working Time (FTE)'})
+            # handle both the correct column and any historical typo
+            if 'human_resource_fte' in df.columns:
+                df = df.rename(columns={'human_resource_fte': 'Work Hours(FTE)'})
             if 'personnel_expense' in df.columns:
                 df = df.rename(columns={'personnel_expense': 'Personnel Expense'})
 
@@ -92,6 +93,67 @@ def transform_table(df, table_name, cursor, cnxn):
                 df['Staff Category'] = df['human_resource_category_id'].map(ref_dict)
                 # drop the id column to prefer friendly name display
                 df = df.drop(columns=['human_resource_category_id'])
+
+            # Compute Personnel Cost by looking up hourly/unit cost from human_resource_cost
+            # We need mapping from Staff Category name -> id to query human_resource_cost table
+            try:
+                # build name->id map from human_resource_categories
+                hr_ref = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+                name_to_id = dict(zip(hr_ref['name'], hr_ref['id'])) if 'name' in hr_ref.columns and 'id' in hr_ref.columns else {}
+                # load human_resource_cost table once and pivot for fast lookup
+                hr_cost_df = select_all_from_table(cursor, cnxn, 'human_resource_cost')
+                # ensure expected columns exist
+                if not hr_cost_df.empty and 'category_id' in hr_cost_df.columns and 'year' in hr_cost_df.columns and 'cost' in hr_cost_df.columns:
+                    # create a lookup dict keyed by (category_id, year)
+                    hr_cost_df_local = hr_cost_df[['category_id', 'year', 'cost']].copy()
+                    # force types for reliable lookup
+                    try:
+                        hr_cost_df_local['year'] = hr_cost_df_local['year'].astype(int)
+                    except Exception:
+                        pass
+                    cost_lookup = {(int(r['category_id']), int(r['year'])): float(r['cost']) for _, r in hr_cost_df_local.iterrows() if r['category_id'] is not None}
+
+                    # Determine which column holds work-hours (FTE) after renames
+                    fte_col = None
+                    if 'Work Hours(FTE)' in df.columns:
+                        fte_col = 'Work Hours(FTE)'
+                    elif 'human_resource_fte' in df.columns:
+                        fte_col = 'human_resource_fte'
+
+                    # Determine fiscal year column after transform
+                    fy_col = 'Fiscal Year' if 'Fiscal Year' in df.columns else ('fiscal_year' if 'fiscal_year' in df.columns else None)
+
+                    personnel_costs = []
+                    for _, row in df.iterrows():
+                        try:
+                            # map Staff Category name back to id
+                            staff_name = row.get('Staff Category') if 'Staff Category' in row.index else None
+                            cat_id = name_to_id.get(staff_name) if staff_name is not None else None
+                            fy = int(row.get(fy_col)) if fy_col and row.get(fy_col) not in (None, '') else None
+                            # get work hours
+                            wh = row.get(fte_col) if fte_col else None
+                            # coerce work hours to float
+                            try:
+                                wh = float(wh) if wh not in (None, '') else 0.0
+                            except Exception:
+                                wh = 0.0
+                            if cat_id is None or fy is None:
+                                personnel_costs.append(None)
+                                continue
+                            key = (int(cat_id), int(fy))
+                            hourly = cost_lookup.get(key)
+                            if hourly is None:
+                                personnel_costs.append(None)
+                            else:
+                                personnel_costs.append(hourly * wh)
+                        except Exception:
+                            personnel_costs.append(None)
+
+                    # attach the new column
+                    df['Personnel Cost'] = personnel_costs
+            except Exception:
+                # non-fatal: if cost lookup fails, continue without Personnel Cost
+                pass
             # If the DataFrame itself has a 'name' column (ambiguous), prefer Staff Category label
             if 'name' in df.columns:
                 if 'Staff Category' in df.columns:
@@ -126,6 +188,21 @@ def transform_table(df, table_name, cursor, cnxn):
         # human_resource_categories: rename name -> Staff Category
         if table_name == 'human_resource_categories' and 'name' in df.columns:
             df = df.rename(columns={'name': 'Staff Category'})
+
+        # human_resource_cost: map category_id -> Staff Category (name) and rename year
+        if table_name == 'human_resource_cost':
+            if 'category_id' in df.columns:
+                ref_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+                ref_dict = dict(zip(ref_df['id'], ref_df['name'])) if 'id' in ref_df.columns and 'name' in ref_df.columns else {}
+                df['Staff Category'] = df['category_id'].map(ref_dict)
+                # drop the numeric id column to prefer friendly name display
+                df = df.drop(columns=['category_id'])
+            # If fiscal year or year appears, prefer 'Year' or keep as-is
+            if 'year' in df.columns:
+                df = df.rename(columns={'year': 'Year'})
+            # Rename cost -> Unit Expense (k CNY) for clearer display
+            if 'cost' in df.columns:
+                df = df.rename(columns={'cost': 'Unit Expense (k CNY)'})
 
         # pos/POs: rename name -> PO Name for PO display
         if table_name in ('pos', 'POs') and 'name' in df.columns:
@@ -260,14 +337,14 @@ def select():
     # options = [
     #     'projects', 'departments', 'POs', 'cost_elements', 'budgets', 'expenses', 'fundings',
     #     'project_categories', 'co_object_names', 'IOs', 'IO_CE_connection', 'human_resource_categories',
-    #     'human_resource_expense', 'project_forecasts_nonpc', 'project_forecasts_pc',
+    #     'human_resource_cost', 'project_forecasts_nonpc', 'project_forecasts_pc',
     #     'capex_forecasts', 'capex_budgets', 'capex_expenses'
     # ]
 
     options = [
         'projects', 'departments', 'POs', 'budgets', 'expenses', 'fundings',
         'project_categories', 'IOs', 'human_resource_categories',
-        'project_forecasts_nonpc', 'project_forecasts_pc',
+        'project_forecasts_nonpc', 'project_forecasts_pc', 'human_resource_cost',
         'capex_forecasts', 'capex_budgets', 'capex_expenses'
     ]
 

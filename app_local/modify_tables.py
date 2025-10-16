@@ -321,6 +321,38 @@ def modify_table_router(action):
                     except Exception:
                         pass
 
+            # Special handling for modify_staff_cost: map staff_category name to category_id
+            if action == 'modify_staff_cost':
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    hr_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+                    hr_map = dict(zip(hr_df['name'], hr_df['id'])) if 'name' in hr_df.columns and 'id' in hr_df.columns else {}
+                    # create category_id column by mapping the provided staff_category name
+                    df_upload['category_id'] = df_upload.get('staff_category').map(hr_map) if 'staff_category' in df_upload.columns else None
+                    # ensure year is int when possible
+                    if 'year' in df_upload.columns:
+                        try:
+                            df_upload['year'] = df_upload['year'].astype(int)
+                        except Exception:
+                            pass
+                    # reorder/keep only the expected columns for the human_resource_cost table
+                    expected_cols = modify_table_config.get(action).get('columns', [])
+                    keep_cols = [c for c in expected_cols if c in df_upload.columns]
+                    if keep_cols:
+                        df_upload = df_upload[keep_cols]
+                except Exception:
+                    # Fallback: try a simple rename if mapping failed
+                    try:
+                        df_upload.rename(columns={'staff_category': 'category_id'}, inplace=True)
+                        if 'year' in df_upload.columns:
+                            try:
+                                df_upload['year'] = df_upload['year'].astype(int)
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
+
             merge_columns = modify_table_config.get(action).get('columns', list(row.keys()))
             merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
             res = add_entry(df_upload, table_name, merge_columns, merge_on)

@@ -17,6 +17,6 @@ DISPLAY_NAMES = {
     'IOs': 'List of IOs and Corresponding Projects',
     'IO_CE_connection': 'IO-CE Connection',
     'human_resource_categories': 'Staff Categories',
-    'human_resource_expense': 'Staff Cost(KCNY)',
+    'human_resource_cost': 'Staff Cost(kCNY)',
     'concat': 'Concatenated View'
 }

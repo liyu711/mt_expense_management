@@ -205,6 +205,9 @@ def upload_forecast_pc_r():
         row[fieldname] = value
     df.loc[len(df)] = row
     df["IO"] = df["IO"].astype(int)
+    # project_forecasts_pc table does not store personnel_expense - drop Personnel cost before upload
+    if 'Personnel cost' in df.columns:
+        df = df.drop(columns=['Personnel cost'])
     try:
         columns_changed = upload_pc_forecasts_local_m(df)
         if columns_changed > 0:
@@ -343,6 +346,9 @@ def upload_forecast_merged():
             df_pc["IO"] = df_pc["IO"].astype(int)
         except:
             pass
+        # project_forecasts_pc table does not store personnel_expense - drop Personnel cost before upload
+        if 'Personnel cost' in df_pc.columns:
+            df_pc = df_pc.drop(columns=['Personnel cost'])
         try:
             from backend.upload_forecasts_pc import upload_pc_forecasts_local_m
             changed = upload_pc_forecasts_local_m(df_pc)

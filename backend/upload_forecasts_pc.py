@@ -62,8 +62,6 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
 
     merged_departments = select_all_from_table(cursor, cnxn, "departments")
 
-    merged_project_category = select_all_from_table(cursor, cnxn, "project_categories")
-
     projects_merged = select_all_from_table(cursor, cnxn, "projects")
 
     io_merged = select_all_from_table(cursor, cnxn, "ios")
