@@ -377,19 +377,20 @@ def upload_forecast_merged():
     # Non-personnel
     if form.get("Non_personnel_cost"):
         df_nonpc = pd.DataFrame([nonpc_row])
+        print(df_nonpc)
         try:
             df_nonpc["IO"] = df_nonpc["IO"].astype(int)
         except:
             pass
-        try:
-            from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_local_m
-            changed = upload_nonpc_forecasts_local_m(df_nonpc)
-            if changed > 0:
-                results.append("Non-personnel forecast uploaded successfully.")
-            else:
-                results.append("Non-personnel forecast already exists.")
-        except Exception as e:
-            results.append(f"Non-personnel upload failed: {e}")
+        # try:
+            # from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_local_m
+        changed = upload_nonpc_forecasts_local_m(df_nonpc)
+        if changed > 0:
+            results.append("Non-personnel forecast uploaded successfully.")
+        else:
+            results.append("Non-personnel forecast already exists.")
+        # except Exception as e:
+        #     results.append(f"Non-personnel upload failed: {e}")
     # Personnel
     if form.get("Personnel_cost"):
         df_pc = pd.DataFrame([pc_row])

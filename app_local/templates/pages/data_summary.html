@@ -27,7 +27,7 @@
                 <option value="All" {% if selected_department == 'All' %}selected{% endif %}>All</option>
                 {% if departments %}
                     {% for d in departments %}
-                        <option value="{{ d }}" {% if selected_department and selected_department == d %}selected{% endif %}>{{ d }}</option>
+                        <option value="{{ d.name }}" data-po-id="{{ d.po_id }}" {% if selected_department and selected_department == d.name %}selected{% endif %}>{{ d.name }}</option>
                     {% endfor %}
                 {% endif %}
             </select>
@@ -38,7 +38,7 @@
                 <option value="All" {% if selected_io == 'All' %}selected{% endif %}>All</option>
                 {% if ios %}
                     {% for i in ios %}
-                        <option value="{{ i }}" {% if selected_io and selected_io == i %}selected{% endif %}>{{ i }}</option>
+                        <option value="{{ i.value }}" data-po-id="{{ i.po_id }}" data-project-id="{{ i.project_id }}" {% if selected_io and selected_io == i.value %}selected{% endif %}>{{ i.value }}</option>
                     {% endfor %}
                 {% endif %}
             </select>
@@ -49,7 +49,7 @@
                 <option value="All" {% if selected_project == 'All' %}selected{% endif %}>All</option>
                 {% if projects %}
                     {% for proj in projects %}
-                        <option value="{{ proj }}" {% if selected_project and selected_project == proj %}selected{% endif %}>{{ proj }}</option>
+                        <option value="{{ proj.name }}" data-po-id="{{ proj.po_id }}" data-dept-id="{{ proj.dept_id }}" data-project-id="{{ proj.id }}" {% if selected_project and selected_project == proj.name %}selected{% endif %}>{{ proj.name }}</option>
                     {% endfor %}
                 {% endif %}
             </select>
@@ -68,32 +68,202 @@
         </form>
 </form>
 
-        {% if results_list %}
+        {% if summary_row %}
             <hr>
-            <h3>Results</h3>
-            {% for res in results_list %}
-                <div style="margin-top:18px;">
-                    <h4>{{ res.title }}</h4>
-                    <table class="display" style="width:100%" border="1">
-                        <thead>
-                            <tr>
-                                {% for col in res.columns %}
-                                    <th>{{ col }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in res.data %}
-                                <tr>
-                                    {% for item in row %}
-                                        <td>{{ item }}</td>
-                                    {% endfor %}
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-            {% endfor %}
+            <h3>Aggregated Summary</h3>
+            <table id="summary_table" class="display" style="width:60%" border="1">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Forecasted Expense</td>
+                        <td>{{ summary_row['Forecasted Expense'] }}</td>
+                    </tr>
+                    <tr>
+                        <td>Budget and Funding</td>
+                        <td>{{ summary_row['Budget and Funding'] }}</td>
+                    </tr>
+                    <tr>
+                        <td>Actual Expenditure</td>
+                        <td>{{ summary_row['Actual Expenditure'] }}</td>
+                    </tr>
+                </tbody>
+            </table>
         {% endif %}
+    <script>
+    (function(){
+        var poSelect = document.getElementById('po');
+        var deptSelect = document.getElementById('department');
+        var ioSelect = document.getElementById('io');
+        var projSelect = document.getElementById('project');
+
+        function hideNonAll(selectEl){
+            if(!selectEl) return;
+            for(var i=0;i<selectEl.options.length;i++){
+                var opt = selectEl.options[i];
+                if(opt.value === '' || opt.value === 'All'){
+                    opt.style.display = '';
+                } else {
+                    opt.style.display = 'none';
+                }
+            }
+            // reset to placeholder
+            selectEl.value = '';
+        }
+
+        function filterByPo(selectEl, poId){
+            if(!selectEl) return;
+            for(var i=0;i<selectEl.options.length;i++){
+                var opt = selectEl.options[i];
+                if(opt.value === '' || opt.value === 'All'){
+                    opt.style.display = '';
+                    continue;
+                }
+                var optPo = opt.getAttribute('data-po-id');
+                if(!poId || poId === '' || String(optPo) === 'None' || optPo === null){
+                    // show all if poId not provided
+                    opt.style.display = '';
+                } else {
+                    if(String(optPo) === String(poId)){
+                        opt.style.display = '';
+                    } else {
+                        opt.style.display = 'none';
+                        if(selectEl.value === opt.value){ selectEl.value = ''; }
+                    }
+                }
+            }
+        }
+
+        // initialize: hide all non-All options until a PO is selected
+        hideNonAll(deptSelect);
+        hideNonAll(ioSelect);
+        hideNonAll(projSelect);
+
+        if(poSelect){
+            poSelect.addEventListener('change', function(){
+                var selectedPoOption = poSelect.options[poSelect.selectedIndex];
+                var poId = selectedPoOption ? selectedPoOption.getAttribute('data-po-id') : null;
+                if(!poId || poId === 'None' || poId === ''){
+                    // if user selected All or placeholder, show only All option
+                    hideNonAll(deptSelect);
+                    hideNonAll(ioSelect);
+                    hideNonAll(projSelect);
+                } else {
+                    filterByPo(deptSelect, poId);
+                    filterByPo(ioSelect, poId);
+                    filterByPo(projSelect, poId);
+                }
+            });
+
+            // run once in case a PO is preselected on page load
+            (function initRun(){
+                var selectedPoOption = poSelect.options[poSelect.selectedIndex];
+                var poId = selectedPoOption ? selectedPoOption.getAttribute('data-po-id') : null;
+                if(poId && poId !== '' && poId !== 'None'){
+                    filterByPo(deptSelect, poId);
+                    filterByPo(ioSelect, poId);
+                    filterByPo(projSelect, poId);
+                }
+            })();
+        }
+
+        // Department -> filter Projects and IOs
+        if(deptSelect){
+            deptSelect.addEventListener('change', function(){
+                var selDeptOpt = deptSelect.options[deptSelect.selectedIndex];
+                var deptId = selDeptOpt ? selDeptOpt.getAttribute('data-dept-id') : null;
+                // if deptId not present or 'All', apply PO filter only
+                if(!deptId || deptId === '' || deptId === 'None' || deptSelect.value === 'All'){
+                    // re-apply PO filter
+                    var poOpt = poSelect.options[poSelect.selectedIndex];
+                    var poId = poOpt ? poOpt.getAttribute('data-po-id') : null;
+                    if(poId && poId !== '' && poId !== 'None'){
+                        filterByPo(projSelect, poId);
+                        filterByPo(ioSelect, poId);
+                    } else {
+                        hideNonAll(projSelect);
+                        hideNonAll(ioSelect);
+                    }
+                    return;
+                }
+                // show only projects whose data-dept-id matches
+                for(var i=0;i<projSelect.options.length;i++){
+                    var opt = projSelect.options[i];
+                    if(opt.value === '' || opt.value === 'All') { opt.style.display = ''; continue; }
+                    var optDept = opt.getAttribute('data-dept-id');
+                    if(String(optDept) === String(deptId)){
+                        opt.style.display = '';
+                    } else {
+                        opt.style.display = 'none';
+                        if(projSelect.value === opt.value) projSelect.value = '';
+                    }
+                }
+                // Now filter IOs to those whose data-project-id belongs to visible projects
+                var visibleProjectIds = [];
+                for(var i=0;i<projSelect.options.length;i++){
+                    var opt = projSelect.options[i];
+                    if(opt.style.display !== 'none' && opt.value !== '' && opt.value !== 'All'){
+                        var pid = opt.getAttribute('data-project-id');
+                        if(pid) visibleProjectIds.push(String(pid));
+                    }
+                }
+                for(var j=0;j<ioSelect.options.length;j++){
+                    var iopt = ioSelect.options[j];
+                    if(iopt.value === '' || iopt.value === 'All'){ iopt.style.display = ''; continue; }
+                    var iProj = iopt.getAttribute('data-project-id');
+                    if(iProj && visibleProjectIds.indexOf(String(iProj)) !== -1){
+                        iopt.style.display = '';
+                    } else {
+                        iopt.style.display = 'none';
+                        if(ioSelect.value === iopt.value) ioSelect.value = '';
+                    }
+                }
+            });
+        }
+
+        // Project -> filter IOs
+        if(projSelect){
+            projSelect.addEventListener('change', function(){
+                var selProjOpt = projSelect.options[projSelect.selectedIndex];
+                var projId = selProjOpt ? selProjOpt.getAttribute('data-project-id') : null;
+                if(!projId || projId === '' || projId === 'None' || projSelect.value === 'All'){
+                    // if no project selected, re-apply department or PO filters
+                    var deptOpt = deptSelect.options[deptSelect.selectedIndex];
+                    var deptId = deptOpt ? deptOpt.getAttribute('data-dept-id') : null;
+                    if(deptId && deptId !== '' && deptId !== 'None'){
+                        // trigger dept change handler to recompute IO filtering
+                        var evt = new Event('change');
+                        deptSelect.dispatchEvent(evt);
+                    } else {
+                        // fallback to PO filter
+                        var poOpt = poSelect.options[poSelect.selectedIndex];
+                        var poId = poOpt ? poOpt.getAttribute('data-po-id') : null;
+                        if(poId && poId !== '' && poId !== 'None'){
+                            filterByPo(ioSelect, poId);
+                        } else {
+                            hideNonAll(ioSelect);
+                        }
+                    }
+                    return;
+                }
+                for(var j=0;j<ioSelect.options.length;j++){
+                    var iopt = ioSelect.options[j];
+                    if(iopt.value === '' || iopt.value === 'All'){ iopt.style.display = ''; continue; }
+                    var iProj = iopt.getAttribute('data-project-id');
+                    if(String(iProj) === String(projId)){
+                        iopt.style.display = '';
+                    } else {
+                        iopt.style.display = 'none';
+                        if(ioSelect.value === iopt.value) ioSelect.value = '';
+                    }
+                }
+            });
+        }
+    })();
+    </script>
 </body>
 </html>

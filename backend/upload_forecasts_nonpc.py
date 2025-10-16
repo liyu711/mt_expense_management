@@ -31,7 +31,7 @@ def upload_nonpc_forecasts_local(df_upload):
 def upload_nonpc_forecasts_local_m(df_upload):
     conn = cl.connect_local()
     engine, cursor, cnxn = conn.connect_to_db(engine=True)
-    df_fin = upload_nonpc_forecasts_df(df_upload, engine, cursor, cnxn, 'local')
+    df_fin = upload_nonpc_forecasts_df2(df_upload, engine, cursor, cnxn, 'local')
     existing_values = select_columns_from_table(cursor, "project_forecasts_nonpc", table_column_dict["project_forecasts_nonpc"])
     
     shared_columns = [col for col in df_fin.columns if col in existing_values.columns and col != 'non_personnel_expense']
