@@ -4,6 +4,9 @@
     <meta charset="utf-8">
     <title>Data Summary</title>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    <style>
+        .hidden { display: none; }
+    </style>
 </head>
 <body>
     {% include 'sidebar.html' %}
@@ -20,7 +23,7 @@
                     {% endfor %}
                 {% endif %}
             </select>
-            <div id="department_wrapper" style="margin-top:10px; {% if not selected_po %}display:none;{% endif %}">
+            <div id="department_wrapper" class="{% if not selected_po %}hidden{% endif %}" style="margin-top:10px;">
                 <label for="department">Choose Department</label>
                 <select name="department" id="department">
                     <option value="">-- select Department --</option>
@@ -33,7 +36,7 @@
                     {% endif %}
                 </select>
             </div>
-            <div id="fiscal_year_wrapper" style="margin-top:10px; {% if not selected_department %}display:none;{% endif %}">
+            <div id="fiscal_year_wrapper" class="{% if not selected_department or not selected_po %}hidden{% endif %}" style="margin-top:10px;">
                 <label for="fiscal_year">Choose Fiscal Year</label>
                 <select name="fiscal_year" id="fiscal_year">
                     <option value="">-- select Year --</option>
@@ -45,6 +48,39 @@
                     {% endif %}
                 </select>
             </div>
+            <div id="project_wrapper" class="{% if not selected_fiscal_year %}hidden{% endif %}" style="margin-top:10px;">
+                <label for="project">Choose Project</label>
+                <select name="project" id="project">
+                    <option value="">-- select Project --</option>
+                    <option value="All" {% if selected_project == 'All' %}selected{% endif %}>All</option>
+                    {% if projects %}
+                        {% for p in projects %}
+                            {% set pname = p.get('name') or p.get('Project') or p.get('project') %}
+                            <option value="{{ pname }}" data-project="{{ pname }}" {% if selected_project and selected_project == pname %}selected{% endif %}>{{ pname }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            <script>
+                (function(){
+                    var project = document.getElementById('project');
+                    if(!project) return;
+                    project.addEventListener('change', function(){
+                        var val = project.value;
+                        fetch('/data_summary/project_selection', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ project: val })
+                        }).then(function(resp){
+                            if(resp.ok){
+                                window.location.reload();
+                            } else {
+                                console.error('Failed to set Project');
+                            }
+                        }).catch(function(err){ console.error(err); });
+                    });
+                })();
+            </script>
             <script>
                 (function(){
                     var dept = document.getElementById('department');
@@ -53,9 +89,12 @@
                     dept.addEventListener('change', function(){
                         // show/hide fiscal year wrapper immediately when department selected
                         if(fyWrap){
-                            if(dept.value && dept.value !== '') fyWrap.style.display = '';
-                            else fyWrap.style.display = 'none';
-                        }
+                                // show fiscal year only when a department is selected and a PO is selected
+                                var poSel = document.getElementById('po');
+                                var poHas = poSel && poSel.value && poSel.value !== '';
+                                if(dept.value && dept.value !== '' && poHas) fyWrap.style.display = '';
+                                else fyWrap.style.display = 'none';
+                            }
                         var val = dept.value;
                         fetch('/data_summary/department_selection', {
                             method: 'POST',

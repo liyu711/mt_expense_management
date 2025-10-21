@@ -10,6 +10,7 @@ data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates
 selected_po = None
 selected_department = None
 selected_fiscal_year = None
+selected_project = None
 
 
 @data_summary_bp.route('/data_summary', methods=['GET', 'POST'])
@@ -77,7 +78,35 @@ def data_summary():
             departments = []
 
     # return template with current module-level selections
-    return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department, fiscal_years=fiscal_years, selected_fiscal_year=selected_fiscal_year)
+    # Build projects list filtered by server-side selections
+    projects = []
+    if project_df is not None:
+        try:
+            raw_projects = project_df.to_dict(orient='records')
+        except Exception:
+            raw_projects = []
+
+        try:
+            for p in raw_projects:
+                proj_name = p.get('Project') or p.get('project') or p.get('name')
+                po_name = p.get('PO Name') or p.get('PO') or p.get('po_name')
+                dept_name = p.get('Department Name') or p.get('Department') or p.get('department')
+                fy = p.get('Fiscal Year') or p.get('fiscal_year')
+                rec = {'name': proj_name, 'po_name': po_name, 'department_name': dept_name, 'fiscal_year': fy}
+                # apply server-side filters if selections exist (treat 'All' as wildcard)
+                ok = True
+                if selected_po and selected_po != '' and selected_po != 'All':
+                    ok = ok and (po_name == selected_po)
+                if selected_department and selected_department != '' and selected_department != 'All':
+                    ok = ok and (dept_name == selected_department)
+                if selected_fiscal_year and selected_fiscal_year != '' and selected_fiscal_year != 'All':
+                    ok = ok and (str(fy) == str(selected_fiscal_year))
+                if ok:
+                    projects.append(rec)
+        except Exception:
+            projects = []
+
+    return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department, fiscal_years=fiscal_years, selected_fiscal_year=selected_fiscal_year, projects=projects, selected_project=selected_project)
 
 
 @data_summary_bp.route('/data_summary/po_selection', methods=['POST'])
@@ -126,6 +155,23 @@ def fiscal_year_selection():
             val = request.form.get('fiscal_year')
         selected_fiscal_year = val
         return {'status': 'ok', 'selected_fiscal_year': selected_fiscal_year}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+
+@data_summary_bp.route('/data_summary/project_selection', methods=['POST'])
+def project_selection():
+    """Endpoint to receive Project selection and update server-side selected_project."""
+    global selected_project
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('project')
+        else:
+            val = request.form.get('project')
+        selected_project = val
+        return {'status': 'ok', 'selected_project': selected_project}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
 
