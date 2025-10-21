@@ -1,7 +1,7 @@
 from flask import render_template, request, Blueprint
 from backend.connect_local import connect_local, select_all_from_table
 from backend.display_names import DISPLAY_NAMES
-from backend import get_departments_display
+from backend import get_departments_display, get_forecasts_display, get_pc_display
 import pandas as pd
 
 data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates')
@@ -22,8 +22,8 @@ def data_summary():
     departments_df = get_departments_display()
     project_df = select_all_from_table(cursor, cnxn, 'projects')
     IO_df = select_all_from_table(cursor, cnxn, 'ios')
-    pc_forecast_df = select_all_from_table(cursor, cnxn, 'project_forecasts_pc')
-    non_pc_forecast_df = select_all_from_table(cursor, cnxn, 'project_forecasts_nonpc')
+    pc_forecast_df = get_pc_display()
+    non_pc_forecast_df = get_forecasts_display()
     expense_df = select_all_from_table(cursor, cnxn, 'expenses')
     budget_df = select_all_from_table(cursor, cnxn, 'budgets')
     funding_df = select_all_from_table(cursor, cnxn, 'fundings')
