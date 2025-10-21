@@ -295,3 +295,44 @@ def get_pc_display():
 
 	return df.reset_index(drop=True)
 
+
+def get_projects_display():
+	"""Return a DataFrame of available projects based on project_forecasts_nonpc.
+
+	Behavior:
+	- Calls get_forecasts_display() to obtain a cleaned forecasts DataFrame
+	- Drops 'Project Category' and 'id' columns if present
+	- If a 'Project' column exists, returns a deduplicated DataFrame with one row per Project (preserving other display columns like PO Name, Department Name when available)
+	- Otherwise returns the modified DataFrame as-is
+	"""
+	try:
+		df = get_forecasts_display()
+	except Exception:
+		return pd.DataFrame()
+
+	if df is None or df.empty:
+		return pd.DataFrame() if df is None else df
+
+	cols_to_drop = [c for c in ['Project Category', 'id'] if c in df.columns]
+	if cols_to_drop:
+		try:
+			df = df.drop(columns=cols_to_drop)
+		except Exception:
+			pass
+
+	# If Project column exists, deduplicate by Project (keep first occurrence)
+	if 'Project' in df.columns:
+		try:
+			# keep first occurrence and preserve PO/Department if present
+			subset_cols = ['Project', 'PO Name', 'Department Name']
+			present_subset = [c for c in subset_cols if c in df.columns]
+			projects_df = df.drop_duplicates(subset=['Project']).reset_index(drop=True)
+			return projects_df
+		except Exception:
+			return df.reset_index(drop=True)
+
+	return df.reset_index(drop=True)
+
+
+# def get_pc_sum():
+	

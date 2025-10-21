@@ -1,7 +1,7 @@
 from flask import render_template, request, Blueprint
 from backend.connect_local import connect_local, select_all_from_table
 from backend.display_names import DISPLAY_NAMES
-from backend import get_departments_display, get_forecasts_display, get_pc_display
+from backend import get_departments_display, get_forecasts_display, get_pc_display, get_projects_display
 import pandas as pd
 
 data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates')
@@ -20,7 +20,7 @@ def data_summary():
     # Prepare DataFrame variables from database tables for use in summary and filtering
     po_df = select_all_from_table(cursor, cnxn, 'pos')
     departments_df = get_departments_display()
-    project_df = select_all_from_table(cursor, cnxn, 'projects')
+    project_df = get_projects_display()
     IO_df = select_all_from_table(cursor, cnxn, 'ios')
     pc_forecast_df = get_pc_display()
     non_pc_forecast_df = get_forecasts_display()
@@ -128,3 +128,4 @@ def fiscal_year_selection():
         return {'status': 'ok', 'selected_fiscal_year': selected_fiscal_year}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
+
