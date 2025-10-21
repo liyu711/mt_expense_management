@@ -12,11 +12,7 @@ def get_departments_display():
 	"""
 	conn = connect_local()
 	cursor, cnxn = conn.connect_to_db()
-
-
 	depts = select_all_from_table(cursor, cnxn, 'departments')
-
-
 	pos = select_all_from_table(cursor, cnxn, 'pos')
 
 	# if pos missing, return department names with po_name as None
@@ -29,8 +25,8 @@ def get_departments_display():
 		out['po_name'] = None
 		return out.reset_index(drop=True)
 
-
 	merged = pd.merge(depts, pos, how='left', left_on='po_id', right_on='id', suffixes=('_departments', '_po'))
 	merged.drop(columns=['id_departments', 'po_id', 'id_po'], inplace=True)
 
 	return merged.reset_index(drop=True)
+

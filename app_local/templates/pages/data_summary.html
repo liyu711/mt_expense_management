@@ -33,11 +33,29 @@
                     {% endif %}
                 </select>
             </div>
+            <div id="fiscal_year_wrapper" style="margin-top:10px; {% if not selected_department %}display:none;{% endif %}">
+                <label for="fiscal_year">Choose Fiscal Year</label>
+                <select name="fiscal_year" id="fiscal_year">
+                    <option value="">-- select Year --</option>
+                    <option value="All" {% if selected_fiscal_year == 'All' %}selected{% endif %}>All</option>
+                    {% if fiscal_years %}
+                        {% for y in fiscal_years %}
+                            <option value="{{ y }}" {% if selected_fiscal_year and selected_fiscal_year == y %}selected{% endif %}>{{ y }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
             <script>
                 (function(){
                     var dept = document.getElementById('department');
                     if(!dept) return;
+                    var fyWrap = document.getElementById('fiscal_year_wrapper');
                     dept.addEventListener('change', function(){
+                        // show/hide fiscal year wrapper immediately when department selected
+                        if(fyWrap){
+                            if(dept.value && dept.value !== '') fyWrap.style.display = '';
+                            else fyWrap.style.display = 'none';
+                        }
                         var val = dept.value;
                         fetch('/data_summary/department_selection', {
                             method: 'POST',
@@ -48,6 +66,27 @@
                                 window.location.reload();
                             } else {
                                 console.error('Failed to set Department');
+                            }
+                        }).catch(function(err){ console.error(err); });
+                    });
+                })();
+            </script>
+
+            <script>
+                (function(){
+                    var fy = document.getElementById('fiscal_year');
+                    if(!fy) return;
+                    fy.addEventListener('change', function(){
+                        var val = fy.value;
+                        fetch('/data_summary/fiscal_year_selection', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ fiscal_year: val })
+                        }).then(function(resp){
+                            if(resp.ok){
+                                window.location.reload();
+                            } else {
+                                console.error('Failed to set Fiscal Year');
                             }
                         }).catch(function(err){ console.error(err); });
                     });

@@ -9,6 +9,7 @@ data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates
 # module-level selection state for data_summary page
 selected_po = None
 selected_department = None
+selected_fiscal_year = None
 
 
 @data_summary_bp.route('/data_summary', methods=['GET', 'POST'])
@@ -76,7 +77,7 @@ def data_summary():
             departments = []
 
     # return template with current module-level selections
-    return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department)
+    return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department, fiscal_years=fiscal_years, selected_fiscal_year=selected_fiscal_year)
 
 
 @data_summary_bp.route('/data_summary/po_selection', methods=['POST'])
@@ -109,5 +110,21 @@ def department_selection():
             val = request.form.get('department')
         selected_department = val
         return {'status': 'ok', 'selected_department': selected_department}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@data_summary_bp.route('/data_summary/fiscal_year_selection', methods=['POST'])
+def fiscal_year_selection():
+    """Endpoint to receive Fiscal Year selection and update server-side selected_fiscal_year."""
+    global selected_fiscal_year
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('fiscal_year')
+        else:
+            val = request.form.get('fiscal_year')
+        selected_fiscal_year = val
+        return {'status': 'ok', 'selected_fiscal_year': selected_fiscal_year}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
