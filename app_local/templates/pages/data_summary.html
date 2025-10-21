@@ -20,7 +20,7 @@
                     {% endfor %}
                 {% endif %}
             </select>
-            <div style="margin-top:10px;">
+            <div id="department_wrapper" style="margin-top:10px; {% if not selected_po %}display:none;{% endif %}">
                 <label for="department">Choose Department</label>
                 <select name="department" id="department">
                     <option value="">-- select Department --</option>
@@ -35,9 +35,35 @@
             </div>
             <script>
                 (function(){
+                    var dept = document.getElementById('department');
+                    if(!dept) return;
+                    dept.addEventListener('change', function(){
+                        var val = dept.value;
+                        fetch('/data_summary/department_selection', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ department: val })
+                        }).then(function(resp){
+                            if(resp.ok){
+                                window.location.reload();
+                            } else {
+                                console.error('Failed to set Department');
+                            }
+                        }).catch(function(err){ console.error(err); });
+                    });
+                })();
+            </script>
+            <script>
+                (function(){
                     var po = document.getElementById('po');
+                    var deptWrap = document.getElementById('department_wrapper');
                     if(!po) return;
                     po.addEventListener('change', function(){
+                        // show/hide department wrapper immediately when a PO is selected
+                        if(deptWrap){
+                            if(po.value && po.value !== '') deptWrap.style.display = '';
+                            else deptWrap.style.display = 'none';
+                        }
                         var val = po.value;
                         // send selection to server
                         fetch('/data_summary/po_selection', {

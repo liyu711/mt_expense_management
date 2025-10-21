@@ -8,6 +8,7 @@ data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates
 
 # module-level selection state for data_summary page
 selected_po = None
+selected_department = None
 
 
 @data_summary_bp.route('/data_summary', methods=['GET', 'POST'])
@@ -74,8 +75,7 @@ def data_summary():
         except Exception:
             departments = []
 
-    # selected filter placeholders (dropdowns removed)
-    selected_department = None
+    # return template with current module-level selections
     return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department)
 
 
@@ -93,5 +93,21 @@ def po_selection():
         # set global selection
         selected_po = val
         return {'status': 'ok', 'selected_po': selected_po}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@data_summary_bp.route('/data_summary/department_selection', methods=['POST'])
+def department_selection():
+    """Endpoint to receive Department selection from client and update server-side selected_department."""
+    global selected_department
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('department')
+        else:
+            val = request.form.get('department')
+        selected_department = val
+        return {'status': 'ok', 'selected_department': selected_department}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
