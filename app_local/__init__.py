@@ -10,6 +10,7 @@ from app_local.manual_upload import manual_upload
 from app_local.select_data import select_data
 from app_local.modify_tables import modify_tables
 from app_local.data_vis import data_vis
+from app_local.data_summary import data_summary_bp
 from backend.connect_local import \
     connect_local, initialize_database, close_connection, select_all_from_table
 
@@ -23,6 +24,7 @@ app.register_blueprint(manual_upload)
 app.register_blueprint(select_data)
 app.register_blueprint(modify_tables)
 app.register_blueprint(data_vis)
+app.register_blueprint(data_summary_bp)
 
 
 # Jinja filter to render numbers with 1 decimal when possible
