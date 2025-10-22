@@ -45,8 +45,6 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
         local_data = local_data[['name_x', 'category_id', 'id']]
         local_data = local_data.rename(columns={'name_x': 'name', 'category_id': 'category_id', 'id': 'department_id'})
 
-
-
     if table_name == "ios":
         projects_merged = select_all_from_table(cursor, cnxn, "projects")
         try:
@@ -136,9 +134,9 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
     #     upload_df = merge_departments(cur_table, local_data)
     # else:
     if table_name == 'departments':
-        print('test')
         upload_df = merge_departments(cur_table, local_data)
     else:
+        print(merge_on)
         upload_df = merge_dataframes(cur_table, local_data, merge_columns, merge_on)
     # 4. Upload new/merged data to the table
     upload_df.to_sql(table_name, con=engine, if_exists='append', index=False)

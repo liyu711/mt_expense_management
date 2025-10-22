@@ -67,7 +67,7 @@ modify_table_config = {
         'fields': [
             {'name': 'category', 'type': 'text', 'label': 'Staff Category'},
         ],
-        'merge_on': 'name',
+        'merge_on': ['name'],
         'columns': ['name']
     },
     'modify_staff_cost': {
@@ -358,6 +358,8 @@ def modify_table_router(action):
                     keep_cols = [c for c in expected_cols if c in df_upload.columns]
                     if keep_cols:
                         df_upload = df_upload[keep_cols]
+                    df_upload['cost'] = df_upload['cost'].astype(float)
+                    
                 except Exception:
                     # Fallback: try a simple rename if mapping failed
                     try:

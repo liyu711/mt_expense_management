@@ -7,22 +7,34 @@ def join_tables(left, right, left_col, right_col, drops, rename_dic):
     return res
 
 def merge_dataframes(cloud, local, columns, merge_on, departments=False):
-    print(local)
-    local = local.drop_duplicates().reset_index(drop=True)
-    local.columns = columns
-    upload = local[~local[merge_on].isin(cloud[merge_on])]
-    return upload
+    """
+    Return rows from `local` that are not exact duplicates of any row in `cloud`.
 
+    This merges `local` with `cloud` using the full set of target `columns` and
+    keeps only rows that do not have an exact match in `cloud`.
+    """
+    # Normalize column names on the incoming local DataFrame
+    local.columns = columns
+
+    # Ensure cloud has the same columns so we can compare row-wise
+    cloud_subset = cloud.copy()
+    for c in columns:
+        if c not in cloud_subset.columns:
+            cloud_subset[c] = pd.NA
+
+    # Merge on all columns and use the indicator to find left-only rows
+    merged = pd.merge(local, cloud_subset[columns], on=columns, how='left', indicator=True)
+    upload = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge']).reset_index(drop=True)
+    return upload
 
 # Not used, need to check if is used
 def merge_cost_elements(cloud, local, columns, merge_on):
-    local = local.drop_duplicates('Cost element').reset_index(drop=True)
+    # Deduplication intentionally left to caller; preserve incoming rows as-is
     local.columns = columns
     upload = local[~local[merge_on].isin(cloud[merge_on])]
     return upload
 
 def merge_departments(cloud, local):
-    local = local.drop_duplicates().reset_index(drop=True)
     local.columns = ['name', 'po_id']
     # print(type(local))
     upload = local[~local['name'].isin(cloud['name'])]
