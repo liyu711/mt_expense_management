@@ -21,9 +21,34 @@ def upload_capex_budget_df(df_upload, engine, cursor, cnxn, type, clear=True):
     print(df_upload.columns)
     df_upload['fiscal_year'] = df_upload['fiscal_year'].astype(int)
 
+    # remove exact duplicate upload rows early to avoid duplicates
+    try:
+        dedupe_cols = [c for c in ['PO', 'for_project', 'Department', 'fiscal_year'] if c in df_upload.columns]
+        if dedupe_cols:
+            df_upload = df_upload.drop_duplicates(subset=dedupe_cols, keep='first')
+    except Exception:
+        pass
+
     departments = select_all_from_table(cursor, cnxn, "departments")
     po = select_all_from_table(cursor, cnxn, "POs")
     projects = select_all_from_table(cursor, cnxn, "projects")
+
+    # ensure reference tables have unique join keys to avoid multiplicative merges
+    try:
+        if departments is not None and not departments.empty and 'name' in departments.columns:
+            departments = departments.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
+    try:
+        if po is not None and not po.empty and 'name' in po.columns:
+            po = po.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
+    try:
+        if projects is not None and not projects.empty and 'name' in projects.columns:
+            projects = projects.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
 
     # df_upload = join_tables(
     #     df_upload,
@@ -51,6 +76,13 @@ def upload_capex_budget_df(df_upload, engine, cursor, cnxn, type, clear=True):
         ['for_project', 'name', 'category_id', 'Department'],
         {'id': 'project_id', 'fiscal_year': 'cap_year'}
     )
+    # deduplicate final merged DataFrame on id keys when present
+    try:
+        dedupe_ids = [c for c in ['po_id', 'project_id', 'department_id', 'cap_year'] if c in df_upload.columns]
+        if dedupe_ids:
+            df_upload = df_upload.drop_duplicates(subset=dedupe_ids, keep='first')
+    except Exception:
+        pass
     # df_upload['department_id'] = df_upload['department_id'].astype(int)
     # df_upload.to_sql('capex_budgets', con=engine, if_exists='append', index=False)
 

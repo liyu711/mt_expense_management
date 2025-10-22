@@ -71,7 +71,7 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
             'department',
             'name',
             ['department', 'name', 'po_id'],
-            {'id': 'department_id'}
+            {'id': 'department_id_k'}
         )
 
         local_data = join_tables(
@@ -91,7 +91,6 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
             ['project_name', 'name', 'category_id'],
             {'id': 'project_id', 'Forecast': 'capex_forecast'}
         )
-        print(local_data.columns)
         local_data = local_data[['po_id', 'department_id', 'cap_year', 'project_id', 'capex_description', 'capex_forecast', 'cost_center']]
 
 
@@ -110,7 +109,7 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
             'department',
             'name',
             ['department', 'name', 'po_id'],
-            {'id': 'department_id'}
+            {'id': 'department_id_k'}
         )
 
         local_data = join_tables(
@@ -133,13 +132,14 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
         local_data = local_data[['po_id', 'department_id',  'project_id', 'cap_year','capex_description', 'approved_budget']]
 
     # 3. Merge new data with current table
+    # if table_name == 'departments':
+    #     upload_df = merge_departments(cur_table, local_data)
+    # else:
     if table_name == 'departments':
+        print('test')
         upload_df = merge_departments(cur_table, local_data)
     else:
         upload_df = merge_dataframes(cur_table, local_data, merge_columns, merge_on)
-    
-    print(local_data)
-    print(upload_df)
     # 4. Upload new/merged data to the table
     upload_df.to_sql(table_name, con=engine, if_exists='append', index=False)
 

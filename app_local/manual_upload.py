@@ -8,11 +8,19 @@ from app_local.select_data import transform_table
 from backend import \
     upload_nonpc_forecasts_local_m, upload_pc_forecasts_local_m,\
     upload_budgets_local_m, upload_expenses_local, upload_fundings_local, \
-    upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local
+    upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local, get_projects_display
 from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_df, upload_nonpc_forecasts_local_m
 import pandas as pd
 
 manual_upload = Blueprint('manual_upload', __name__, template_folder='templates')
+# module-level selected PO for manual input page
+selected_po = None
+# module-level selected Department for manual input page
+selected_department = None
+# module-level selected Fiscal Year for manual input page
+selected_fiscal_year = None
+# module-level selected Project for manual input page
+selected_project = None
 input_types = [
         "forecast_nonpc",
         "forecast_pc" ,
@@ -62,11 +70,99 @@ titles = {
 def render_mannual_input():
     conn = connect_local()
     engine, cursor, cnxn = conn.connect_to_db(engine=True)
+    # load POs first so we can resolve selected_po -> po_id
+    pos_df = select_all_from_table(cursor, cnxn, 'pos')
+    if pos_df is None:
+        po = []
+    else:
+        po = []
+        for _, r in pos_df.iterrows():
+            pname = r['name'] if 'name' in r.index and pd.notna(r['name']) else (r.get('Name') if 'Name' in r.index else None)
+            pid = None
+            if 'id' in r.index and pd.notna(r['id']):
+                try:
+                    pid = int(r['id'])
+                except Exception:
+                    pid = None
+            po.append({'id': pid, 'name': pname})
+
+    # Resolve selected_po (name) -> selected_po_id using the POs table
+    selected_po_id = None
+    try:
+        if pos_df is not None and selected_po:
+            # normalize both sides for robust match
+            name_series = None
+            if 'name' in pos_df.columns:
+                name_series = pos_df['name']
+            elif 'Name' in pos_df.columns:
+                name_series = pos_df['Name']
+            if name_series is not None:
+                mask = name_series.astype(str).str.strip().str.lower() == str(selected_po).strip().lower()
+                match = pos_df[mask]
+                if not match.empty and 'id' in match.columns and pd.notna(match.iloc[0]['id']):
+                    try:
+                        selected_po_id = int(match.iloc[0]['id'])
+                    except Exception:
+                        selected_po_id = None
+    except Exception:
+        selected_po_id = None
     # load departments with their po_id so the UI can filter departments by selected PO
     depts_df = select_all_from_table(cursor, cnxn, 'departments')
     if depts_df is None:
+        departments_all = []
         departments = []
     else:
+        # Build complete department list for client-side dynamic filtering
+        departments_all = []
+        for _, r in depts_df.iterrows():
+            name = None
+            if 'name' in r.index and pd.notna(r['name']):
+                name = r['name']
+            elif 'Department' in r.index and pd.notna(r['Department']):
+                name = r['Department']
+            elif 'Name' in r.index and pd.notna(r['Name']):
+                name = r['Name']
+
+            # try several possible column names for po id
+            po_all_id = None
+            for key in ('po_id', 'PO_id', 'poId', 'po', 'PO'):
+                if key in r.index and pd.notna(r[key]):
+                    try:
+                        po_all_id = int(r[key])
+                    except Exception:
+                        try:
+                            po_all_id = int(str(r[key]))
+                        except Exception:
+                            po_all_id = None
+                    break
+
+            dept_all_id = None
+            if 'id' in r.index and pd.notna(r['id']):
+                try:
+                    dept_all_id = int(r['id'])
+                except Exception:
+                    dept_all_id = None
+
+            departments_all.append({'id': dept_all_id, 'name': name, 'po_id': po_all_id})
+
+        # If a PO has been selected, filter departments to those linked to that PO id
+        try:
+            if selected_po_id is not None:
+                possible_cols = [c for c in ('po_id', 'PO_id', 'poId', 'po', 'PO') if c in depts_df.columns]
+                if possible_cols:
+                    mask_total = None
+                    for c in possible_cols:
+                        try:
+                            coerced = pd.to_numeric(depts_df[c], errors='coerce')
+                        except Exception:
+                            coerced = pd.Series([pd.NA] * len(depts_df))
+                        mask_c = (coerced == selected_po_id)
+                        mask_total = mask_c if mask_total is None else (mask_total | mask_c)
+                    if mask_total is not None:
+                        depts_df = depts_df[mask_total.fillna(False)]
+        except Exception:
+            # If anything goes wrong during filtering, fall back to unfiltered departments
+            pass
         departments = []
         # iterate defensively over rows and normalize keys
         for _, r in depts_df.iterrows():
@@ -100,24 +196,43 @@ def render_mannual_input():
 
             departments.append({'id': dept_id, 'name': name, 'po_id': po_id})
 
-    # load POs as list of objects with id & name so template can expose data-po-id
-    pos_df = select_all_from_table(cursor, cnxn, 'pos')
-    if pos_df is None:
-        po = []
-    else:
-        po = []
-        for _, r in pos_df.iterrows():
-            pname = r['name'] if 'name' in r.index and pd.notna(r['name']) else (r.get('Name') if 'Name' in r.index else None)
-            pid = None
-            if 'id' in r.index and pd.notna(r['id']):
-                try:
-                    pid = int(r['id'])
-                except Exception:
-                    pid = None
-            po.append({'id': pid, 'name': pname})
+    # POs already loaded above
 
     io = select_all_from_table(cursor, cnxn, "ios")['IO_num']
-    projects = select_all_from_table(cursor, cnxn, 'projects')['name']
+    # Build initial projects list from the display helper and apply any module-level filters
+    try:
+        proj_df = get_projects_display()
+    except Exception:
+        proj_df = None
+    projects = []
+    if proj_df is not None:
+        try:
+            raw_projects = proj_df.to_dict(orient='records')
+        except Exception:
+            raw_projects = []
+        try:
+            seen = set()
+            for p in raw_projects:
+                proj_name = p.get('Project') or p.get('project') or p.get('name') or p.get('project_name')
+                po_name = p.get('PO Name') or p.get('PO') or p.get('po_name') or p.get('po')
+                dept_name = p.get('Department Name') or p.get('Department') or p.get('department')
+                fy_val = p.get('Fiscal Year') or p.get('fiscal_year') or p.get('fy')
+                if not proj_name:
+                    continue
+                ok = True
+                if selected_po and selected_po != '' and selected_po != 'All':
+                    ok = ok and (str(po_name) == str(selected_po))
+                if selected_department and selected_department != '' and selected_department != 'All':
+                    ok = ok and (str(dept_name) == str(selected_department))
+                if selected_fiscal_year and selected_fiscal_year != '' and selected_fiscal_year != 'All':
+                    ok = ok and (str(fy_val) == str(selected_fiscal_year))
+                if ok and proj_name not in seen:
+                    seen.add(proj_name)
+                    projects.append(proj_name)
+        except Exception:
+            projects = []
+    else:
+        projects = []
     project_categories = select_all_from_table(cursor, cnxn, "project_categories")['category']
     human_resource_categories = select_all_from_table(cursor, cnxn, "human_resource_categories")['name']
     # Fetch forecast table contents to show below the Add button
@@ -168,6 +283,7 @@ def render_mannual_input():
                            display_names=display_names, 
                            upload_columns=upload_columns,
                            departments = departments,
+                           departments_all = departments_all,
                            pos = po,
                            ios = io,
                            projects = projects,
@@ -225,6 +341,208 @@ def api_hr_cost():
             cnxn.close()
         except:
             pass
+
+
+@manual_upload.route('/manual_input/po_selection', methods=['POST'])
+def manual_po_selection():
+    """Endpoint to receive PO selection from client for manual input page and update module-level selected_po."""
+    global selected_po
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('po')
+        else:
+            val = request.form.get('po')
+        selected_po = val
+        return {'status': 'ok', 'selected_po': selected_po}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@manual_upload.route('/manual_input/department_selection', methods=['POST'])
+def manual_department_selection():
+    """Endpoint to receive Department selection from client for manual input page and update module-level selected_department."""
+    global selected_department
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('department')
+        else:
+            val = request.form.get('department')
+        selected_department = val
+        return {'status': 'ok', 'selected_department': selected_department}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@manual_upload.route('/manual_input/fiscal_year_selection', methods=['POST'])
+def manual_fiscal_year_selection():
+    """Endpoint to receive Fiscal Year selection from client for manual input page and update module-level selected_fiscal_year."""
+    global selected_fiscal_year
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('fiscal_year')
+        else:
+            val = request.form.get('fiscal_year')
+        selected_fiscal_year = val
+        return {'status': 'ok', 'selected_fiscal_year': selected_fiscal_year}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@manual_upload.route('/manual_input/departments', methods=['GET'])
+def manual_departments():
+    """Return departments filtered by the provided PO name (query param 'po')
+    or by the current module-level selected_po if no query param is provided.
+    Response JSON: {"departments": [{id, name, po_id}, ...]}
+    """
+    po_name = request.args.get('po') or selected_po
+    try:
+        db = connect_local()
+        # No need for SQLAlchemy engine here
+        cursor, cnxn = db.connect_to_db()
+
+        # Load POs and resolve po_name -> po_id
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        po_id = None
+        if pos_df is not None and po_name:
+            # Choose name column
+            name_col = 'name' if 'name' in pos_df.columns else ('Name' if 'Name' in pos_df.columns else None)
+            if name_col:
+                mask = pos_df[name_col].astype(str).str.strip().str.lower() == str(po_name).strip().lower()
+                match = pos_df[mask]
+                if not match.empty and 'id' in match.columns and pd.notna(match.iloc[0]['id']):
+                    try:
+                        po_id = int(match.iloc[0]['id'])
+                    except Exception:
+                        po_id = None
+
+        # Load departments
+        depts_df = select_all_from_table(cursor, cnxn, 'departments')
+        result = []
+        if depts_df is not None:
+            df = depts_df
+            # If po_id resolved, filter rows by any possible column variant
+            if po_id is not None:
+                possible_cols = [c for c in ('po_id', 'PO_id', 'poId', 'po', 'PO') if c in df.columns]
+                if possible_cols:
+                    mask_total = None
+                    for c in possible_cols:
+                        try:
+                            coerced = pd.to_numeric(df[c], errors='coerce')
+                        except Exception:
+                            coerced = pd.Series([pd.NA] * len(df))
+                        mask_c = (coerced == po_id)
+                        mask_total = mask_c if mask_total is None else (mask_total | mask_c)
+                    if mask_total is not None:
+                        df = df[mask_total.fillna(False)]
+            # Build output list
+            for _, r in df.iterrows():
+                name = None
+                if 'name' in r.index and pd.notna(r['name']):
+                    name = r['name']
+                elif 'Department' in r.index and pd.notna(r['Department']):
+                    name = r['Department']
+                elif 'Name' in r.index and pd.notna(r['Name']):
+                    name = r['Name']
+
+                dept_id = None
+                if 'id' in r.index and pd.notna(r['id']):
+                    try:
+                        dept_id = int(r['id'])
+                    except Exception:
+                        dept_id = None
+
+                d_po_id = None
+                for key in ('po_id', 'PO_id', 'poId', 'po', 'PO'):
+                    if key in r.index and pd.notna(r[key]):
+                        try:
+                            d_po_id = int(r[key])
+                        except Exception:
+                            try:
+                                d_po_id = int(str(r[key]))
+                            except Exception:
+                                d_po_id = None
+                        break
+
+                result.append({'id': dept_id, 'name': name, 'po_id': d_po_id})
+
+        return jsonify({'departments': result}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    finally:
+        try:
+            cursor.close()
+            cnxn.close()
+        except Exception:
+            pass
+
+
+@manual_upload.route('/manual_input/projects', methods=['GET'])
+def manual_projects():
+    """Return projects filtered by provided query params: po (name), department (name), fiscal_year.
+    If a param is not provided, fall back to module-level selected_* variables.
+    Response JSON: {'projects': [{'name': <str>} , ...]}
+    """
+    po_name = request.args.get('po') or selected_po
+    dept_name = request.args.get('department') or selected_department
+    fy = request.args.get('fiscal_year') or selected_fiscal_year
+    try:
+        proj_df = get_projects_display()
+    except Exception:
+        proj_df = None
+    result = []
+    if proj_df is None:
+        return jsonify({'projects': []}), 200
+    try:
+        raw = proj_df.to_dict(orient='records')
+    except Exception:
+        raw = []
+    try:
+        for p in raw:
+            proj_name = p.get('Project') or p.get('project') or p.get('name') or p.get('project_name')
+            po_val = p.get('PO Name') or p.get('PO') or p.get('po_name') or p.get('po')
+            dept_val = p.get('Department Name') or p.get('Department') or p.get('department')
+            fy_val = p.get('Fiscal Year') or p.get('fiscal_year') or p.get('fy')
+            if not proj_name:
+                continue
+            ok = True
+            if po_name and po_name != '' and po_name != 'All':
+                ok = ok and (str(po_val) == str(po_name))
+            if dept_name and dept_name != '' and dept_name != 'All':
+                ok = ok and (str(dept_val) == str(dept_name))
+            if fy and fy != '' and fy != 'All':
+                ok = ok and (str(fy_val) == str(fy))
+            if ok:
+                result.append({'name': proj_name})
+    except Exception:
+        result = []
+    # deduplicate preserving order
+    seen = set()
+    deduped = []
+    for r in result:
+        n = r.get('name')
+        if n not in seen:
+            seen.add(n)
+            deduped.append({'name': n})
+    return jsonify({'projects': deduped}), 200
+
+
+@manual_upload.route('/manual_input/project_selection', methods=['POST'])
+def manual_project_selection():
+    """Receive Project selection from client for manual input page and update module-level selected_project."""
+    global selected_project
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('project')
+        else:
+            val = request.form.get('project')
+        selected_project = val
+        return {'status': 'ok', 'selected_project': selected_project}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
 
 
 @manual_upload.route("/upload_forecast_nonpc", methods=['POST'])

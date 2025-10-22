@@ -15,10 +15,34 @@ def upload_capex_forecasts_df(df_upload, engine, cursor, cnxn, type):
     
     df_upload['PO'] = df_upload['PO'].astype(str)
     df_upload['cap_year'] = df_upload['cap_year'].astype(int)
+    # drop exact duplicate upload rows to avoid duplicates
+    try:
+        dedupe_cols = [c for c in ['PO', 'Project name', 'Department', 'cap_year'] if c in df_upload.columns]
+        if dedupe_cols:
+            df_upload = df_upload.drop_duplicates(subset=dedupe_cols, keep='first')
+    except Exception:
+        pass
     
     departments = select_all_from_table(cursor, cnxn, "departments")
     po = select_all_from_table(cursor, cnxn, "POs")
     projects = select_all_from_table(cursor, cnxn, "projects")
+
+    # ensure reference tables have unique keys for joins to prevent multiplicative merges
+    try:
+        if departments is not None and not departments.empty and 'name' in departments.columns:
+            departments = departments.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
+    try:
+        if po is not None and not po.empty and 'name' in po.columns:
+            po = po.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
+    try:
+        if projects is not None and not projects.empty and 'name' in projects.columns:
+            projects = projects.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
 
     # df_upload = join_tables(
     #     df_upload,
@@ -46,7 +70,14 @@ def upload_capex_forecasts_df(df_upload, engine, cursor, cnxn, type):
         ['Project name', 'name', 'category_id', 'Department'],
         {'id': 'project_id', 'Forecast': 'capex_forecast'}
     )
-    
+    # deduplicate final DataFrame on id-based keys when available
+    try:
+        dedupe_ids = [c for c in ['po_id', 'project_id', 'department_id', 'cap_year'] if c in df_upload.columns]
+        if dedupe_ids:
+            df_upload = df_upload.drop_duplicates(subset=dedupe_ids, keep='first')
+    except Exception:
+        pass
+
     return df_upload
 
 def upload_capex_forecast_m(df_upload):

@@ -313,7 +313,7 @@ def get_projects_display():
 	if df is None or df.empty:
 		return pd.DataFrame() if df is None else df
 
-	cols_to_drop = [c for c in ['Project Category', 'id'] if c in df.columns]
+	cols_to_drop = [c for c in ['id'] if c in df.columns]
 	if cols_to_drop:
 		try:
 			df = df.drop(columns=cols_to_drop)
@@ -334,5 +334,99 @@ def get_projects_display():
 	return df.reset_index(drop=True)
 
 
-# def get_pc_sum():
+def get_project_cateogory_display():
+	"""Return a DataFrame of projects with their project category.
+
+	Behavior:
+	- Reads `projects` and `project_categories` using select_all_from_table
+	- Joins projects.category_id (or fallback project_category_id) to project_categories.id
+	- Returns a DataFrame with exactly two columns: 'name' (from projects) and 'category' (from project_categories)
+	- Handles missing tables/columns gracefully (fills missing category with None)
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	proj_df = select_all_from_table(cursor, cnxn, 'projects')
+	cat_df = select_all_from_table(cursor, cnxn, 'project_categories')
+
+	# If projects missing or empty return empty DataFrame
+	if proj_df is None or proj_df.empty:
+		return pd.DataFrame()
+
+	# Normalize project name column
+	# prefer 'name' but accept other common variants
+	name_col = 'name' if 'name' in proj_df.columns else ( 'Project' if 'Project' in proj_df.columns else None )
+
+	# Determine category id column on projects (common variants)
+	proj_cat_col = None
+	for candidate in ('category_id', 'project_category_id', 'project_category'):
+		if candidate in proj_df.columns:
+			proj_cat_col = candidate
+			break
+
+	# If category table missing, return projects with category None
+	if cat_df is None or cat_df.empty or 'id' not in cat_df.columns or 'category' not in cat_df.columns:
+		out = pd.DataFrame()
+		# project name
+		if name_col:
+			out['name'] = proj_df[name_col].astype(object)
+		else:
+			# fallback to first column as name
+			out['name'] = proj_df.iloc[:,0].astype(object)
+		out['category'] = None
+		return out.reset_index(drop=True)
+
+	# Perform join
+	try:
+		# ensure id columns are comparable types
+		left = proj_df.copy()
+		right = cat_df.copy()
+		# If project has no explicit category id column, return names with category None
+		if proj_cat_col is None:
+			# attempt to join on name->category? Not requested — return None categories
+			out = pd.DataFrame()
+			if name_col:
+				out['name'] = left[name_col].astype(object)
+			else:
+				out['name'] = left.iloc[:,0].astype(object)
+			out['category'] = None
+			return out.reset_index(drop=True)
+
+		# Coerce join keys to numeric where possible to avoid dtype mismatches
+		try:
+			left_key = pd.to_numeric(left[proj_cat_col], errors='coerce')
+			right_key = pd.to_numeric(right['id'], errors='coerce')
+			left['_join_key'] = left_key
+			right['_join_key'] = right_key
+			merged = pd.merge(left, right, how='left', left_on='_join_key', right_on='_join_key', suffixes=('_proj','_cat'))
+		except Exception:
+			# fallback to string-based join
+			left['_join_key'] = left[proj_cat_col].astype(str)
+			right['_join_key'] = right['id'].astype(str)
+			merged = pd.merge(left, right, how='left', left_on='_join_key', right_on='_join_key', suffixes=('_proj','_cat'))
+
+		# Extract project name and category columns
+		out = pd.DataFrame()
+		if name_col and name_col in merged.columns:
+			out['name'] = merged[name_col].astype(object)
+		else:
+			out['name'] = merged.iloc[:,0].astype(object)
+
+		# category column in right table is 'category'
+		if 'category' in merged.columns:
+			out['category'] = merged['category'].where(pd.notna(merged['category']), None)
+		else:
+			out['category'] = None
+
+		return out.reset_index(drop=True)
+	except Exception:
+		# On error return a minimal DataFrame with names and None categories
+		out = pd.DataFrame()
+		if name_col:
+			out['name'] = proj_df[name_col].astype(object)
+		else:
+			out['name'] = proj_df.iloc[:,0].astype(object)
+		out['category'] = None
+		return out.reset_index(drop=True)
+
 	

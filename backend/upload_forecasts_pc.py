@@ -49,6 +49,13 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
     df_upload['Project Name'] = df_upload['Project Name'].astype(str)
     df_upload['Department'] = df_upload['Department'].astype(str)
     df_upload['fiscal_year'] = df_upload['fiscal_year'].astype(int)
+    # remove exact duplicate upload rows to avoid inserting duplicates
+    try:
+        dedupe_subset = [c for c in ['PO', 'Project Name', 'Department', 'IO', 'fiscal_year', 'Human resource category'] if c in df_upload.columns]
+        if dedupe_subset:
+            df_upload = df_upload.drop_duplicates(subset=dedupe_subset, keep='first')
+    except Exception:
+        pass
     # engine, cursor, cnxn = connect_to_sql(True)
 
     # upload human resource categories
@@ -67,6 +74,32 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
     io_merged = select_all_from_table(cursor, cnxn, "ios")
 
     pos_merged = select_all_from_table(cursor, cnxn, "pos")
+    # ensure uniqueness on join keys in reference tables to avoid multiplicative joins
+    try:
+        if hr_categories_merged is not None and not hr_categories_merged.empty and 'name' in hr_categories_merged.columns:
+            hr_categories_merged = hr_categories_merged.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
+    try:
+        if merged_departments is not None and not merged_departments.empty and 'name' in merged_departments.columns:
+            merged_departments = merged_departments.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
+    try:
+        if projects_merged is not None and not projects_merged.empty and 'name' in projects_merged.columns:
+            projects_merged = projects_merged.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
+    try:
+        if io_merged is not None and not io_merged.empty and 'IO_num' in io_merged.columns:
+            io_merged = io_merged.drop_duplicates(subset=['IO_num'])
+    except Exception:
+        pass
+    try:
+        if pos_merged is not None and not pos_merged.empty and 'name' in pos_merged.columns:
+            pos_merged = pos_merged.drop_duplicates(subset=['name'])
+    except Exception:
+        pass
     # upload expenses
     # df_upload_fin = pd.merge(df_upload, merged_departments, left_on='Department', right_on='name', how='left')
     # df_upload_fin.drop(['name', 'Department', 'po_id'], axis=1, inplace=True)
@@ -88,7 +121,19 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
     
     df_upload_fin.rename(columns={'Human resource FTE': 'human_resource_fte', 'Personnel cost': 'personnel_expense'}, inplace=True)
     # df_upload_fin['fiscal_year'] =pd.to_datetime(df_upload_fin['fiscal_year'], format='%Y')
-    # df_upload_fin.to_sql("project_forecasts_pc", con=engine, if_exists='append', index=False)
+    # Deduplicate final merged DataFrame on id columns where possible to avoid duplicate inserts
+    try:
+        dedupe_ids = [c for c in ['po_id', 'project_id', 'department_id', 'io_id', 'fiscal_year', 'human_resource_category_id'] if c in df_upload_fin.columns]
+        if dedupe_ids:
+            df_upload_fin = df_upload_fin.drop_duplicates(subset=dedupe_ids, keep='first')
+        else:
+            # fallback: dedupe on names/IO/fiscal_year
+            fallback = [c for c in ['PO', 'Project Name', 'Department', 'IO', 'fiscal_year'] if c in df_upload_fin.columns]
+            if fallback:
+                df_upload_fin = df_upload_fin.drop_duplicates(subset=fallback, keep='first')
+    except Exception:
+        pass
+
     # close_connection(cursor, cnxn)
     return df_upload_fin
 

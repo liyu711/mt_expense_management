@@ -371,7 +371,6 @@ def modify_table_router(action):
                         pass
 
             if action == 'modify_department':
-                # try:
                 db = connect_local()
                 cursor, cnxn = db.connect_to_db()
                 pos_df = select_all_from_table(cursor, cnxn, 'pos')
@@ -382,6 +381,7 @@ def modify_table_router(action):
                 keep_cols = [c for c in expected_cols if c in df_upload.columns]
                 if keep_cols:
                     df_upload = df_upload[keep_cols]
+                df_upload = df_upload.rename(columns={'Department': 'name'})
                 
             if action == 'modify_project':
                 try:
@@ -408,7 +408,6 @@ def modify_table_router(action):
 
             merge_columns = modify_table_config.get(action).get('columns', list(row.keys()))
             merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
-            print(df_upload)
             if action == 'modify_project':
                 conn = connect_local()
                 engine, cursor, cnxn = conn.connect_to_db(engine=True)
