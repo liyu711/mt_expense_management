@@ -45,7 +45,9 @@ CREATE TABLE projects(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT,
     category_id INTEGER,
-    FOREIGN KEY (category_id) REFERENCES project_categories(id)
+    department_id INTEGER,
+    FOREIGN KEY (category_id) REFERENCES project_categories(id),
+    FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
 CREATE TABLE IOs(

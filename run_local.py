@@ -193,7 +193,8 @@ initialize_database(cursor, cnxn, initial_values=False)
 df_io = df_nonpc[['IO', 'Project Name']]
 # df_department = df_nonpc[['Department']]
 df_project_category = df_nonpc[['Project Category']]
-df_projects = df_nonpc[['Project Name', 'Project Category']]
+df_projects = df_nonpc[['Project Name', 'Project Category', 'Department']]
+
 # df_po.to_csv('processed_data/info/po_.csv', index= False)
 df_po = pd.read_csv('processed_data/info/po_.csv')
 # df_department = df_department.drop_duplicates()
@@ -202,7 +203,7 @@ df_po = pd.read_csv('processed_data/info/po_.csv')
 po_row = add_entry(df_po, "pos", ['name'], 'name')
 department_row = add_entry(df_departments, 'departments',['category'], 'name')
 category_row = add_entry(df_project_category, "project_categories", ['category'], 'category')
-projects_row = add_entry(df_projects, "projects", ['name', 'category_id'], 'name')
+projects_row = add_entry(df_projects, "projects", ['name', 'category_id', 'department_id'], 'name')
 add_entry(df_hr, "human_resource_categories", ['name'], 'name')
 # Now generate staff cost CSV (after human_resource_categories inserted) and insert into DB
 try:

@@ -20,14 +20,14 @@ def upload_capex_forecasts_df(df_upload, engine, cursor, cnxn, type):
     po = select_all_from_table(cursor, cnxn, "POs")
     projects = select_all_from_table(cursor, cnxn, "projects")
 
-    df_upload = join_tables(
-        df_upload,
-        departments,
-        'Department',
-        'name',
-        ['Department', 'name', 'po_id'],
-        {'id': 'department_id'}
-    )
+    # df_upload = join_tables(
+    #     df_upload,
+    #     departments,
+    #     'Department',
+    #     'name',
+    #     ['Department', 'name', 'po_id'],
+    #     {'id': 'department_id'}
+    # )
 
     df_upload = join_tables(
         df_upload,
@@ -43,7 +43,7 @@ def upload_capex_forecasts_df(df_upload, engine, cursor, cnxn, type):
         projects,
         'Project name',
         'name',
-        ['Project name', 'name', 'category_id'],
+        ['Project name', 'name', 'category_id', 'Department'],
         {'id': 'project_id', 'Forecast': 'capex_forecast'}
     )
     

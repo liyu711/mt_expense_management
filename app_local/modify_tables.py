@@ -45,10 +45,11 @@ modify_table_config = {
         'table_name': 'projects',
         'fields': [
             {'name': 'name', 'type': 'text', 'label': 'Project Name'},
-            {'name': 'category', 'type': 'select', 'label': 'Category Name', 'options': []}
+            {'name': 'category', 'type': 'select', 'label': 'Category Name', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []}
         ],
         'merge_on': 'name',
-        'columns': ['name', 'category_id']
+        'columns': ['name', 'category_id', 'department_id']
     },
     'modify_io': {
         'title': 'Modify IO',
@@ -242,6 +243,15 @@ def modify_table_router(action):
         for field in config['fields']:
             if field['name'] == 'category' and field['type'] == 'select':
                 field['options'] = options
+            if field['name'] == 'department' and field['type'] == 'select':
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    ddf = select_all_from_table(cursor, cnxn, 'departments')
+                    dept_options = ddf['name'].tolist() if 'name' in ddf.columns else []
+                except Exception:
+                    dept_options = []
+                field['options'] = dept_options
 
     # If this is the modify_department form, fetch PO options for dropdown
     if action == 'modify_department':
@@ -282,11 +292,9 @@ def modify_table_router(action):
         row = {k: v for k, v in form_data.items() if k in field_names}
         if action == 'upload_budget':
             # Custom upload_budget logic goes here
-            print('Received upload_budget form:', row)
             # You can add your own database logic here
             df_upload = pd.DataFrame([row])
             df_upload.columns = ['PO', 'Department', 'fiscal_year', 'human_resource_expense', 'non_personnel_expense']
-            print(df_upload)
             upload_budgets_local(df_upload)
 
             msg = f"Budget uploaded: {row}"
@@ -375,12 +383,38 @@ def modify_table_router(action):
                 if keep_cols:
                     df_upload = df_upload[keep_cols]
                 
+            if action == 'modify_project':
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    cat_df = select_all_from_table(cursor, cnxn, 'project_categories')
+                    dept_df = select_all_from_table(cursor, cnxn, 'departments')
+                    cat_map = dict(zip(cat_df['category'], cat_df['id'])) if 'category' in cat_df.columns and 'id' in cat_df.columns else {}
+                    dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+                    df_upload['category_id'] = df_upload.get('category').map(cat_map) if 'category' in df_upload.columns else None
+                    df_upload['department_id'] = df_upload.get('department').map(dept_map) if 'department' in df_upload.columns else None
+                    
+                    # Keep only expected columns
+                    expected_cols = modify_table_config.get(action).get('columns', [])
+                    keep_cols = [c for c in expected_cols if c in df_upload.columns]
+                    if keep_cols:
+                        df_upload = df_upload[keep_cols]
+                except Exception:
+                    try:
+                        df_upload.rename(columns={'category': 'category_id', 'department': 'department_id'}, inplace=True)
+                    except Exception:
+                        pass
             
-            print(df_upload)
+
             merge_columns = modify_table_config.get(action).get('columns', list(row.keys()))
             merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
-           
-            res = add_entry(df_upload, table_name, merge_columns, merge_on)
+            print(df_upload)
+            if action == 'modify_project':
+                conn = connect_local()
+                engine, cursor, cnxn = conn.connect_to_db(engine=True)
+                df_upload.to_sql(table_name, con=engine, if_exists='append', index=False)
+            else:
+                res = add_entry(df_upload, table_name, merge_columns, merge_on)
 
     # After handling POST (or on GET), fetch table contents to display below the form
     try:

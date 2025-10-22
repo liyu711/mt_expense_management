@@ -25,14 +25,14 @@ def upload_capex_budget_df(df_upload, engine, cursor, cnxn, type, clear=True):
     po = select_all_from_table(cursor, cnxn, "POs")
     projects = select_all_from_table(cursor, cnxn, "projects")
 
-    df_upload = join_tables(
-        df_upload,
-        departments,
-        'Department',
-        'name',
-        ['Department', 'name', 'po_id'],
-        {'id': 'department_id'}
-    )
+    # df_upload = join_tables(
+    #     df_upload,
+    #     departments,
+    #     'Department',
+    #     'name',
+    #     ['Department', 'name', 'po_id'],
+    #     {'id': 'department_id'}
+    # )
 
     df_upload = join_tables(
         df_upload,
@@ -48,7 +48,7 @@ def upload_capex_budget_df(df_upload, engine, cursor, cnxn, type, clear=True):
         projects,
         'for_project',
         'name',
-        ['for_project', 'name', 'category_id'],
+        ['for_project', 'name', 'category_id', 'Department'],
         {'id': 'project_id', 'fiscal_year': 'cap_year'}
     )
     # df_upload['department_id'] = df_upload['department_id'].astype(int)

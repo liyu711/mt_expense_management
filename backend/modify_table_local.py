@@ -33,9 +33,19 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
         try:
             local_data = pd.merge(local_data, merged_project_category, left_on='category', right_on='category', how='left')
         except:
-            local_data.columns = ['name', 'category']
+            local_data.columns = ['name', 'category', 'Departments']
             local_data = pd.merge(local_data, merged_project_category, left_on='category', right_on='category', how='left')
-        local_data = local_data[['name', 'id']]
+        local_data = local_data[['name', 'id', 'Departments']]
+        
+        local_data = local_data.rename(columns={'name': 'name', 'id': 'category_id'})
+        
+        departments = select_all_from_table(cursor, cnxn, "departments")
+        local_data = pd.merge(local_data, departments, left_on='Departments', right_on='name', how='left')
+        # print(local_data.columns)
+        local_data = local_data[['name_x', 'category_id', 'id']]
+        local_data = local_data.rename(columns={'name_x': 'name', 'category_id': 'category_id', 'id': 'department_id'})
+
+
 
     if table_name == "ios":
         projects_merged = select_all_from_table(cursor, cnxn, "projects")
