@@ -47,9 +47,10 @@ modify_table_config = {
             {'name': 'name', 'type': 'text', 'label': 'Project Name'},
             {'name': 'category', 'type': 'select', 'label': 'Category Name', 'options': []},
             {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []}
+            ,{'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []}
         ],
         'merge_on': 'name',
-        'columns': ['name', 'category_id', 'department_id']
+        'columns': ['name', 'category_id', 'department_id', 'fiscal_year']
     },
     'modify_io': {
         'title': 'Modify IO',
@@ -252,6 +253,8 @@ def modify_table_router(action):
                 except Exception:
                     dept_options = []
                 field['options'] = dept_options
+            if field['name'] == 'fiscal_year' and field['type'] == 'select':
+                field['options'] = [str(y) for y in range(2020, 2031)]
 
     # If this is the modify_department form, fetch PO options for dropdown
     if action == 'modify_department':
@@ -387,6 +390,7 @@ def modify_table_router(action):
                 
             if action == 'modify_project':
                 try:
+                    print(df_upload)
                     db = connect_local()
                     cursor, cnxn = db.connect_to_db()
                     cat_df = select_all_from_table(cursor, cnxn, 'project_categories')
@@ -399,6 +403,9 @@ def modify_table_router(action):
                     # Keep only expected columns
                     expected_cols = modify_table_config.get(action).get('columns', [])
                     keep_cols = [c for c in expected_cols if c in df_upload.columns]
+                    print(expected_cols)
+                    print(df_upload.columns)
+                    print(keep_cols)
                     if keep_cols:
                         df_upload = df_upload[keep_cols]
                 except Exception:

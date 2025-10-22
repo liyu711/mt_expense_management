@@ -87,15 +87,24 @@ def data_summary():
             raw_projects = []
 
         try:
+            print('test')
             for p in raw_projects:
-                proj_name = p.get('Project') or p.get('project') or p.get('name')
-                po_name = p.get('PO Name') or p.get('PO') or p.get('po_name')
-                dept_name = p.get('Department Name') or p.get('Department') or p.get('department')
-                fy = p.get('Fiscal Year') or p.get('fiscal_year')
+                print(raw_projects)
+                # normalize project name candidates (include project_name)
+                proj_name = p.get('project_name')
+                # normalize PO name candidates
+                po_name = p.get('po_name') or p.get('PO Name') or p.get('PO') or p.get('po')
+                # normalize department name candidates
+                dept_name = p.get('department_name') or p.get('Department Name') or p.get('Department') or p.get('department')
+                # normalize fiscal year candidates
+                fy = p.get('fiscal_year') or p.get('Fiscal Year') or p.get('fy') or p.get('fiscal')
+
                 rec = {'name': proj_name, 'po_name': po_name, 'department_name': dept_name, 'fiscal_year': fy}
+
                 # apply server-side filters if selections exist (treat 'All' as wildcard)
                 ok = True
                 if selected_po and selected_po != '' and selected_po != 'All':
+                    # if project record lacks po_name, treat as non-matching
                     ok = ok and (po_name == selected_po)
                 if selected_department and selected_department != '' and selected_department != 'All':
                     ok = ok and (dept_name == selected_department)
@@ -103,7 +112,9 @@ def data_summary():
                     ok = ok and (str(fy) == str(selected_fiscal_year))
                 if ok:
                     projects.append(rec)
+                
         except Exception:
+            print('test2')
             projects = []
 
     return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department, fiscal_years=fiscal_years, selected_fiscal_year=selected_fiscal_year, projects=projects, selected_project=selected_project)

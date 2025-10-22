@@ -3,6 +3,6 @@ from backend import \
     get_project_cateogory_display
 
 if __name__ == '__main__':
-    res = get_project_cateogory_display()
+    res = get_projects_display()
     print(res)
     print(res.columns)

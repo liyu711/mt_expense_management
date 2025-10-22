@@ -32,90 +32,93 @@ def get_departments_display():
 
 
 def get_forecasts_display():
-	"""Return a DataFrame for display of project_forecasts_nonpc.
+	"""Return a DataFrame with projects joined to departments and project_categories.
 
 	Behavior:
-	- Reads `project_forecasts_nonpc` and reference tables (projects, departments, POs, IOs, project_categories)
-	- Maps id columns (project_id, department_id, PO_id, io_id) to friendly display columns
-	- Renames non_personnel_expense -> 'Non-personnel Expense' and fiscal_year -> 'Fiscal Year'
-	- Reorders columns to place id, Department, IO, Project Category near the front similar to transform_table
-	- Handles missing reference tables gracefully (leaves mapped columns as-is or None)
+	- Reads the `projects` table and reference tables `departments` and `project_categories`.
+	- Joins projects.department_id -> departments.id and projects.category_id -> project_categories.id.
+	- Removes id columns and returns a DataFrame containing project name, department name, and category name.
+	- Gracefully handles missing tables/columns.
 	"""
 	conn = connect_local()
 	cursor, cnxn = conn.connect_to_db()
 
-	df = select_all_from_table(cursor, cnxn, 'project_forecasts_nonpc')
-	if df is None or df.empty:
-		return pd.DataFrame() if df is None else df
+	proj_df = select_all_from_table(cursor, cnxn, 'projects')
+	dept_df = select_all_from_table(cursor, cnxn, 'departments')
+	cat_df = select_all_from_table(cursor, cnxn, 'project_categories')
 
-	# Map id -> name for department, PO, project, IO, project_category
-	id_name_map = {
-		'department_id': ('departments', 'id', 'name', 'Department Name'),
-		'PO_id': ('pos', 'id', 'name', 'PO Name'),
-		'project_id': ('projects', 'id', 'name', 'Project'),
-		'io_id': ('IOs', 'id', 'IO_num', 'IO'),
-		'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
-	}
+	# If projects missing return empty
+	if proj_df is None or proj_df.empty:
+		return pd.DataFrame()
 
-	for id_col, (ref_table, ref_id, ref_name, new_col_name) in id_name_map.items():
-		if id_col in df.columns:
-			try:
-				ref_df = select_all_from_table(cursor, cnxn, ref_table)
-				if ref_df is None or ref_df.empty or ref_id not in ref_df.columns or ref_name not in ref_df.columns:
-					df[new_col_name] = None
-				else:
-					ref_dict = dict(zip(ref_df[ref_id], ref_df[ref_name]))
-					df[new_col_name] = df[id_col].map(ref_dict)
-			except Exception:
-				df[new_col_name] = None
+	# Normalize project name column
+	proj_name_col = 'name' if 'name' in proj_df.columns else ('Project' if 'Project' in proj_df.columns else proj_df.columns[0])
 
-	# Drop the raw id columns where appropriate (keep if user may need them)
-	drop_cols = [c for c in ['department_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if c in df.columns]
-	if drop_cols:
+	# Determine key columns on projects
+	proj_dept_col = next((c for c in ('department_id', 'dept_id', 'department') if c in proj_df.columns), None)
+	proj_cat_col = next((c for c in ('category_id', 'project_category_id', 'project_category') if c in proj_df.columns), None)
+
+	left = proj_df.copy()
+	# Join departments
+	if proj_dept_col and dept_df is not None and not dept_df.empty and 'id' in dept_df.columns:
 		try:
-			df = df.drop(columns=drop_cols)
+			# coerce keys to numeric where possible
+			left['_dept_key'] = pd.to_numeric(left[proj_dept_col], errors='coerce')
+			right = dept_df.copy()
+			right['_dept_key'] = pd.to_numeric(right['id'], errors='coerce')
+			merged = pd.merge(left, right, how='left', left_on='_dept_key', right_on='_dept_key', suffixes=('_proj','_dept'))
 		except Exception:
+			left['_dept_key'] = left[proj_dept_col].astype(str)
+			right = dept_df.copy()
+			right['_dept_key'] = right['id'].astype(str)
+			merged = pd.merge(left, right, how='left', left_on='_dept_key', right_on='_dept_key', suffixes=('_proj','_dept'))
+	else:
+		# no department join performed
+		merged = left.copy()
+
+	# Now join project categories
+	if proj_cat_col and cat_df is not None and not cat_df.empty and 'id' in cat_df.columns:
+		try:
+			merged['_cat_key'] = pd.to_numeric(merged[proj_cat_col], errors='coerce')
+			right_cat = cat_df.copy()
+			right_cat['_cat_key'] = pd.to_numeric(right_cat['id'] if 'right_cat' in locals() else right_cat['id'], errors='coerce')
+		except Exception:
+			# fallback: ensure string join
+			merged['_cat_key'] = merged[proj_cat_col].astype(str)
+			right_cat = cat_df.copy()
+			right_cat['_cat_key'] = right_cat['id'].astype(str) if 'right_cat' in locals() else right_cat['id'].astype(str)
+		# perform merge
+		try:
+			merged = pd.merge(merged, right_cat, how='left', left_on='_cat_key', right_on='_cat_key', suffixes=('','_cat'))
+		except Exception:
+			# if merge fails, leave as-is
 			pass
 
-	# Rename non_personnel_expense and fiscal_year if present
-	if 'non_personnel_expense' in df.columns:
-		df = df.rename(columns={'non_personnel_expense': 'Non-personnel Expense'})
-	if 'fiscal_year' in df.columns:
-		df = df.rename(columns={'fiscal_year': 'Fiscal Year'})
+	# Build output DataFrame
+	out = pd.DataFrame()
+	out['project_name'] = merged[proj_name_col].astype(object) if proj_name_col in merged.columns else merged.iloc[:,0].astype(object)
 
-	# Reorder columns similar to transform_table special-case for project_forecasts_nonpc
-	current_cols = list(df.columns)
-	new_order = []
-	if 'id' in current_cols:
-		new_order.append('id')
+	# department name
+	if 'name_dept' in merged.columns:
+		out['department_name'] = merged['name_dept'].where(pd.notna(merged['name_dept']), None)
+	elif 'name' in dept_df.columns if dept_df is not None and not dept_df.empty else False:
+		# sometimes merge left the department name in column 'name'
+		out['department_name'] = merged['name'].where(pd.notna(merged['name']), None) if 'name' in merged.columns else None
+	else:
+		out['department_name'] = None
 
-	# Department candidates
-	dept_candidates = ['Department Name', 'Department', 'department']
-	dept = next((c for c in dept_candidates if c in current_cols), None)
-	io_candidates = ['IO', 'IO number']
-	io_col = next((c for c in io_candidates if c in current_cols), None)
-	pc_col = 'Project Category' if 'Project Category' in current_cols else None
+	# category name
+	if 'category' in merged.columns:
+		out['category'] = merged['category'].where(pd.notna(merged['category']), None)
+	elif 'category_cat' in merged.columns:
+		out['category'] = merged['category_cat'].where(pd.notna(merged['category_cat']), None)
+	else:
+		out['category'] = None
 
-	if dept and dept not in new_order:
-		new_order.append(dept)
-	if io_col and io_col not in new_order:
-		new_order.append(io_col)
-	if pc_col and pc_col not in new_order:
-		new_order.append(pc_col)
+	# Ensure columns are exactly as requested
+	out = out[['project_name', 'department_name', 'category']]
 
-	# Append remaining columns preserving original order
-	for c in current_cols:
-		if c not in new_order:
-			new_order.append(c)
-
-	try:
-		new_order = [c for c in new_order if c in df.columns]
-		if new_order and new_order != current_cols:
-			df = df.loc[:, new_order]
-	except Exception:
-		pass
-
-	return df.reset_index(drop=True)
+	return out.reset_index(drop=True)
 
 
 def get_pc_display():
@@ -297,42 +300,171 @@ def get_pc_display():
 
 
 def get_projects_display():
-	"""Return a DataFrame of available projects based on project_forecasts_nonpc.
+	"""Return a DataFrame of projects joined with department and project category.
 
 	Behavior:
-	- Calls get_forecasts_display() to obtain a cleaned forecasts DataFrame
-	- Drops 'Project Category' and 'id' columns if present
-	- If a 'Project' column exists, returns a deduplicated DataFrame with one row per Project (preserving other display columns like PO Name, Department Name when available)
-	- Otherwise returns the modified DataFrame as-is
+	- Reads `projects`, `departments`, and `project_categories` using select_all_from_table
+	- Joins projects.department_id -> departments.id and projects.category_id -> project_categories.id
+	- Returns a DataFrame with exactly three columns: `project_name`, `department_name`, `category`
+	- Handles missing tables/columns gracefully (fills missing names with None)
 	"""
-	try:
-		df = get_forecasts_display()
-	except Exception:
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	proj_df = select_all_from_table(cursor, cnxn, 'projects')
+	dept_df = select_all_from_table(cursor, cnxn, 'departments')
+	cat_df = select_all_from_table(cursor, cnxn, 'project_categories')
+
+	# If projects missing or empty return empty DataFrame
+	if proj_df is None or proj_df.empty:
 		return pd.DataFrame()
 
-	if df is None or df.empty:
-		return pd.DataFrame() if df is None else df
+	# Determine project name column (prefer 'name')
+	if 'name' in proj_df.columns:
+		proj_name_col = 'name'
+	elif 'Project' in proj_df.columns:
+		proj_name_col = 'Project'
+	else:
+		proj_name_col = proj_df.columns[0]
 
-	cols_to_drop = [c for c in ['id'] if c in df.columns]
-	if cols_to_drop:
+	# Determine department id column on projects
+	proj_dept_col = None
+	for cand in ('department_id', 'dept_id', 'Department', 'department'):
+		if cand in proj_df.columns:
+			proj_dept_col = cand
+			break
+
+	# Determine project category id column on projects
+	proj_cat_col = next((c for c in ('category_id', 'project_category_id', 'project_category') if c in proj_df.columns), None)
+
+	# Work on a copy to avoid mutating original
+	left = proj_df.copy()
+
+	# Normalize project name column into a canonical 'project_name'
+	left['project_name'] = left[proj_name_col].astype(object) if proj_name_col in left.columns else left.iloc[:, 0].astype(object)
+
+	# Ensure fiscal_year is preserved when present
+	if 'fiscal_year' in left.columns:
+		left['fiscal_year'] = left['fiscal_year']
+	else:
+		left['fiscal_year'] = None
+
+	# Prepare right-hand tables with canonical name columns
+	# Departments -> department_name
+	if dept_df is not None and not dept_df.empty and 'id' in dept_df.columns:
+		dept_name_col = 'name' if 'name' in dept_df.columns else dept_df.columns[0]
+		dept_right = dept_df.rename(columns={dept_name_col: 'department_name'})[['id', 'department_name']].copy()
+	else:
+		dept_right = None
+
+	# Project categories -> category
+	if cat_df is not None and not cat_df.empty and 'id' in cat_df.columns:
+		cat_name_col = 'category' if 'category' in cat_df.columns else (cat_df.columns[1] if len(cat_df.columns) > 1 else cat_df.columns[0])
+		cat_right = cat_df.rename(columns={cat_name_col: 'category'})[['id', 'category']].copy()
+	else:
+		cat_right = None
+
+	# POs -> po_name (join via po_id on projects or via departments.po_id if projects lacks po_id)
+	pos_df = select_all_from_table(cursor, cnxn, 'pos')
+	if pos_df is not None and not pos_df.empty and 'id' in pos_df.columns:
+		pos_name_col = 'name' if 'name' in pos_df.columns else pos_df.columns[0]
+		pos_right = pos_df.rename(columns={pos_name_col: 'po_name'})[['id', 'po_name']].copy()
+	else:
+		pos_right = None
+
+	# Start with left (projects) and merge departments on detected key
+	merged = left
+	if proj_dept_col and dept_right is not None:
+		# Coerce comparable types where sensible by creating temporary numeric keys
 		try:
-			df = df.drop(columns=cols_to_drop)
+			merged['_proj_dept_key'] = pd.to_numeric(merged[proj_dept_col], errors='coerce')
+			dept_right['_dept_key'] = pd.to_numeric(dept_right['id'], errors='coerce')
+			merged = pd.merge(merged, dept_right, how='left', left_on='_proj_dept_key', right_on='_dept_key', suffixes=('', '_dept'))
 		except Exception:
-			pass
+			merged[proj_dept_col] = merged[proj_dept_col].astype(str)
+			dept_right['id'] = dept_right['id'].astype(str)
+			merged = pd.merge(merged, dept_right.rename(columns={'id': proj_dept_col}), how='left', left_on=proj_dept_col, right_on=proj_dept_col)
+	else:
+		# no department info available; ensure department_name column exists
+		merged['department_name'] = None
 
-	# If Project column exists, deduplicate by Project (keep first occurrence)
-	if 'Project' in df.columns:
+	# Merge project categories
+	if proj_cat_col and cat_right is not None:
 		try:
-			# keep first occurrence and preserve PO/Department if present
-			subset_cols = ['Project', 'PO Name', 'Department Name']
-			present_subset = [c for c in subset_cols if c in df.columns]
-			projects_df = df.drop_duplicates(subset=['Project']).reset_index(drop=True)
-			return projects_df
+			merged['_proj_cat_key'] = pd.to_numeric(merged[proj_cat_col], errors='coerce')
+			cat_right['_cat_key'] = pd.to_numeric(cat_right['id'], errors='coerce')
+			merged = pd.merge(merged, cat_right, how='left', left_on='_proj_cat_key', right_on='_cat_key', suffixes=('', '_cat'))
 		except Exception:
-			return df.reset_index(drop=True)
+			merged[proj_cat_col] = merged[proj_cat_col].astype(str)
+			cat_right['id'] = cat_right['id'].astype(str)
+			merged = pd.merge(merged, cat_right.rename(columns={'id': proj_cat_col}), how='left', left_on=proj_cat_col, right_on=proj_cat_col)
+	else:
+		merged['category'] = None
 
-	return df.reset_index(drop=True)
+	# Merge POs. First try to join directly from projects.po_id -> pos.id if present
+	po_joined = False
+	if 'po_id' in merged.columns and pos_right is not None:
+		try:
+			merged['_proj_po_key'] = pd.to_numeric(merged['po_id'], errors='coerce')
+			pos_right['_po_key'] = pd.to_numeric(pos_right['id'], errors='coerce')
+			merged = pd.merge(merged, pos_right, how='left', left_on='_proj_po_key', right_on='_po_key', suffixes=('', '_po'))
+			po_joined = True
+		except Exception:
+			merged['po_id'] = merged['po_id'].astype(str)
+			pos_right['id'] = pos_right['id'].astype(str)
+			merged = pd.merge(merged, pos_right.rename(columns={'id': 'po_id'}), how='left', left_on='po_id', right_on='po_id')
+			po_joined = True
 
+	# If not joined yet, try to get PO via department -> departments.po_id
+	if not po_joined and dept_df is not None and not dept_df.empty and 'po_id' in dept_df.columns and pos_right is not None:
+		# Make sure department id columns are comparable
+		try:
+			merged['_dept_id_for_po'] = pd.to_numeric(merged[proj_dept_col], errors='coerce') if proj_dept_col in merged.columns else None
+			dept_local = dept_df.copy()
+			dept_local['_dept_id_for_po'] = pd.to_numeric(dept_local['id'], errors='coerce')
+			dept_local['_dept_po_key'] = pd.to_numeric(dept_local['po_id'], errors='coerce')
+			# merge departments to expose po_id then merge pos
+			merged = pd.merge(merged, dept_local[['_dept_id_for_po', '_dept_po_key']], how='left', left_on='_dept_id_for_po', right_on='_dept_id_for_po')
+			merged = pd.merge(merged, pos_right.rename(columns={'id': '_dept_po_key'}), how='left', left_on='_dept_po_key', right_on='_dept_po_key')
+		except Exception:
+			# last-resort: set po_name to None
+			merged['po_name'] = None
+
+	# Build final output with canonical columns
+	out = pd.DataFrame()
+	out['project_name'] = merged['project_name'].where(pd.notna(merged['project_name']), None)
+
+	# department_name might be present from dept_right merge, or as 'department_name'
+	if 'department_name' in merged.columns:
+		out['department_name'] = merged['department_name'].where(pd.notna(merged['department_name']), None)
+	elif 'name' in dept_df.columns if dept_df is not None and not dept_df.empty else False:
+		out['department_name'] = None
+	else:
+		out['department_name'] = None
+
+	# category
+	if 'category' in merged.columns:
+		out['category'] = merged['category'].where(pd.notna(merged['category']), None)
+	elif 'category_cat' in merged.columns:
+		out['category'] = merged['category_cat'].where(pd.notna(merged['category_cat']), None)
+	else:
+		out['category'] = None
+
+	# po_name
+	if 'po_name' in merged.columns:
+		out['po_name'] = merged['po_name'].where(pd.notna(merged['po_name']), None)
+	else:
+		out['po_name'] = None
+
+	# fiscal_year already preserved
+	out['fiscal_year'] = merged['fiscal_year'] if 'fiscal_year' in merged.columns else None
+
+	# Ensure only the requested columns are present (keep the new po_name and fiscal_year as requested)
+	cols = ['project_name', 'department_name', 'category', 'po_name', 'fiscal_year']
+	out = out.loc[:, cols]
+	
+
+	return out.reset_index(drop=True)
 
 def get_project_cateogory_display():
 	"""Return a DataFrame of projects with their project category.
