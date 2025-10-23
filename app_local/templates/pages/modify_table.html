@@ -261,6 +261,148 @@
             document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeModal(); });
         })();
     </script>
+    <script>
+        // When selects inside modify modal change (PO, Department, Cap Year, Project), notify server so module-level vars update
+        (function () {
+            var modal = document.getElementById('modifyModal');
+            function attachChangeHandlers() {
+                if (!modal) return;
+                // PO
+                var poSelects = modal.querySelectorAll('select[name="po"], select[id="po"], select[name="PO"], select[id="PO"]');
+                poSelects.forEach(function (sel) {
+                    sel.addEventListener('change', function () {
+                        var val = sel.value || '';
+                        // notify server of PO selection (module-level state)
+                        fetch('/capex_forecast/po_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ po: val }) }).catch(function () { });
+
+                        // After notifying server, request updated department list filtered by this PO
+                        try {
+                            var url = '/capex_forecast/department_update?po=' + encodeURIComponent(val);
+                            fetch(url).then(function (res) {
+                                if (!res.ok) return null;
+                                return res.json();
+                            }).then(function (data) {
+                                if (!data || !data.departments) return;
+                                // rebuild department selects inside the modal
+                                var deptSelects = modal.querySelectorAll('select[name="department"], select[id="department"], select[name="Department"], select[id="Department"]');
+                                deptSelects.forEach(function (dsel) {
+                                    // preserve a default placeholder option
+                                    dsel.innerHTML = '';
+                                    var placeholder = document.createElement('option');
+                                    placeholder.value = '';
+                                    placeholder.disabled = true;
+                                    placeholder.selected = true;
+                                    placeholder.textContent = 'Select an option';
+                                    dsel.appendChild(placeholder);
+                                    data.departments.forEach(function (opt) {
+                                        var o = document.createElement('option');
+                                        o.value = opt;
+                                        o.textContent = opt;
+                                        dsel.appendChild(o);
+                                    });
+                                });
+                            }).catch(function () { /* ignore */ });
+                        } catch (e) {
+                            /* ignore */
+                        }
+                    });
+                });
+
+                // Department
+                var deptSelects = modal.querySelectorAll('select[name="department"], select[id="department"], select[name="Department"], select[id="Department"]');
+                deptSelects.forEach(function (sel) {
+                    sel.addEventListener('change', function () {
+                        var val = sel.value || '';
+                        fetch('/capex_forecast/department_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department: val }) }).catch(function () { });
+                        // attempt to refresh projects if PO, Department and Cap Year are selected
+                        try {
+                            var currentPO = (modal.querySelector('select[name="po"]') || modal.querySelector('select[id="po"]'))?.value || '';
+                            var currentDept = val;
+                            var currentFY = (modal.querySelector('select[name="cap_year"]') || modal.querySelector('select[id="cap_year"]'))?.value || '';
+                            if (currentPO && currentDept && currentFY) {
+                                var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                                fetch(url).then(function (res) {
+                                    if (!res.ok) return null;
+                                    return res.json();
+                                }).then(function (data) {
+                                    if (!data || !data.projects) return;
+                                    var projSelects = modal.querySelectorAll('select[name="project_name"], select[id="project_name"], select[name="Project Name"], select[id="Project Name"]');
+                                    projSelects.forEach(function (ps) {
+                                        ps.innerHTML = '';
+                                        var placeholder = document.createElement('option');
+                                        placeholder.value = '';
+                                        placeholder.disabled = true;
+                                        placeholder.selected = true;
+                                        placeholder.textContent = 'Select an option';
+                                        ps.appendChild(placeholder);
+                                        data.projects.forEach(function (opt) {
+                                            var o = document.createElement('option');
+                                            o.value = opt;
+                                            o.textContent = opt;
+                                            ps.appendChild(o);
+                                        });
+                                    });
+                                }).catch(function () { });
+                            }
+                        } catch (e) { /* ignore */ }
+                    });
+                });
+
+                // Cap Year
+                var capYearSelects = modal.querySelectorAll('select[name="cap_year"], select[id="cap_year"], select[name="CapYear"], select[id="CapYear"]');
+                capYearSelects.forEach(function (sel) {
+                    sel.addEventListener('change', function () {
+                        var val = sel.value || '';
+                        fetch('/capex_forecast/cap_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cap_year: val }) }).catch(function () { });
+                        // when cap year changes, try to refresh projects if PO & Department are set
+                        try {
+                            var currentPO = (modal.querySelector('select[name="po"]') || modal.querySelector('select[id="po"]'))?.value || '';
+                            var currentDept = (modal.querySelector('select[name="department"]') || modal.querySelector('select[id="department"]'))?.value || '';
+                            var currentFY = val;
+                            if (currentPO && currentDept && currentFY) {
+                                var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                                fetch(url).then(function (res) {
+                                    if (!res.ok) return null;
+                                    return res.json();
+                                }).then(function (data) {
+                                    if (!data || !data.projects) return;
+                                    var projSelects = modal.querySelectorAll('select[name="project_name"], select[id="project_name"], select[name="Project Name"], select[id="Project Name"]');
+                                    projSelects.forEach(function (ps) {
+                                        ps.innerHTML = '';
+                                        var placeholder = document.createElement('option');
+                                        placeholder.value = '';
+                                        placeholder.disabled = true;
+                                        placeholder.selected = true;
+                                        placeholder.textContent = 'Select an option';
+                                        ps.appendChild(placeholder);
+                                        data.projects.forEach(function (opt) {
+                                            var o = document.createElement('option');
+                                            o.value = opt;
+                                            o.textContent = opt;
+                                            ps.appendChild(o);
+                                        });
+                                    });
+                                }).catch(function () { });
+                            }
+                        } catch (e) { /* ignore */ }
+                    });
+                });
+
+                // Project Name
+                var projSelects = modal.querySelectorAll('select[name="project_name"], select[id="project_name"], select[name="Project Name"], select[id="Project Name"]');
+                projSelects.forEach(function (sel) {
+                    sel.addEventListener('change', function () {
+                        var val = sel.value || '';
+                        fetch('/capex_forecast/project_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: val }) }).catch(function () { });
+                    });
+                });
+            }
+            if (document.readyState === 'complete' || document.readyState === 'interactive') attachChangeHandlers(); else document.addEventListener('DOMContentLoaded', attachChangeHandlers);
+            // Also attach when modal opens (in case fields are re-rendered)
+            var addBtn = document.getElementById('add_button');
+            if (addBtn) addBtn.addEventListener('click', function () { setTimeout(attachChangeHandlers, 30); });
+        })();
+    </script>
     <style>
         /* Modal styles */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; }

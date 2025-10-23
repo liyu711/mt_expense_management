@@ -58,6 +58,7 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
     if table_name == 'capex_forecasts':
         local_data['po'] = local_data['po'].astype(str)
         local_data['cap_year'] = local_data['cap_year'].astype(int)
+        local_data['capex_forecast'] = local_data['capex_forecast'].astype(float)
         
         departments = select_all_from_table(cursor, cnxn, "departments")
         po = select_all_from_table(cursor, cnxn, "POs")

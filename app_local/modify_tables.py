@@ -6,8 +6,15 @@ import pandas as pd
 import os
 from backend.connect_local import connect_local, select_all_from_table
 from app_local.select_data import transform_table
+from backend.create_display_table import get_departments_display, get_projects_display
 
 modify_tables = Blueprint('modify_tables', __name__, template_folder='templates')
+
+# module-level selected PO for modify forms (capex and others)
+selected_po = None
+selected_department = None
+selected_cap_year = None
+selected_project = None
 
 # Map route to table and form fields
 modify_table_config = {
@@ -517,3 +524,128 @@ def change_staff_cost():
         pass
 
     return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
+
+
+@modify_tables.route('/capex_forecast/po_selection', methods=['POST'])
+def modify_po_selection():
+    """Receive PO selection from client for modify forms and update module-level selected_po."""
+    global selected_po
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('po')
+        else:
+            val = request.form.get('po')
+        selected_po = val
+        return {'status': 'ok', 'selected_po': selected_po}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@modify_tables.route('/capex_forecast/department_selection', methods=['POST'])
+def modify_department_selection():
+    """Receive Department selection from client for modify forms and update module-level selected_department."""
+    global selected_department
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('department')
+        else:
+            val = request.form.get('department')
+        selected_department = val
+        return {'status': 'ok', 'selected_department': selected_department}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@modify_tables.route('/capex_forecast/cap_year_selection', methods=['POST'])
+def modify_cap_year_selection():
+    """Receive Capex year selection from client for modify forms and update module-level selected_cap_year."""
+    global selected_cap_year
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('cap_year')
+        else:
+            val = request.form.get('cap_year')
+        selected_cap_year = val
+        return {'status': 'ok', 'selected_cap_year': selected_cap_year}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@modify_tables.route('/capex_forecast/project_selection', methods=['POST'])
+def modify_project_selection():
+    """Receive Project selection from client for modify forms and update module-level selected_project."""
+    global selected_project
+    try:
+        if request.is_json:
+            payload = request.get_json()
+            val = payload.get('project') or payload.get('project_name')
+        else:
+            val = request.form.get('project') or request.form.get('project_name')
+        selected_project = val
+        return {'status': 'ok', 'selected_project': selected_project}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@modify_tables.route('/capex_forecast/department_update', methods=['GET'])
+def capex_department_update():
+    """Return a JSON list of departments filtered by PO.
+
+    Query params:
+    - po: optional PO name to filter by. If not provided, falls back to module-level selected_po.
+    Response: { 'departments': [ ... ] }
+    """
+        # prefer explicit query parameter, fall back to module-level selected_po
+    po = request.args.get('po') or selected_po
+    df = get_departments_display()
+    if df is None or df.empty:
+        return {'departments': []}, 200
+    df_dept = df[df['name_po'] == po]
+    depts = df_dept['name_departments'].to_list()
+                
+    return {'departments': depts}, 200
+
+
+@modify_tables.route('/capex_forecast/project_update', methods=['GET'])
+def capex_project_update():
+    """Return a JSON list of projects filtered by PO, Department and Fiscal Year.
+
+    Query params:
+    - po: optional PO name to filter by. Falls back to module-level selected_po.
+    - department: optional department name to filter by. Falls back to selected_department.
+    - fiscal_year or cap_year: optional fiscal year to filter by. Falls back to selected_cap_year.
+    Response: { 'projects': [ ... ] }
+    """
+    try:
+        po = request.args.get('po') or selected_po
+        department = request.args.get('department') or selected_department
+        fiscal_year = request.args.get('fiscal_year') or request.args.get('cap_year') or selected_cap_year
+
+        df = get_projects_display()
+        if df is None or df.empty:
+            return {'projects': []}, 200
+
+        proj_col = 'project_name' if 'project_name' in df.columns else ( 'name' if 'name' in df.columns else (df.columns[0] if len(df.columns)>0 else None))
+        dept_col = next((c for c in ('department_name','department','name') if c in df.columns), None)
+        po_col = next((c for c in ('po_name','po','name_po') if c in df.columns), None)
+        fy_col = next((c for c in ('fiscal_year','Fiscal Year') if c in df.columns), None)
+
+        filt = df
+        if po and po_col in filt.columns:
+            filt = filt[filt[po_col].astype(str) == str(po)]
+        if department and dept_col in filt.columns:
+            filt = filt[filt[dept_col].astype(str) == str(department)]
+        if fiscal_year and fy_col in filt.columns:
+            filt = filt[filt[fy_col].astype(str) == str(fiscal_year)]
+
+        try:
+            projects = list(dict.fromkeys([p for p in filt[proj_col].dropna().astype(str).tolist()])) if proj_col in filt.columns else []
+        except Exception:
+            projects = []
+
+        return {'projects': projects}, 200
+    except Exception as e:
+        return {'projects': [], 'error': str(e)}, 500
