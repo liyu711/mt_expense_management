@@ -1,7 +1,9 @@
 from flask import render_template, request, Blueprint
 from backend.connect_local import connect_local, select_all_from_table
 from backend.display_names import DISPLAY_NAMES
-from backend import get_departments_display, get_forecasts_display, get_pc_display, get_projects_display
+from backend import \
+    get_departments_display, get_forecasts_display, get_pc_display, get_projects_display,\
+    get_nonpc_display
 import pandas as pd
 
 data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates')
@@ -185,4 +187,107 @@ def project_selection():
         return {'status': 'ok', 'selected_project': selected_project}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
+
+
+@data_summary_bp.route('/data_summary/get_statistics', methods=['GET'])
+def get_statistics():
+    """Compute aggregated statistics filtered by current module-level selections.
+
+    Returns JSON with keys:
+    - non_personnel_forecast
+    - personnel_forecast
+    - total_forecast
+    - budget
+    - funding
+    - total_budget
+    - actual_expense
+    """
+    try:
+        conn = connect_local()
+        cursor, cnxn = conn.connect_to_db()
+
+        # load dataframes
+        # project_forecasts_nonpc: non-personnel forecasts
+        nonpc = get_nonpc_display(xw)
+        # project_forecasts_pc: personnel forecasts (personnel_expense)
+        pc = get_pc_display()
+        # budgetsxw
+        budgets = select_all_from_table(cursor, cnxn, 'budgets')
+        # fundings
+        fundings = select_all_from_table(cursor, cnxn, 'fundings')
+        # expenses
+        expenses = select_all_from_table(cursor, cnxn, 'expenses')
+
+        def apply_filters(df):
+            if df is None or df.empty:
+                return pd.DataFrame()
+            out = df.copy()
+            # helper to match selection keys across variants
+            # PO
+            if selected_po and selected_po != '' and selected_po != 'All':
+                po_cols = [c for c in out.columns if c.lower() in ('po', 'po_name', 'po_id')]
+                if po_cols:
+                    col = po_cols[0]
+                    out = out[out[col].astype(str) == str(selected_po)]
+            # Department
+            if selected_department and selected_department != '' and selected_department != 'All':
+                dept_cols = [c for c in out.columns if c.lower() in ('department', 'department_name')]
+                if dept_cols:
+                    col = dept_cols[0]
+                    out = out[out[col].astype(str) == str(selected_department)]
+            # Fiscal year
+            if selected_fiscal_year and selected_fiscal_year != '' and selected_fiscal_year != 'All':
+                fy_cols = [c for c in out.columns if c.lower() in ('fiscal_year', 'fiscal year', 'fy')]
+                if fy_cols:
+                    col = fy_cols[0]
+                    out = out[out[col].astype(str) == str(selected_fiscal_year)]
+            # Project
+            if selected_project and selected_project != '' and selected_project != 'All':
+                proj_cols = [c for c in out.columns if c.lower() in ('project_name', 'project', 'project name', 'name')]
+                if proj_cols:
+                    col = proj_cols[0]
+                    out = out[out[col].astype(str) == str(selected_project)]
+            return out
+
+        # apply filters and sum
+        nonpc_f = apply_filters(nonpc)
+        pc_f = apply_filters(pc)
+        budgets_f = apply_filters(budgets)
+        fundings_f = apply_filters(fundings)
+        expenses_f = apply_filters(expenses)
+
+        def sum_column(df, candidates):
+            if df is None or df.empty:
+                return 0.0
+            for c in candidates:
+                if c in df.columns:
+                    try:
+                        return float(df[c].dropna().astype(float).sum())
+                    except Exception:
+                        continue
+            return 0.0
+
+        non_personnel_forecast = sum_column(nonpc_f, ['non_personnel_expense', 'Non-personnel Expense', 'Non-personnel cost', 'non_personnel_cost'])
+        personnel_forecast = sum_column(pc_f, ['personnel_expense', 'Personnel Expense', 'personnel_cost'])
+        total_forecast = non_personnel_forecast + personnel_forecast
+
+        budget_sum = sum_column(budgets_f, ['non_personnel_expense', 'human_resource_expense', 'Non-personnel Budget', 'Personnel Budget'])
+        funding_sum = sum_column(fundings_f, ['funding', 'Funding'])
+        total_budget = budget_sum + funding_sum
+
+        actual_expense = sum_column(expenses_f, ['expenses', 'expense', 'amount', 'Actual Expenditure'])
+
+        result = {
+            'non_personnel_forecast': round(non_personnel_forecast, 2),
+            'personnel_forecast': round(personnel_forecast, 2),
+            'total_forecast': round(total_forecast, 2),
+            'budget': round(budget_sum, 2),
+            'funding': round(funding_sum, 2),
+            'total_budget': round(total_budget, 2),
+            'actual_expense': round(actual_expense, 2)
+        }
+        print(result)
+        return result, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
 

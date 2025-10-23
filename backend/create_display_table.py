@@ -466,6 +466,154 @@ def get_projects_display():
 
 	return out.reset_index(drop=True)
 
+
+def get_nonpc_display():
+	"""Return a DataFrame for project_forecasts_nonpc joined with PO, Department and Project.
+
+	Behavior:
+	- Reads `project_forecasts_nonpc`, `pos`, `departments`, and `projects` from the local DB
+	- Attempts to join on project_id -> projects.id, department_id -> departments.id, po_id -> pos.id
+	- Returns a DataFrame with canonical columns: project_name, department_name, po_name, fiscal_year, and a non-personnel amount column
+	- Handles missing tables/columns gracefully (fills missing names with None)
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	df = select_all_from_table(cursor, cnxn, 'project_forecasts_nonpc')
+	if df is None or df.empty:
+		return pd.DataFrame()
+
+	left = df.copy()
+
+	# detect candidate id columns on forecast table
+	proj_id_col = next((c for c in ('project_id', 'proj_id', 'projects_id', 'project') if c in left.columns), None)
+	dept_id_col = next((c for c in ('department_id', 'dept_id', 'department') if c in left.columns), None)
+	po_id_col = next((c for c in ('PO_id', 'po_id', 'po', 'PO') if c in left.columns), None)
+	fiscal_col = next((c for c in ('fiscal_year', 'Fiscal Year', 'fy', 'year') if c in left.columns), None)
+
+	# load reference tables
+	proj_df = select_all_from_table(cursor, cnxn, 'projects')
+	dept_df = select_all_from_table(cursor, cnxn, 'departments')
+	pos_df = select_all_from_table(cursor, cnxn, 'pos')
+
+	merged = left
+
+	# join projects -> provide project_name
+	if proj_df is not None and not proj_df.empty and proj_id_col is not None:
+		try:
+			merged['_proj_key'] = pd.to_numeric(merged[proj_id_col], errors='coerce')
+			right = proj_df.copy()
+			right['_proj_key'] = pd.to_numeric(right['id'], errors='coerce')
+			merged = pd.merge(merged, right, how='left', left_on='_proj_key', right_on='_proj_key', suffixes=('','_proj'))
+		except Exception:
+			try:
+				merged[proj_id_col] = merged[proj_id_col].astype(str)
+				right = proj_df.copy()
+				right['id'] = right['id'].astype(str)
+				merged = pd.merge(merged, right.rename(columns={'id': proj_id_col}), how='left', left_on=proj_id_col, right_on=proj_id_col)
+			except Exception:
+				pass
+	else:
+		# ensure project_name exists even if not joined
+		merged['project_name'] = None
+
+	# join departments -> provide department_name
+	if dept_df is not None and not dept_df.empty and dept_id_col is not None:
+		try:
+			merged['_dept_key'] = pd.to_numeric(merged[dept_id_col], errors='coerce')
+			right_dept = dept_df.copy()
+			right_dept['_dept_key'] = pd.to_numeric(right_dept['id'], errors='coerce')
+			merged = pd.merge(merged, right_dept, how='left', left_on='_dept_key', right_on='_dept_key', suffixes=('','_dept'))
+		except Exception:
+			try:
+				merged[dept_id_col] = merged[dept_id_col].astype(str)
+				right_dept = dept_df.copy()
+				right_dept['id'] = right_dept['id'].astype(str)
+				merged = pd.merge(merged, right_dept.rename(columns={'id': dept_id_col}), how='left', left_on=dept_id_col, right_on=dept_id_col)
+			except Exception:
+				pass
+	else:
+		merged['department_name'] = None
+
+	# join POs -> provide po_name (direct join from po_id if present)
+	if pos_df is not None and not pos_df.empty and po_id_col is not None:
+		try:
+			merged['_po_key'] = pd.to_numeric(merged[po_id_col], errors='coerce')
+			right_po = pos_df.copy()
+			right_po['_po_key'] = pd.to_numeric(right_po['id'], errors='coerce')
+			merged = pd.merge(merged, right_po, how='left', left_on='_po_key', right_on='_po_key', suffixes=('','_po'))
+		except Exception:
+			try:
+				merged[po_id_col] = merged[po_id_col].astype(str)
+				right_po = pos_df.copy()
+				right_po['id'] = right_po['id'].astype(str)
+				merged = pd.merge(merged, right_po.rename(columns={'id': po_id_col}), how='left', left_on=po_id_col, right_on=po_id_col)
+			except Exception:
+				pass
+	else:
+		merged['po_name'] = None
+
+	# Build canonical output
+	out = pd.DataFrame()
+
+	# project name candidates
+	proj_name_col = 'name' if proj_df is not None and 'name' in proj_df.columns else ('Project' if proj_df is not None and 'Project' in proj_df.columns else None)
+	if proj_name_col and proj_name_col in merged.columns:
+		out['project_name'] = merged[proj_name_col].where(pd.notna(merged[proj_name_col]), None)
+	elif 'project_name' in merged.columns:
+		out['project_name'] = merged['project_name'].where(pd.notna(merged['project_name']), None)
+	else:
+		out['project_name'] = None
+
+	# department name
+	if 'name_dept' in merged.columns:
+		out['department_name'] = merged['name_dept'].where(pd.notna(merged['name_dept']), None)
+	elif 'department_name' in merged.columns:
+		out['department_name'] = merged['department_name'].where(pd.notna(merged['department_name']), None)
+	elif dept_df is not None and 'name' in dept_df.columns and 'name' in merged.columns:
+		out['department_name'] = merged['name'].where(pd.notna(merged['name']), None)
+	else:
+		out['department_name'] = None
+
+	# po name
+	if 'po_name' in merged.columns:
+		out['po_name'] = merged['po_name'].where(pd.notna(merged['po_name']), None)
+	elif 'name_po' in merged.columns:
+		out['po_name'] = merged['name_po'].where(pd.notna(merged['name_po']), None)
+	elif pos_df is not None and 'name' in pos_df.columns and 'name' in merged.columns:
+		out['po_name'] = merged['name'].where(pd.notna(merged['name']), None)
+	else:
+		out['po_name'] = None
+
+	# fiscal year
+	if fiscal_col and fiscal_col in merged.columns:
+		out['fiscal_year'] = merged[fiscal_col].where(pd.notna(merged[fiscal_col]), None)
+	elif 'fiscal_year' in merged.columns:
+		out['fiscal_year'] = merged['fiscal_year'].where(pd.notna(merged['fiscal_year']), None)
+	else:
+		out['fiscal_year'] = None
+
+	# non-personnel amount: detect candidate columns
+	nonpc_candidates = ['non_personnel_expense', 'Non-personnel Expense', 'Non-personnel cost', 'non_personnel_cost', 'amount', 'expense', 'nonpersonnel_expense']
+	nonpc_col = next((c for c in nonpc_candidates if c in merged.columns), None)
+	if nonpc_col:
+		try:
+			out['non_personnel_expense'] = merged[nonpc_col].where(pd.notna(merged[nonpc_col]), 0.0).astype(float)
+		except Exception:
+			# fallback: coerce via to_numeric
+			try:
+				out['non_personnel_expense'] = pd.to_numeric(merged[nonpc_col], errors='coerce').fillna(0.0)
+			except Exception:
+				out['non_personnel_expense'] = 0.0
+	else:
+		out['non_personnel_expense'] = 0.0
+
+	# Ensure column order
+	cols = ['project_name', 'department_name', 'po_name', 'fiscal_year', 'non_personnel_expense']
+	out = out.loc[:, cols]
+
+	return out.reset_index(drop=True)
+
 def get_project_cateogory_display():
 	"""Return a DataFrame of projects with their project category.
 

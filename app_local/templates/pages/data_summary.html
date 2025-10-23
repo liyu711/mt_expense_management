@@ -82,6 +82,29 @@
                 })();
             </script>
             <script>
+                // Ensure the handler is attached after the DOM is ready so the button exists
+                document.addEventListener('DOMContentLoaded', function(){
+                    var btn = document.getElementById('calculate_stats');
+                    if(!btn) return;
+                    btn.addEventListener('click', function(){
+                        // request current stats from server
+                        fetch('/data_summary/get_statistics', { method: 'GET' }).then(function(resp){
+                            if(!resp.ok) return resp.json().then(function(){throw new Error('bad')});
+                            return resp.json();
+                        }).then(function(data){
+                            if(!data) return;
+                            document.getElementById('stat_non_personnel').textContent = data.non_personnel_forecast != null ? data.non_personnel_forecast : '-';
+                            document.getElementById('stat_personnel').textContent = data.personnel_forecast != null ? data.personnel_forecast : '-';
+                            document.getElementById('stat_total_forecast').textContent = data.total_forecast != null ? data.total_forecast : '-';
+                            document.getElementById('stat_budget').textContent = data.budget != null ? data.budget : '-';
+                            document.getElementById('stat_funding').textContent = data.funding != null ? data.funding : '-';
+                            document.getElementById('stat_total_budget').textContent = data.total_budget != null ? data.total_budget : '-';
+                            document.getElementById('stat_actual').textContent = data.actual_expense != null ? data.actual_expense : '-';
+                        }).catch(function(err){ console.error('Failed to fetch stats', err); });
+                    });
+                });
+            </script>
+            <script>
                 (function(){
                     var dept = document.getElementById('department');
                     if(!dept) return;
@@ -137,32 +160,82 @@
                     var deptWrap = document.getElementById('department_wrapper');
                     if(!po) return;
                     po.addEventListener('change', function(){
-                        // show/hide department wrapper immediately when a PO is selected
-                        if(deptWrap){
-                            if(po.value && po.value !== '') deptWrap.style.display = '';
-                            else deptWrap.style.display = 'none';
-                        }
-                        var val = po.value;
-                        // send selection to server
-                        fetch('/data_summary/po_selection', {
-                            method: 'POST',
-                            headers: {
-                                'Content-Type': 'application/json'
-                            },
-                            body: JSON.stringify({po: val})
-                        }).then(function(resp){
-                            if(resp.ok){
-                                // reload to reflect selection
-                                window.location.reload();
-                            } else {
-                                console.error('Failed to set PO');
+                            // When PO changes we should reset downstream selects immediately
+                            if(deptWrap){
+                                if(po.value && po.value !== '') deptWrap.style.display = '';
+                                else deptWrap.style.display = 'none';
                             }
-                        }).catch(function(err){ console.error(err); });
-                    });
+                            // reset UI selects for department, fiscal year and project
+                            var dept = document.getElementById('department');
+                            var fy = document.getElementById('fiscal_year');
+                            var project = document.getElementById('project');
+                            if(dept) { dept.selectedIndex = 0; }
+                            if(fy) { fy.selectedIndex = 0; }
+                            if(project) { project.selectedIndex = 0; }
+
+                            // clear server-side selections for department/fiscal_year/project before applying new PO
+                            var clearPromises = [];
+                            clearPromises.push(fetch('/data_summary/department_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department: '' }) }).catch(function(){}) );
+                            clearPromises.push(fetch('/data_summary/fiscal_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscal_year: '' }) }).catch(function(){}) );
+                            clearPromises.push(fetch('/data_summary/project_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '' }) }).catch(function(){}) );
+
+                            Promise.all(clearPromises).then(function(){
+                                // now send PO selection to server
+                                var val = po.value;
+                                fetch('/data_summary/po_selection', {
+                                    method: 'POST',
+                                    headers: {
+                                        'Content-Type': 'application/json'
+                                    },
+                                    body: JSON.stringify({po: val})
+                                }).then(function(resp){
+                                    if(resp.ok){
+                                        // reload to reflect selection
+                                        window.location.reload();
+                                    } else {
+                                        console.error('Failed to set PO');
+                                    }
+                                }).catch(function(err){ console.error(err); });
+                            });
+                        });
                 })();
             </script>
         </div>
         <hr>
+        <div style="margin-top:12px;">
+            <h3>Statistics</h3>
+            <div>
+                <label>Non personnel forecast: </label>
+                <span id="stat_non_personnel">-</span>
+            </div>
+            <div>
+                <label>Personnel forecast: </label>
+                <span id="stat_personnel">-</span>
+            </div>
+            <div>
+                <label>Total forecast: </label>
+                <span id="stat_total_forecast">-</span>
+            </div>
+            <div>
+                <label>Budget: </label>
+                <span id="stat_budget">-</span>
+            </div>
+            <div>
+                <label>Funding: </label>
+                <span id="stat_funding">-</span>
+            </div>
+            <div>
+                <label>Total Budget: </label>
+                <span id="stat_total_budget">-</span>
+            </div>
+            <div>
+                <label>Actual Expense: </label>
+                <span id="stat_actual">-</span>
+            </div>
+            <div style="margin-top:8px;">
+                <button id="calculate_stats">Calculate statistics</button>
+            </div>
+        </div>
         {% if summary_row %}
             <h3>Aggregated Summary</h3>
             <table id="summary_table" class="display" style="width:60%" border="1">
