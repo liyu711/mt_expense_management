@@ -97,6 +97,7 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
         # local_data['po'] = local_data['po'].astype(str)
         # print(local_data.columns)
         local_data['cap_year'] = local_data['cap_year'].astype(int)
+        local_data['approved_budget'] = local_data['approved_budget'].astype(float)
 
         departments = select_all_from_table(cursor, cnxn, "departments")
         po = select_all_from_table(cursor, cnxn, "POs")
@@ -126,10 +127,10 @@ def add_entry(df_upload, table_name, merge_columns, merge_on):
             'project_name',
             'name',
             ['project_name', 'name', 'category_id'],
-            {'id': 'project_id', 'fiscal_year': 'cap_year'}
+            {'id': 'project_id'}
         )
+        
         local_data = local_data[['po_id', 'department_id',  'project_id', 'cap_year','capex_description', 'approved_budget']]
-
     # 3. Merge new data with current table
     # if table_name == 'departments':
     #     upload_df = merge_departments(cur_table, local_data)

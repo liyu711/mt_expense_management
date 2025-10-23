@@ -307,8 +307,8 @@ def modify_table_router(action):
             df_upload.columns = ['PO', 'Department', 'fiscal_year', 'human_resource_expense', 'non_personnel_expense']
             upload_budgets_local(df_upload)
 
-            msg = f"Budget uploaded: {row}"
-            return msg
+            # msg = f"Budget uploaded: {row}"
+            # return msg
         else:
             # Default: use add_entry for other actions
             df_upload = pd.DataFrame([row])
@@ -350,6 +350,7 @@ def modify_table_router(action):
                                 pass
                     except Exception:
                         pass
+                df_upload['funding'] = df_upload['funding'].astype(float)
 
             # Special handling for modify_staff_cost: map staff_category name to category_id
             if action == 'modify_staff_cost':
