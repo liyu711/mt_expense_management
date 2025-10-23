@@ -178,11 +178,11 @@ def upload_nonpc_forecasts_df2(df_upload, engine, cursor, cnxn, type):
             projects_merged = projects_merged.drop_duplicates(subset=['name'])
     except Exception:
         pass
-    try:
-        if io_merged is not None and not io_merged.empty and 'IO_num' in io_merged.columns:
-            io_merged = io_merged.drop_duplicates(subset=['IO_num'])
-    except Exception:
-        pass
+    # try:
+    #     if io_merged is not None and not io_merged.empty and 'IO_num' in io_merged.columns:
+    #         io_merged = io_merged.drop_duplicates(subset=['IO_num'])
+    # except Exception:
+    #     pass
     try:
         if pos_merged is not None and not pos_merged.empty and 'name' in pos_merged.columns:
             pos_merged = pos_merged.drop_duplicates(subset=['name'])
