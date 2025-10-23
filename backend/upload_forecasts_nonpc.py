@@ -202,9 +202,9 @@ def upload_nonpc_forecasts_df2(df_upload, engine, cursor, cnxn, type):
     df_upload_fin = pd.merge(df_upload_fin, pos_merged, left_on='PO', right_on='name', how='left')
     df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'po_id', 'Fiscal Year': 'fiscal_year', 'Non-personnel cost':'non_personnel_expense'}, inplace=True)
-    df_upload_fin.drop(['fiscal_year_x', 'department_id_x'], axis=1, inplace=True)
-    df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year', 'department_id_y': 'department_id'}, inplace=True)
-
+    df_upload_fin.drop(['fiscal_year_x'], axis=1, inplace=True)
+    df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year', 'department_id_x': 'department_id'}, inplace=True)
+    print(df_upload_fin)
     return df_upload_fin
 
 
