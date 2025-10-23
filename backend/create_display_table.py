@@ -561,4 +561,78 @@ def get_project_cateogory_display():
 		out['category'] = None
 		return out.reset_index(drop=True)
 
-	
+def get_IO_display_table():
+	"""Return a DataFrame with IO numbers and their associated project name.
+
+	Behavior:
+	- Reads `IOs` and `projects` using select_all_from_table
+	- LEFT JOIN io_table.project_id -> project_table.id
+	- Returns a DataFrame with exactly two columns: 'IO' (from IO_num) and 'project_name'
+	- Handles missing tables/columns gracefully (fills missing project_name with None)
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+	io_table = select_all_from_table(cursor, cnxn, "IOs")
+	project_table = select_all_from_table(cursor, cnxn, "projects")
+
+	# If IO table missing or empty, return empty DataFrame
+	if io_table is None or io_table.empty:
+		return pd.DataFrame()
+
+	# Determine IO number column (common variants)
+	io_num_col = next((c for c in ('IO_num', 'IO', 'io_num', 'io') if c in io_table.columns), io_table.columns[0])
+
+	# Determine project id column on io_table (prefer 'project_id')
+	proj_id_col = next((c for c in ('project_id', 'proj_id', 'project') if c in io_table.columns), None)
+
+	# If project table missing, return IOs with None project_name
+	if project_table is None or project_table.empty:
+		out = pd.DataFrame()
+		out['IO'] = io_table[io_num_col].astype(object) if io_num_col in io_table.columns else io_table.iloc[:,0].astype(object)
+		out['project_name'] = None
+		return out.reset_index(drop=True)
+
+	# Determine project name column on projects table
+	proj_name_col = 'name' if 'name' in project_table.columns else ('Project' if 'Project' in project_table.columns else project_table.columns[0])
+
+	# Perform left join, attempting numeric coercion first then fallback to string join
+	left = io_table.copy()
+	right = project_table.copy()
+	merged = None
+	if proj_id_col is not None and 'id' in right.columns:
+		try:
+			left['_proj_key'] = pd.to_numeric(left[proj_id_col], errors='coerce')
+			right['_proj_key'] = pd.to_numeric(right['id'], errors='coerce')
+			merged = pd.merge(left, right, how='left', left_on='_proj_key', right_on='_proj_key', suffixes=('','_proj'))
+		except Exception:
+			# fallback to string-based join
+			left[proj_id_col] = left[proj_id_col].astype(str)
+			right['id'] = right['id'].astype(str)
+			merged = pd.merge(left, right, how='left', left_on=proj_id_col, right_on='id', suffixes=('','_proj'))
+	else:
+		# no project id to join on; preserve IOs and set project_name None
+		merged = left.copy()
+		merged['project_name'] = None
+
+	# Build output DataFrame with canonical columns
+	out = pd.DataFrame()
+	# IO column
+	if io_num_col in merged.columns:
+		out['IO'] = merged[io_num_col].where(pd.notna(merged[io_num_col]), None)
+	else:
+		out['IO'] = merged.iloc[:,0].where(pd.notna(merged.iloc[:,0]), None)
+
+	# project_name column from joined projects table (use proj_name_col if available)
+	if proj_name_col in merged.columns:
+		out['project_name'] = merged[proj_name_col].where(pd.notna(merged[proj_name_col]), None)
+	elif 'project_name' in merged.columns:
+		out['project_name'] = merged['project_name'].where(pd.notna(merged['project_name']), None)
+	else:
+		# attempt to find a candidate name column from the right-hand table
+		cand = next((c for c in ('name_proj', 'name', 'Project') if c in merged.columns), None)
+		out['project_name'] = merged[cand].where(pd.notna(merged[cand]), None) if cand else None
+
+	# Ensure exact column order
+	out = out[['IO', 'project_name']]
+
+	return out.reset_index(drop=True)
