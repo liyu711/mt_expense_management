@@ -8,7 +8,8 @@ from app_local.select_data import transform_table
 from backend import \
     upload_nonpc_forecasts_local_m, upload_pc_forecasts_local_m,\
     upload_budgets_local_m, upload_expenses_local, upload_fundings_local, \
-    upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local, get_projects_display
+    upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local, get_projects_display,\
+    get_project_cateogory_display
 from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_df, upload_nonpc_forecasts_local_m
 import pandas as pd
 
@@ -163,77 +164,45 @@ def render_mannual_input():
         except Exception:
             # If anything goes wrong during filtering, fall back to unfiltered departments
             pass
-        departments = []
-        # iterate defensively over rows and normalize keys
-        for _, r in depts_df.iterrows():
-            name = None
-            if 'name' in r.index and pd.notna(r['name']):
-                name = r['name']
-            elif 'Department' in r.index and pd.notna(r['Department']):
-                name = r['Department']
-            elif 'Name' in r.index and pd.notna(r['Name']):
-                name = r['Name']
+        # departments = []
+        # # iterate defensively over rows and normalize keys
+        # for _, r in depts_df.iterrows():
+        #     name = None
+        #     if 'name' in r.index and pd.notna(r['name']):
+        #         name = r['name']
+        #     elif 'Department' in r.index and pd.notna(r['Department']):
+        #         name = r['Department']
+        #     elif 'Name' in r.index and pd.notna(r['Name']):
+        #         name = r['Name']
 
-            # try several possible column names for po id
-            po_id = None
-            for key in ('po_id', 'PO_id', 'poId', 'po', 'PO'):
-                if key in r.index and pd.notna(r[key]):
-                    try:
-                        po_id = int(r[key])
-                    except Exception:
-                        try:
-                            po_id = int(str(r[key]))
-                        except Exception:
-                            po_id = None
-                    break
+        #     # try several possible column names for po id
+        #     po_id = None
+        #     for key in ('po_id', 'PO_id', 'poId', 'po', 'PO'):
+        #         if key in r.index and pd.notna(r[key]):
+        #             try:
+        #                 po_id = int(r[key])
+        #             except Exception:
+        #                 try:
+        #                     po_id = int(str(r[key]))
+        #                 except Exception:
+        #                     po_id = None
+        #             break
 
-            dept_id = None
-            if 'id' in r.index and pd.notna(r['id']):
-                try:
-                    dept_id = int(r['id'])
-                except Exception:
-                    dept_id = None
+        #     dept_id = None
+        #     if 'id' in r.index and pd.notna(r['id']):
+        #         try:
+        #             dept_id = int(r['id'])
+        #         except Exception:
+        #             dept_id = None
 
-            departments.append({'id': dept_id, 'name': name, 'po_id': po_id})
+        #     departments.append({'id': dept_id, 'name': name, 'po_id': po_id})
 
     # POs already loaded above
 
     io = select_all_from_table(cursor, cnxn, "ios")['IO_num']
     # Build initial projects list from the display helper and apply any module-level filters
-    try:
-        proj_df = get_projects_display()
-    except Exception:
-        proj_df = None
-    projects = []
-    if proj_df is not None:
-        try:
-            raw_projects = proj_df.to_dict(orient='records')
-        except Exception:
-            raw_projects = []
-        try:
-            seen = set()
-            for p in raw_projects:
-                proj_name = p.get('Project') or p.get('project') or p.get('name') or p.get('project_name')
-                po_name = p.get('PO Name') or p.get('PO') or p.get('po_name') or p.get('po')
-                dept_name = p.get('Department Name') or p.get('Department') or p.get('department')
-                fy_val = p.get('Fiscal Year') or p.get('fiscal_year') or p.get('fy')
-                if not proj_name:
-                    continue
-                ok = True
-                if selected_po and selected_po != '' and selected_po != 'All':
-                    ok = ok and (str(po_name) == str(selected_po))
-                if selected_department and selected_department != '' and selected_department != 'All':
-                    ok = ok and (str(dept_name) == str(selected_department))
-                if selected_fiscal_year and selected_fiscal_year != '' and selected_fiscal_year != 'All':
-                    ok = ok and (str(fy_val) == str(selected_fiscal_year))
-                if ok and proj_name not in seen:
-                    seen.add(proj_name)
-                    projects.append(proj_name)
-        except Exception:
-            projects = []
-    else:
-        projects = []
-    project_categories = select_all_from_table(cursor, cnxn, "project_categories")['category']
+    proj_df = get_projects_display()
+
     human_resource_categories = select_all_from_table(cursor, cnxn, "human_resource_categories")['name']
     # Fetch forecast table contents to show below the Add button
     try:
@@ -282,12 +251,12 @@ def render_mannual_input():
                            titles = titles, 
                            display_names=display_names, 
                            upload_columns=upload_columns,
-                           departments = departments,
+                           departments = [],
                            departments_all = departments_all,
                            pos = po,
                            ios = io,
-                           projects = projects,
-                           project_categories=project_categories,
+                           projects = [],
+                           project_categories=[],
                            human_resource_categories= human_resource_categories,
                            pf_nonpc_columns=pf_nonpc_columns,
                            pf_nonpc_data=pf_nonpc_data,
@@ -398,6 +367,9 @@ def manual_departments():
     Response JSON: {"departments": [{id, name, po_id}, ...]}
     """
     po_name = request.args.get('po') or selected_po
+    # Hierarchy: if no PO selected, department options should be empty
+    if not po_name or str(po_name).strip() == '' or str(po_name) == 'All':
+        return jsonify({'departments': []}), 200
     try:
         db = connect_local()
         # No need for SQLAlchemy engine here
@@ -485,6 +457,7 @@ def manual_projects():
     If a param is not provided, fall back to module-level selected_* variables.
     Response JSON: {'projects': [{'name': <str>} , ...]}
     """
+    print("projects route")
     po_name = request.args.get('po') or selected_po
     dept_name = request.args.get('department') or selected_department
     fy = request.args.get('fiscal_year') or selected_fiscal_year
@@ -492,6 +465,9 @@ def manual_projects():
         proj_df = get_projects_display()
     except Exception:
         proj_df = None
+    # Hierarchy: if no fiscal year selected, project options should be empty
+    if not fy or str(fy).strip() == '' or str(fy) == 'All':
+        return jsonify({'projects': []}), 200
     result = []
     if proj_df is None:
         return jsonify({'projects': []}), 200
@@ -500,18 +476,25 @@ def manual_projects():
     except Exception:
         raw = []
     try:
+        # Use same normalization/filtering approach as data_summary.data_summary
         for p in raw:
-            proj_name = p.get('Project') or p.get('project') or p.get('name') or p.get('project_name')
-            po_val = p.get('PO Name') or p.get('PO') or p.get('po_name') or p.get('po')
-            dept_val = p.get('Department Name') or p.get('Department') or p.get('department')
-            fy_val = p.get('Fiscal Year') or p.get('fiscal_year') or p.get('fy')
+            # normalize project name candidates (include project_name)
+            proj_name = p.get('project_name') or p.get('Project') or p.get('project') or p.get('name')
+            # normalize PO name candidates
+            po_val = p.get('po_name') or p.get('PO Name') or p.get('PO') or p.get('po')
+            # normalize department name candidates
+            dept_val = p.get('department_name') or p.get('Department Name') or p.get('Department') or p.get('department')
+            # normalize fiscal year candidates
+            fy_val = p.get('fiscal_year') or p.get('Fiscal Year') or p.get('fy') or p.get('fiscal')
+
             if not proj_name:
                 continue
+
             ok = True
             if po_name and po_name != '' and po_name != 'All':
-                ok = ok and (str(po_val) == str(po_name))
+                ok = ok and (po_val == po_name)
             if dept_name and dept_name != '' and dept_name != 'All':
-                ok = ok and (str(dept_val) == str(dept_name))
+                ok = ok and (dept_val == dept_name)
             if fy and fy != '' and fy != 'All':
                 ok = ok and (str(fy_val) == str(fy))
             if ok:
@@ -526,7 +509,27 @@ def manual_projects():
         if n not in seen:
             seen.add(n)
             deduped.append({'name': n})
+    print(result)
+    print(deduped)
     return jsonify({'projects': deduped}), 200
+
+
+@manual_upload.route('/manual_input/fiscal_years', methods=['GET'])
+def manual_fiscal_years():
+    """Return fiscal year options filtered by provided query params: po (name), department (name).
+    If department is not provided, return empty list to enforce hierarchy.
+    Response JSON: {'fiscal_years': ['2022', '2023', ...]}
+    """
+    po_name = request.args.get('po') or selected_po
+    dept_name = request.args.get('department') or selected_department
+    # If no department selected, fiscal year options should be empty
+    if not dept_name or str(dept_name).strip() == '' or str(dept_name) == 'All':
+        return jsonify({'fiscal_years': []}), 200
+
+    years = set()
+    
+    years_list = sorted(list(years))
+    return jsonify({'fiscal_years': years_list}), 200
 
 
 @manual_upload.route('/manual_input/project_selection', methods=['POST'])
@@ -543,6 +546,55 @@ def manual_project_selection():
         return {'status': 'ok', 'selected_project': selected_project}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
+
+
+@manual_upload.route('/manual_input/project_categories', methods=['GET'])
+def manual_project_categories():
+    """Return project categories filtered by provided query param 'project' or by module-level selected_project.
+    Response JSON: {'project_categories': [<str>, ...]}
+    """
+    proj_name = request.args.get('project') or selected_project
+    # If no project selected, return empty list
+    if not proj_name or str(proj_name).strip() == '' or str(proj_name) == 'All':
+        return jsonify({'project_categories': []}), 200
+
+    try:
+        # get full project-category display table from backend helper
+        try:
+            pc_df = get_project_cateogory_display()
+        except Exception:
+            pc_df = None
+
+        if pc_df is None:
+            return jsonify({'project_categories': []}), 200
+
+        # normalize column names and filter by project name defensively
+        try:
+            records = pc_df.to_dict(orient='records')
+        except Exception:
+            records = []
+
+        cats = []
+        seen = set()
+        for r in records:
+            # possible project name columns
+            name_val = r.get('project_name') or r.get('Project') or r.get('project') or r.get('name')
+            # possible category columns
+            cat_val = r.get('category') or r.get('Project Category') or r.get('project_category') or r.get('Category')
+            if not name_val or not cat_val:
+                continue
+            try:
+                if str(name_val).strip() == str(proj_name).strip():
+                    cv = str(cat_val).strip()
+                    if cv not in seen:
+                        seen.add(cv)
+                        cats.append(cv)
+            except Exception:
+                continue
+
+        return jsonify({'project_categories': cats}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @manual_upload.route("/upload_forecast_nonpc", methods=['POST'])

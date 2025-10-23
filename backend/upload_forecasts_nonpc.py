@@ -139,6 +139,8 @@ def upload_nonpc_forecasts_df(df_upload, engine, cursor, cnxn, type):
     df_upload_fin = pd.merge(df_upload_fin, pos_merged, left_on='PO', right_on='name', how='left')
     df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'po_id', 'Fiscal Year': 'fiscal_year', 'Non-personnel cost':'non_personnel_expense'}, inplace=True)
+    df_upload_fin.drop(['fiscal_year_x'], axis=1, inplace=True)
+    df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year'}, inplace=True)
 
     return df_upload_fin
 
@@ -189,18 +191,19 @@ def upload_nonpc_forecasts_df2(df_upload, engine, cursor, cnxn, type):
 
     # upload expenses
     df_upload_fin = pd.merge(df_upload, merged_departments, left_on='Department', right_on='name', how='left')
-    df_upload_fin.drop(['name', 'Department'], axis=1, inplace=True)
+    df_upload_fin.drop(['name', 'Department', 'po_id'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'department_id'}, inplace=True)
-
     df_upload_fin = pd.merge(df_upload_fin, projects_merged, left_on='Project Name', right_on='name', how='left')
     df_upload_fin.drop(['Project Category', 'Project Name', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'project_id', 'category_id': 'project_category_id'}, inplace=True)
     df_upload_fin = pd.merge(df_upload_fin, io_merged, left_on='IO', right_on='IO_num', how='left')
-    df_upload_fin.drop(['IO', 'IO_num', 'project_id_y', 'po_id', 'department_id_y'], axis=1, inplace=True)
-    df_upload_fin.rename(columns={'id': 'io_id', 'project_id_x': 'project_id', 'department_id_x': 'department_id'}, inplace=True)
+    df_upload_fin.drop(['IO', 'IO_num', 'project_id_y', 'department_id_y'], axis=1, inplace=True)
+    df_upload_fin.rename(columns={'id': 'io_id', 'project_id_x': 'project_id'}, inplace=True)
     df_upload_fin = pd.merge(df_upload_fin, pos_merged, left_on='PO', right_on='name', how='left')
     df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'po_id', 'Fiscal Year': 'fiscal_year', 'Non-personnel cost':'non_personnel_expense'}, inplace=True)
+    df_upload_fin.drop(['fiscal_year_x', 'department_id_x'], axis=1, inplace=True)
+    df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year', 'department_id_y': 'department_id'}, inplace=True)
 
     return df_upload_fin
 

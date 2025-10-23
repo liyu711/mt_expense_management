@@ -133,6 +133,8 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
                 df_upload_fin = df_upload_fin.drop_duplicates(subset=fallback, keep='first')
     except Exception:
         pass
+    df_upload_fin.drop(['fiscal_year_x'], axis=1, inplace=True)
+    df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year'}, inplace=True)
 
     # close_connection(cursor, cnxn)
     return df_upload_fin

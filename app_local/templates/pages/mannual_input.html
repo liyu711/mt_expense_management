@@ -257,6 +257,61 @@
         <!-- Include DataTables and init scripts (with fallbacks like modify_table.html) -->
         <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
         <script>
+            // Populate Project Category dropdown when Project_Name changes
+            (function () {
+                function rebuildCategoryOptions(options) {
+                    var sel = document.querySelector('select[name="Project_Category"]');
+                    if (!sel) return;
+                    var current = sel.value;
+                    while (sel.firstChild) sel.removeChild(sel.firstChild);
+                    var placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Select Project Category';
+                    sel.appendChild(placeholder);
+                    options.forEach(function (c) {
+                        var opt = document.createElement('option');
+                        opt.value = c;
+                        opt.textContent = c;
+                        sel.appendChild(opt);
+                    });
+                    if (current && Array.from(sel.options).some(function (o) { return o.value === current; })) {
+                        sel.value = current;
+                    } else {
+                        sel.value = '';
+                    }
+                }
+
+                function fetchAndRebuildCategories(project) {
+                    var qs = project ? ('?project=' + encodeURIComponent(project)) : '';
+                    fetch('/manual_input/project_categories' + qs).then(function (res) { return res.json(); }).then(function (data) {
+                        if (!data || !data.project_categories) return;
+                        rebuildCategoryOptions(data.project_categories);
+                    }).catch(function () { });
+                }
+
+                function attachProjectHandlers() {
+                    var projectSelects = Array.from(document.querySelectorAll('select[name="Project_Name"]'));
+                    projectSelects.forEach(function (sel) {
+                        sel.addEventListener('change', function () {
+                            var val = sel.value || '';
+                            // notify server selection (existing endpoint)
+                            fetch('/manual_input/project_selection', {
+                                method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: val })
+                            }).catch(function () { }).finally(function () { fetchAndRebuildCategories(val); });
+                        });
+                    });
+                }
+
+                // Ensure categories are initialized on load (in case a project is preselected)
+                if (document.readyState === 'complete' || document.readyState === 'interactive') {
+                    attachProjectHandlers();
+                    // if there is already a selected project in UI, fetch categories for it
+                    var firstProj = document.querySelector('select[name="Project_Name"]');
+                    if (firstProj && firstProj.value) fetchAndRebuildCategories(firstProj.value);
+                } else {
+                    document.addEventListener('DOMContentLoaded', function () { attachProjectHandlers(); var f = document.querySelector('select[name="Project_Name"]'); if (f && f.value) fetchAndRebuildCategories(f.value); });
+                }
+            })();
             if (typeof jQuery === 'undefined') {
                 var s = document.createElement('script');
                 s.src = "{{ url_for('static', filename='vendor/jquery-3.7.1.min.js') }}";
