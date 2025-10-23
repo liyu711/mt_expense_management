@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Home</title>
+    <title>Reset Database</title>
     <style>
     body {
         margin-left: 220px;
@@ -11,7 +11,7 @@
 <body>
     {% include 'sidebar.html' %}
     <div style="padding: 24px;">
-        <h1>Home</h1>
+        <h1>Reset Database</h1>
         <form id="resetForm" action="/reset" method="POST">
             <button name="trigger_warning" type="button" onclick="showModal()">Reset database</button>
         </form>
@@ -34,7 +34,7 @@
             document.getElementById('resetForm').submit();
         }
         function goHome() {
-            window.location.href = '/home';
+            window.location.href = '/reset';
         }
         // Hide modal when clicking outside
         if (document.getElementById('confirmModal')) {

@@ -64,16 +64,23 @@ def login():
             error = 'Please enter both username and password.'
     return render_template('login.html', error=error)
 
-@app.route("/home")
+@app.route('/reset', methods=['GET', 'POST'])
 def homepage():
-    return render_template("home.html")
+    """Render the home page on GET; perform database reset on POST then render home page.
 
-@app.route('/reset', methods=['POST'])
-def reset_database():
-    # flash('This is an alert message!', 'info')
-    cursor, cnxn = conn.connect_to_db()
-    initialize_database(cursor, cnxn, initial_values=False)
-    close_connection(cursor, cnxn)
+    Keeping the endpoint name `homepage` so existing redirects using
+    url_for('homepage') continue to work.
+    """
+    if request.method == 'POST':
+        # perform reset
+        try:
+            cursor, cnxn = conn.connect_to_db()
+            initialize_database(cursor, cnxn, initial_values=False)
+        finally:
+            try:
+                close_connection(cursor, cnxn)
+            except Exception:
+                pass
     return render_template("home.html")
 
 @app.route("/input_data")
