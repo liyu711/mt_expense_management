@@ -56,7 +56,7 @@ modify_table_config = {
         'title': 'Modify IO',
         'table_name': 'ios',
         'fields': [
-            {'name': 'IO', 'type': 'text', 'label': 'IO Number'},
+            {'name': 'IO', 'type': 'number', 'label': 'IO Number'},
             {'name': 'project_name', 'type': 'select', 'label': 'Project Name', 'options': []}
         ],
         'merge_on': 'IO_num',
@@ -306,6 +306,9 @@ def modify_table_router(action):
             # Default: use add_entry for other actions
             df_upload = pd.DataFrame([row])
             # Special handling for modify_funding: map PO and Department names to their local ids
+            if action == 'modify_io':
+                df_upload['IO'] = df_upload['IO'].astype(int)
+
             if action == 'modify_funding':
                 try:
                     db = connect_local()
@@ -423,6 +426,7 @@ def modify_table_router(action):
                 df_upload.to_sql(table_name, con=engine, if_exists='append', index=False)
             else:
                 res = add_entry(df_upload, table_name, merge_columns, merge_on)
+            
 
     # After handling POST (or on GET), fetch table contents to display below the form
     try:

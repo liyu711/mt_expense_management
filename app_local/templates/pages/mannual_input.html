@@ -140,21 +140,11 @@
 
                     <div class="form-group">
                         <label for="Project_Category">Project Category</label>
-                        <select name="Project_Category" required>
-                            <option value="">Select Project Category</option>
-                            {% for cat in project_categories %}
-                            <option value="{{ cat }}">{{ cat }}</option>
-                            {% endfor %}
-                        </select>
+                        <input type="text" name="Project_Category" required value="{{ project_categories[0] if project_categories|length > 0 else '' }}">
                     </div>
                     <div class="form-group">
                         <label for="IO">IO</label>
-                        <select name="IO" required>
-                            <option value="">Select IO</option>
-                            {% for io in ios %}
-                            <option value="{{ io }}">{{ io }}</option>
-                            {% endfor %}
-                        </select>
+                        <input type="text" name="IO" required value="{{ ios[0] if ios|length > 0 else '' }}">
                     </div>
                     <div class="form-group">
                         <label for="Human_resource_category">Human Resource Category</label>
@@ -260,24 +250,38 @@
             // Populate Project Category dropdown when Project_Name changes
             (function () {
                 function rebuildCategoryOptions(options) {
+                    // Support both select and input elements for Project_Category.
                     var sel = document.querySelector('select[name="Project_Category"]');
-                    if (!sel) return;
-                    var current = sel.value;
-                    while (sel.firstChild) sel.removeChild(sel.firstChild);
-                    var placeholder = document.createElement('option');
-                    placeholder.value = '';
-                    placeholder.textContent = 'Select Project Category';
-                    sel.appendChild(placeholder);
-                    options.forEach(function (c) {
-                        var opt = document.createElement('option');
-                        opt.value = c;
-                        opt.textContent = c;
-                        sel.appendChild(opt);
-                    });
-                    if (current && Array.from(sel.options).some(function (o) { return o.value === current; })) {
-                        sel.value = current;
-                    } else {
-                        sel.value = '';
+                    var inp = document.querySelector('input[name="Project_Category"]');
+                    if (sel) {
+                        var current = sel.value;
+                        while (sel.firstChild) sel.removeChild(sel.firstChild);
+                        var placeholder = document.createElement('option');
+                        placeholder.value = '';
+                        placeholder.textContent = 'Select Project Category';
+                        sel.appendChild(placeholder);
+                        options.forEach(function (c) {
+                            var opt = document.createElement('option');
+                            opt.value = c;
+                            opt.textContent = c;
+                            sel.appendChild(opt);
+                        });
+                        if (current && Array.from(sel.options).some(function (o) { return o.value === current; })) {
+                            sel.value = current;
+                        } else {
+                            sel.value = '';
+                        }
+                    } else if (inp) {
+                        // For input, set its value to the first option if available, otherwise clear.
+                        var prev = inp.value || '';
+                        if (prev && options.some(function (o) { return String(o) === String(prev); })) {
+                            // keep previous if still valid
+                            inp.value = prev;
+                        } else if (options.length > 0) {
+                            inp.value = options[0];
+                        } else {
+                            inp.value = '';
+                        }
                     }
                 }
 
@@ -297,19 +301,89 @@
                             // notify server selection (existing endpoint)
                             fetch('/manual_input/project_selection', {
                                 method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: val })
-                            }).catch(function () { }).finally(function () { fetchAndRebuildCategories(val); });
+                            }).catch(function () { }).finally(function () {
+                                // If project cleared, clear Project Category and IO inputs/selects
+                                if (!val) {
+                                    try {
+                                        var catSel = document.querySelector('select[name="Project_Category"]');
+                                        var catInp = document.querySelector('input[name="Project_Category"]');
+                                        if (catSel) { catSel.selectedIndex = 0; }
+                                        if (catInp) { catInp.value = ''; }
+                                        var ioSel = document.querySelector('select[name="IO"]');
+                                        var ioInp = document.querySelector('input[name="IO"]');
+                                        if (ioSel) { ioSel.selectedIndex = 0; }
+                                        if (ioInp) { ioInp.value = ''; }
+                                    } catch (e) { }
+                                }
+                                // refresh dependent fields: categories and IOs
+                                try { fetchAndRebuildCategories(val); } catch (e) { /* ignore */ }
+                                try { fetchAndRebuildIOs(val); } catch (e) { /* ignore */ }
+                            });
                         });
                     });
+                }
+
+                // Also fetch and rebuild IO select based on project selection
+                function rebuildIOOptions(options) {
+                    // Support both select and input elements for IO.
+                    var sel = document.querySelector('select[name="IO"]');
+                    var inp = document.querySelector('input[name="IO"]');
+                    if (sel) {
+                        var current = sel.value;
+                        while (sel.firstChild) sel.removeChild(sel.firstChild);
+                        var placeholder = document.createElement('option');
+                        placeholder.value = '';
+                        placeholder.textContent = 'Select IO';
+                        sel.appendChild(placeholder);
+                        options.forEach(function (i) {
+                            var opt = document.createElement('option');
+                            opt.value = i;
+                            opt.textContent = i;
+                            sel.appendChild(opt);
+                        });
+                        if (current && Array.from(sel.options).some(function (o) { return o.value === String(current); })) {
+                            sel.value = current;
+                        } else {
+                            sel.value = '';
+                        }
+                    } else if (inp) {
+                        var prev = inp.value || '';
+                        if (prev && options.some(function (o) { return String(o) === String(prev); })) {
+                            inp.value = prev;
+                        } else if (options.length > 0) {
+                            inp.value = options[0];
+                        } else {
+                            inp.value = '';
+                        }
+                    }
+                }
+
+                function fetchAndRebuildIOs(project) {
+                    var qs = project ? ('?project=' + encodeURIComponent(project)) : '';
+                    fetch('/manual_input/ios' + qs).then(function (res) { return res.json(); }).then(function (data) {
+                        if (!data || !Array.isArray(data.ios)) return;
+                        rebuildIOOptions(data.ios);
+                    }).catch(function () { });
                 }
 
                 // Ensure categories are initialized on load (in case a project is preselected)
                 if (document.readyState === 'complete' || document.readyState === 'interactive') {
                     attachProjectHandlers();
-                    // if there is already a selected project in UI, fetch categories for it
+                    // if there is already a selected project in UI, fetch categories and IOs for it
                     var firstProj = document.querySelector('select[name="Project_Name"]');
-                    if (firstProj && firstProj.value) fetchAndRebuildCategories(firstProj.value);
+                    if (firstProj && firstProj.value) {
+                        fetchAndRebuildCategories(firstProj.value);
+                        fetchAndRebuildIOs(firstProj.value);
+                    }
                 } else {
-                    document.addEventListener('DOMContentLoaded', function () { attachProjectHandlers(); var f = document.querySelector('select[name="Project_Name"]'); if (f && f.value) fetchAndRebuildCategories(f.value); });
+                    document.addEventListener('DOMContentLoaded', function () { 
+                        attachProjectHandlers(); 
+                        var f = document.querySelector('select[name="Project_Name"]'); 
+                        if (f && f.value) {
+                            fetchAndRebuildCategories(f.value);
+                            fetchAndRebuildIOs(f.value);
+                        }
+                    });
                 }
             })();
             if (typeof jQuery === 'undefined') {
@@ -354,6 +428,8 @@
                 var modalOverlay = document.getElementById('forecastModalOverlay');
                 var modalCancel = document.getElementById('forecastModalCancel');
                 function openModal() {
+                    // reset form to default state when opening
+                    if (typeof window.resetForecastForm === 'function') window.resetForecastForm();
                     modal.style.display = 'block';
                     modal.setAttribute('aria-hidden', 'false');
                     document.body.style.overflow = 'hidden';
@@ -371,6 +447,45 @@
                 modalCancel && modalCancel.addEventListener('click', closeModal);
                 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
             })();
+        </script>
+
+        <script>
+            // Global reset function and hierarchy helpers for forecast modal
+            // Exposed on window so other IIFEs can call it when needed (PO/Department changes)
+            window.resetForecastForm = function () {
+                try {
+                    var form = document.getElementById('upload_forecast');
+                    if (!form) return;
+                    // Reset all select controls to placeholder (first option)
+                    var selects = Array.from(form.querySelectorAll('select'));
+                    selects.forEach(function (s) {
+                        if (s.options && s.options.length) s.selectedIndex = 0;
+                    });
+                    // Clear text inputs (Project_Category, IO, Personnel, Non-personnel, etc.)
+                    var textInputs = Array.from(form.querySelectorAll('input[type="text"]'));
+                    textInputs.forEach(function (i) { i.value = ''; });
+                    // Reset numeric FTE to 0 (match initial markup)
+                    var fte = form.querySelector('#Human_resource_FTE');
+                    if (fte) fte.value = '0';
+                    // Clear personnel cost
+                    var personnel = form.querySelector('#Personnel_cost');
+                    if (personnel) personnel.value = '';
+                    // If there are project selects, clear their option lists (keep placeholder)
+                    var projSelects = Array.from(document.querySelectorAll('select[name="Project_Name"]'));
+                    projSelects.forEach(function (sel) {
+                        while (sel.options && sel.options.length > 1) sel.remove(1);
+                        sel.value = '';
+                    });
+                    // Also clear department options (keep placeholder) - used when opening modal
+                    var dept = document.getElementById('department_select');
+                    if (dept) {
+                        while (dept.options && dept.options.length > 1) dept.remove(1);
+                        dept.value = '';
+                    }
+                } catch (e) {
+                    console.warn('resetForecastForm failed', e);
+                }
+            };
         </script>
 
         <script>
@@ -488,10 +603,20 @@
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ po: val })
                         }).catch(function () { });
-                        // Then fetch server-filtered departments and update UI
-                        fetchServerFilteredDepartments();
-                        // Also refresh projects list filtered by new PO
-                        if (window.fetchAndRebuildProjects) window.fetchAndRebuildProjects();
+                        // If PO is cleared, reset dependent UI and server-side selections
+                        if (!val) {
+                            // reset entire form except PO itself
+                            window.resetForecastForm && window.resetForecastForm();
+                            // notify server that department/fiscal_year/project are cleared
+                            fetch('/manual_input/department_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department: '' }) }).catch(function(){});
+                            fetch('/manual_input/fiscal_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscal_year: '' }) }).catch(function(){});
+                            fetch('/manual_input/project_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '' }) }).catch(function(){});
+                        } else {
+                            // Then fetch server-filtered departments and update UI
+                            fetchServerFilteredDepartments();
+                            // Also refresh projects list filtered by new PO
+                            if (window.fetchAndRebuildProjects) window.fetchAndRebuildProjects();
+                        }
                     });
                 }
             })();
@@ -537,6 +662,9 @@
                     fetch(url).then(function (res) { return res.json(); }).then(function (data) {
                         if (!data || !data.projects) return;
                         rebuildProjectOptions(data.projects);
+                        // after rebuilding projects, if a project is selected fetch IOs for it
+                        var firstProj = document.querySelector('select[name="Project_Name"]');
+                        if (firstProj && firstProj.value) fetchAndRebuildIOs(firstProj.value);
                     }).catch(function () { });
                 }
 
@@ -549,7 +677,25 @@
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ department: val })
-                        }).catch(function () { }).finally(function () { fetchAndRebuildProjects(); });
+                        }).catch(function () { }).finally(function () {
+                            // If department cleared, enforce hierarchy: clear fiscal year, projects, and inputs
+                            if (!val) {
+                                try {
+                                    var fy = document.querySelector('select[name="fiscal_year"]');
+                                    if (fy) fy.selectedIndex = 0;
+                                    // clear project selects
+                                    var projSelects = Array.from(document.querySelectorAll('select[name="Project_Name"]'));
+                                    projSelects.forEach(function (sel) { while (sel.options && sel.options.length > 1) sel.remove(1); sel.value = ''; });
+                                    // clear inputs: Project_Category and IO
+                                    var cat = document.querySelector('input[name="Project_Category"]'); if (cat) cat.value = '';
+                                    var ioInp = document.querySelector('input[name="IO"]'); if (ioInp) ioInp.value = '';
+                                    // notify server that fiscal year and project cleared
+                                    fetch('/manual_input/fiscal_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscal_year: '' }) }).catch(function(){});
+                                    fetch('/manual_input/project_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '' }) }).catch(function(){});
+                                } catch (e) { }
+                            }
+                            fetchAndRebuildProjects();
+                        });
                     });
                 }
                 if (fySelect) {
@@ -583,6 +729,23 @@
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ project: val })
                             }).catch(function () { });
+                            // If project cleared, clear Project Category and IO inputs/selects and notify server
+                            if (!val) {
+                                try {
+                                    var catSel = document.querySelector('select[name="Project_Category"]');
+                                    var catInp = document.querySelector('input[name="Project_Category"]');
+                                    if (catSel) { catSel.selectedIndex = 0; }
+                                    if (catInp) { catInp.value = ''; }
+                                    var ioSel = document.querySelector('select[name="IO"]');
+                                    var ioInp = document.querySelector('input[name="IO"]');
+                                    if (ioSel) { ioSel.selectedIndex = 0; }
+                                    if (ioInp) { ioInp.value = ''; }
+                                } catch (e) { }
+                                fetch('/manual_input/project_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '' }) }).catch(function(){});
+                            } else {
+                                // Also refresh IOs for this project selection
+                                fetchAndRebuildIOs(val);
+                            }
                         });
                     });
                 }

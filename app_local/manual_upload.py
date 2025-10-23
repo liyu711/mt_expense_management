@@ -9,7 +9,7 @@ from backend import \
     upload_nonpc_forecasts_local_m, upload_pc_forecasts_local_m,\
     upload_budgets_local_m, upload_expenses_local, upload_fundings_local, \
     upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local, get_projects_display,\
-    get_project_cateogory_display
+    get_project_cateogory_display, get_IO_display_table
 from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_df, upload_nonpc_forecasts_local_m
 import pandas as pd
 
@@ -198,8 +198,42 @@ def render_mannual_input():
         #     departments.append({'id': dept_id, 'name': name, 'po_id': po_id})
 
     # POs already loaded above
+    io_df = get_IO_display_table()
 
-    io = select_all_from_table(cursor, cnxn, "ios")['IO_num']
+    # Build initial IO list optionally filtered by module-level selected_project
+    io = []
+    try:
+        if io_df is None or io_df.empty:
+            io = []
+        else:
+            try:
+                records = io_df.to_dict(orient='records')
+            except Exception:
+                records = []
+
+            seen_io = set()
+            for r in records:
+                io_val = r.get('IO') or r.get('IO_num') or r.get('io') or r.get('io_num')
+                proj_val = r.get('project_name') or r.get('Project') or r.get('project') or r.get('name')
+
+                # if a project is selected at module level, only include IOs for that project
+                if selected_project and str(selected_project).strip() not in ('', 'All'):
+                    if not proj_val or str(proj_val).strip() != str(selected_project).strip():
+                        continue
+
+                if io_val is None:
+                    continue
+                # try to coerce to int for display where possible
+                try:
+                    candidate = int(io_val)
+                except Exception:
+                    candidate = str(io_val).strip()
+                if candidate not in seen_io:
+                    seen_io.add(candidate)
+                    io.append(candidate)
+    except Exception:
+        io = []
+
     # Build initial projects list from the display helper and apply any module-level filters
     proj_df = get_projects_display()
 
@@ -595,6 +629,51 @@ def manual_project_categories():
         return jsonify({'project_categories': cats}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@manual_upload.route('/manual_input/ios', methods=['GET'])
+def manual_ios():
+    """Return IO options filtered by provided query param 'project' or by module-level selected_project.
+    Response JSON: {'ios': [<int or str>, ...]}
+    """
+    proj_name = request.args.get('project') or selected_project
+    try:
+        io_df = get_IO_display_table()
+    except Exception:
+        io_df = None
+
+    if io_df is None or io_df.empty:
+        return jsonify({'ios': []}), 200
+
+    try:
+        records = io_df.to_dict(orient='records')
+    except Exception:
+        records = []
+
+    ios = []
+    seen = set()
+    for r in records:
+        io_val = r.get('IO') or r.get('IO_num') or r.get('io') or r.get('io_num')
+        proj_val = r.get('project_name') or r.get('Project') or r.get('project') or r.get('name')
+
+        if proj_name and str(proj_name).strip() not in ('', 'All'):
+            try:
+                if not proj_val or str(proj_val).strip() != str(proj_name).strip():
+                    continue
+            except Exception:
+                continue
+
+        if io_val is None:
+            continue
+        try:
+            cand = int(io_val)
+        except Exception:
+            cand = str(io_val).strip()
+        if cand not in seen:
+            seen.add(cand)
+            ios.append(cand)
+
+    return jsonify({'ios': ios}), 200
 
 
 @manual_upload.route("/upload_forecast_nonpc", methods=['POST'])
