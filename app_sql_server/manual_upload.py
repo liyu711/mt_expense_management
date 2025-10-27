@@ -57,7 +57,7 @@ titles = {
 
 @manual_upload.route("/manual_input")
 def render_mannual_input():
-    return render_template("pages/mannual_input.html", input_types = input_types, titles = titles, display_names=display_names, upload_columns=upload_columns)
+    return render_template("pages/manual_input.html", input_types = input_types, titles = titles, display_names=display_names, upload_columns=upload_columns)
 
 @manual_upload.route("/upload_forecast_pc", methods=['POST'])
 def upload_forecast_pc_r():

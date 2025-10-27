@@ -280,7 +280,7 @@ def render_mannual_input():
     pf_nonpc_columns, pf_nonpc_data = map_and_prepare(df_nonpc, 'project_forecasts_nonpc')
     pf_pc_columns, pf_pc_data = map_and_prepare(df_pc, 'project_forecasts_pc')
 
-    return render_template("pages/mannual_input.html", 
+    return render_template("pages/manual_input.html", 
                            input_types = input_types, 
                            titles = titles, 
                            display_names=display_names, 
