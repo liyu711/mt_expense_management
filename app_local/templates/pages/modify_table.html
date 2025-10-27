@@ -53,7 +53,7 @@
                 <h1>{{ title }}</h1>
                 <!-- Add and Modify buttons to trigger modal popups -->
                 <button id="add_button" type="button">Add</button>
-                {% if table_name == 'human_resource_cost' %}
+                {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' %}
                 <button id="modify_button" type="button">Modify</button>
                 {% endif %}
 
@@ -108,13 +108,15 @@
         </div>
 
                     <!-- Modify modal: single instance that submits to /change_staff_cost (render only for staff cost page) -->
-                    {% if table_name == 'human_resource_cost' %}
+            {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' %}
                     <div id="modifyModalChange" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modalTitleChange">
                         <div class="modal-overlay" id="modalOverlayChange"></div>
                         <div class="modal-content" role="document">
                             <button class="modal-close" id="modalCloseChange" aria-label="Close">&times;</button>
                             <h2 id="modalTitleChange">Modify {{ title }}</h2>
-                            <form method="POST" action="{{ url_for('modify_tables.change_staff_cost') }}" name="Change_{{ table_name }}" id="changeForm">
+                    <form method="POST"
+                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% endif %}"
+                                  name="Change_{{ table_name }}" id="changeForm">
                                 <input type="hidden" name="table_name" value="{{ table_name }}">
                                 {% for field in fields %}
                                     <div class="form-group">

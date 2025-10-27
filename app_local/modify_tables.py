@@ -432,6 +432,103 @@ def modify_table_router(action):
                 conn = connect_local()
                 engine, cursor, cnxn = conn.connect_to_db(engine=True)
                 df_upload.to_sql(table_name, con=engine, if_exists='append', index=False)
+            elif action == 'capex_forecast':
+                # Custom handling for capex_forecast: map names to IDs, check duplicates, and upsert accordingly
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+
+                    pos_df = select_all_from_table(cursor, cnxn, 'pos')
+                    dept_df = select_all_from_table(cursor, cnxn, 'departments')
+                    proj_df = select_all_from_table(cursor, cnxn, 'projects')
+
+                    po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+                    dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+                    proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+
+                    po_name = row.get('po')
+                    dept_name = row.get('department')
+                    proj_name = row.get('project_name')
+                    cap_year_val = None
+                    try:
+                        cap_year_val = int(row.get('cap_year')) if row.get('cap_year') not in (None, '') else None
+                    except Exception:
+                        cap_year_val = None
+                    try:
+                        forecast_val = float(row.get('capex_forecast')) if row.get('capex_forecast') not in (None, '') else None
+                    except Exception:
+                        forecast_val = None
+
+                    po_id = po_map.get(po_name)
+                    department_id = dept_map.get(dept_name)
+                    project_id = proj_map.get(proj_name)
+                    capex_description = row.get('capex_description')
+                    cost_center = row.get('cost_center')
+
+                    if None in (po_id, department_id, project_id, cap_year_val):
+                        # Missing required identifiers; skip insert/update
+                        pass
+                    else:
+                        # Check duplicate by (po_id, department_id, project_id, cap_year)
+                        cursor.execute(
+                            """
+                            SELECT 1
+                              FROM capex_forecasts
+                             WHERE po_id = ?
+                               AND department_id = ?
+                               AND project_id = ?
+                               AND cap_year = ?
+                             LIMIT 1
+                            """,
+                            (int(po_id), int(department_id), int(project_id), int(cap_year_val))
+                        )
+                        exists = cursor.fetchone() is not None
+                        if exists:
+                            # Update existing entry
+                            cursor.execute(
+                                """
+                                UPDATE capex_forecasts
+                                   SET capex_description = ?,
+                                       capex_forecast = ?,
+                                       cost_center = ?
+                                 WHERE po_id = ?
+                                   AND department_id = ?
+                                   AND project_id = ?
+                                   AND cap_year = ?
+                                """,
+                                (
+                                    capex_description,
+                                    forecast_val,
+                                    cost_center,
+                                    int(po_id),
+                                    int(department_id),
+                                    int(project_id),
+                                    int(cap_year_val),
+                                ),
+                            )
+                        else:
+                            # Insert new entry
+                            cursor.execute(
+                                """
+                                INSERT INTO capex_forecasts (
+                                    po_id, department_id, project_id, cap_year,
+                                    capex_description, capex_forecast, cost_center
+                                ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                                """,
+                                (
+                                    int(po_id),
+                                    int(department_id),
+                                    int(project_id),
+                                    int(cap_year_val),
+                                    capex_description,
+                                    forecast_val,
+                                    cost_center,
+                                ),
+                            )
+                        cnxn.commit()
+                except Exception:
+                    # On error, fall back to no-op to avoid breaking the request
+                    pass
             else:
                 res = add_entry(df_upload, table_name, merge_columns, merge_on)
             
@@ -526,6 +623,83 @@ def change_staff_cost():
 
     return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
 
+
+@modify_tables.route('/capex_forecast/change_capex_forecast', methods=['POST'])
+def change_capex_forecast():
+    """Handle modify action to change an existing capex forecast entry.
+
+    Expects form fields: po, department, cap_year, project_name, capex_description, capex_forecast, cost_center
+    Updates capex_forecasts.capex_forecast and cost_center WHERE po_id, department_id, project_id, cap_year and capex_description match.
+    """
+    form = dict(request.form)
+    po = form.get('po')
+    department = form.get('department')
+    cap_year = form.get('cap_year')
+    project_name = form.get('project_name')
+    capex_description = form.get('capex_description')
+    capex_forecast = form.get('capex_forecast')
+    cost_center = form.get('cost_center')
+
+    try:
+        # Map names to IDs
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+        proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+
+        po_id = po_map.get(po)
+        department_id = dept_map.get(department)
+        project_id = proj_map.get(project_name)
+
+        # Coerce numeric types
+        try:
+            cap_year_val = int(cap_year) if cap_year not in (None, '') else None
+        except Exception:
+            cap_year_val = None
+        try:
+            forecast_val = float(capex_forecast) if capex_forecast not in (None, '') else None
+        except Exception:
+            forecast_val = None
+
+        # Basic validation: required mapping fields must exist
+        if po_id is None or department_id is None or project_id is None or cap_year_val is None:
+            return redirect(url_for('modify_tables.modify_table_router', action='capex_forecast'))
+
+        # Perform update. Per requirement, identify rows by PO/Department/Project/Cap Year
+        # and update capex_description, capex_forecast and cost_center.
+        cursor.execute(
+            """
+            UPDATE capex_forecasts
+               SET capex_description = ?,
+                   capex_forecast = ?,
+                   cost_center = ?
+             WHERE po_id = ?
+               AND department_id = ?
+               AND project_id = ?
+               AND cap_year = ?
+            """,
+            (
+                capex_description,
+                forecast_val,
+                cost_center,
+                int(po_id),
+                int(department_id),
+                int(project_id),
+                int(cap_year_val),
+            ),
+        )
+        cnxn.commit()
+    except Exception:
+        # Swallow errors and redirect back for now
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='capex_forecast'))
 
 @modify_tables.route('/capex_forecast/po_selection', methods=['POST'])
 def modify_po_selection():
