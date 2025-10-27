@@ -791,6 +791,154 @@ def upload_capex_expense_r():
     return "successful"
 
 
+@manual_upload.route('/manual_input/change_forecast', methods=['POST'])
+def manual_change_forecast():
+    """Modify existing forecasts:
+    - Update project_forecasts_nonpc.non_personnel_expense when Non_personnel_cost is provided
+    - Update project_forecasts_pc.human_resource_fte when Human_resource_FTE is provided
+    Matching keys: PO, Department, fiscal_year, Project_Name, Project_Category, IO
+    For personnel, also match Human_resource_category.
+    """
+    form = request.form
+    po_name = form.get('PO')
+    dept_name = form.get('Department')
+    fiscal_year = form.get('fiscal_year')
+    project_name = form.get('Project_Name')
+    project_category = form.get('Project_Category')
+    io_value = form.get('IO')
+    hr_category = form.get('Human_resource_category')
+    fte = form.get('Human_resource_FTE')
+    nonpc = form.get('Non_personnel_cost')
+
+    try:
+        conn = connect_local()
+        cursor, cnxn = conn.connect_to_db()
+
+        # Resolve IDs
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        depts_df = select_all_from_table(cursor, cnxn, 'departments')
+        projs_df = select_all_from_table(cursor, cnxn, 'projects')
+        pcats_df = select_all_from_table(cursor, cnxn, 'project_categories')
+        ios_df = select_all_from_table(cursor, cnxn, 'IOs')
+        hrc_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+
+        po_id = None
+        if pos_df is not None and 'name' in pos_df.columns and 'id' in pos_df.columns:
+            po_id = dict(zip(pos_df['name'], pos_df['id'])).get(po_name)
+
+        dept_id = None
+        if depts_df is not None and 'name' in depts_df.columns and 'id' in depts_df.columns:
+            dept_id = dict(zip(depts_df['name'], depts_df['id'])).get(dept_name)
+
+        # Filter projects by name (and optionally department/fiscal_year if duplicates exist)
+        proj_id = None
+        if projs_df is not None:
+            try:
+                dfp = projs_df
+                if 'name' in dfp.columns:
+                    mask = dfp['name'].astype(str) == str(project_name)
+                    if dept_id is not None and 'department_id' in dfp.columns:
+                        mask &= (dfp['department_id'] == int(dept_id))
+                    if fiscal_year and 'fiscal_year' in dfp.columns:
+                        try:
+                            mask &= (dfp['fiscal_year'].astype(str) == str(int(fiscal_year)))
+                        except Exception:
+                            mask &= (dfp['fiscal_year'].astype(str) == str(fiscal_year))
+                    rows = dfp[mask]
+                    if not rows.empty and 'id' in rows.columns:
+                        proj_id = rows.iloc[0]['id']
+            except Exception:
+                proj_id = None
+
+        # Project category id
+        pc_id = None
+        if pcats_df is not None and 'category' in pcats_df.columns and 'id' in pcats_df.columns:
+            pc_id = dict(zip(pcats_df['category'], pcats_df['id'])).get(project_category)
+
+        # IO id by IO_num and project_id when possible
+        io_id = None
+        if ios_df is not None and 'IO_num' in ios_df.columns and 'id' in ios_df.columns:
+            try:
+                io_num_val = int(io_value) if io_value not in (None, '') else None
+            except Exception:
+                io_num_val = None
+            if io_num_val is not None:
+                try:
+                    dfi = ios_df[ios_df['IO_num'].astype(int) == int(io_num_val)]
+                except Exception:
+                    dfi = ios_df[ios_df['IO_num'].astype(str) == str(io_num_val)]
+                if proj_id is not None and 'project_id' in ios_df.columns:
+                    try:
+                        dfi = dfi[dfi['project_id'] == int(proj_id)]
+                    except Exception:
+                        pass
+                if not dfi.empty:
+                    io_id = dfi.iloc[0]['id']
+
+        # HR category id
+        hr_cat_id = None
+        if hrc_df is not None and 'name' in hrc_df.columns and 'id' in hrc_df.columns:
+            hr_cat_id = dict(zip(hrc_df['name'], hrc_df['id'])).get(hr_category)
+
+        # Coerce numbers
+        fy_val = None
+        try:
+            fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
+        except Exception:
+            fy_val = None
+        fte_val = None
+        try:
+            fte_val = float(fte) if fte not in (None, '') else None
+        except Exception:
+            fte_val = None
+        nonpc_val = None
+        try:
+            nonpc_val = float(nonpc) if nonpc not in (None, '') else None
+        except Exception:
+            nonpc_val = None
+
+        # Update non-personnel expense if all keys are available
+        if all(v is not None for v in (po_id, dept_id, proj_id, io_id, pc_id, fy_val)) and nonpc_val is not None:
+            try:
+                cursor.execute(
+                    """
+                    UPDATE project_forecasts_nonpc
+                       SET non_personnel_expense = ?
+                     WHERE PO_id = ? AND department_id = ? AND project_id = ?
+                       AND io_id = ? AND project_category_id = ? AND fiscal_year = ?
+                    """,
+                    (nonpc_val, int(po_id), int(dept_id), int(proj_id), int(io_id), int(pc_id), int(fy_val))
+                )
+            except Exception:
+                pass
+
+        # Update personnel FTE if all keys are available (also requires hr category id)
+        if all(v is not None for v in (po_id, dept_id, proj_id, io_id, pc_id, fy_val, hr_cat_id)) and fte_val is not None:
+            try:
+                cursor.execute(
+                    """
+                    UPDATE project_forecasts_pc
+                       SET human_resource_fte = ?
+                     WHERE PO_id = ? AND department_id = ? AND project_id = ? AND io_id = ?
+                       AND project_category_id = ? AND fiscal_year = ? AND human_resource_category_id = ?
+                    """,
+                    (fte_val, int(po_id), int(dept_id), int(proj_id), int(io_id), int(pc_id), int(fy_val), int(hr_cat_id))
+                )
+            except Exception:
+                pass
+
+        try:
+            cnxn.commit()
+        except Exception:
+            pass
+    except Exception:
+        # swallow and continue to redirect
+        pass
+
+    # Redirect back to manual input page so the tables refresh
+    return redirect(url_for('manual_upload.render_mannual_input'))
+
+
 @manual_upload.route("/upload_forecast", methods=['POST'])
 def upload_forecast_merged():
     # Extract form data

@@ -92,6 +92,8 @@
         <div class="page-top">
             <!-- Add button to open modal for manual forecast input -->
             <button id="add_button" type="button">Add</button>
+            <!-- Modify button to open modal for updating existing forecasts -->
+            <button id="modify_button" type="button">Modify</button>
         </div>
 
         <!-- Modal for forecast input (hidden by default) -->
@@ -172,6 +174,77 @@
                     <div style="margin-top:12px;">
                         <button type="submit">Submit</button>
                         <button type="button" id="forecastModalCancel">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Modal for modifying forecasts (hidden by default) -->
+        <div id="modifyForecastModal" class="modal" aria-hidden="true" role="dialog">
+            <div class="modal-overlay" id="modifyForecastModalOverlay"></div>
+            <div class="modal-content">
+                <button class="modal-close" id="modifyForecastModalClose" aria-label="Close">&times;</button>
+                <h1>Modify Forecast (Personnel & Non-Personnel)</h1>
+                <form method="POST" action="/manual_input/change_forecast" id="modify_forecast">
+                    <div class="form-group">
+                        <label for="PO_modify">PO</label>
+                        <select name="PO" id="po_select_modify" required>
+                            <option value="" selected disabled>Select PO</option>
+                            {% for po in pos %}
+                            <option value="{{ po.name }}">{{ po.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="Department_modify">Department</label>
+                        <select name="Department" id="department_select_modify" required>
+                            <option value="" selected disabled>Select Department</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="fiscal_year_modify">Fiscal Year</label>
+                        <select name="fiscal_year" id="fiscal_year_modify" required>
+                            <option value="" selected disabled>Select Fiscal Year</option>
+                            {% for y in range(2020, 2036) %}
+                            <option value="{{ y }}">{{ y }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="Project_Name_modify">Project Name</label>
+                        <select name="Project_Name" id="project_name_modify" required>
+                            <option value="" selected disabled>Select Project</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="Project_Category_modify">Project Category</label>
+                        <input type="text" name="Project_Category" id="project_category_modify" required value="">
+                    </div>
+                    <div class="form-group">
+                        <label for="IO_modify">IO</label>
+                        <input type="text" name="IO" id="io_modify" required value="">
+                    </div>
+                    <div class="form-group">
+                        <label for="Human_resource_category_modify">Human Resource Category</label>
+                        <select name="Human_resource_category" id="hr_category_modify">
+                            <option value="" selected disabled>Select Human Resource Category</option>
+                            {% for hrc in human_resource_categories %}
+                            <option value="{{ hrc }}">{{ hrc }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="Human_resource_FTE_modify">Working Time(FTE)</label>
+                        <input type="number" step="0.1" name="Human_resource_FTE" id="Human_resource_FTE_modify" value="0"
+                            onblur="if(this.value!==''){this.value = parseFloat(this.value).toFixed(1)}">
+                    </div>
+                    <div class="form-group">
+                        <label for="Non_personnel_cost_modify">Non-personnel Expense</label>
+                        <input type="text" name="Non_personnel_cost" id="Non_personnel_cost_modify">
+                    </div>
+                    <div style="margin-top:12px;">
+                        <button type="submit">Submit</button>
+                        <button type="button" id="modifyForecastModalCancel">Cancel</button>
                     </div>
                 </form>
             </div>
@@ -428,6 +501,11 @@
                 var modalClose = document.getElementById('forecastModalClose');
                 var modalOverlay = document.getElementById('forecastModalOverlay');
                 var modalCancel = document.getElementById('forecastModalCancel');
+                var modifyBtn = document.getElementById('modify_button');
+                var modifyModal = document.getElementById('modifyForecastModal');
+                var modifyModalClose = document.getElementById('modifyForecastModalClose');
+                var modifyModalOverlay = document.getElementById('modifyForecastModalOverlay');
+                var modifyModalCancel = document.getElementById('modifyForecastModalCancel');
                 function openModal() {
                     // reset form to default state when opening
                     if (typeof window.resetForecastForm === 'function') window.resetForecastForm();
@@ -442,10 +520,27 @@
                     modal.setAttribute('aria-hidden', 'true');
                     document.body.style.overflow = '';
                 }
+                function openModifyModal() {
+                    if (typeof window.resetModifyForecastForm === 'function') window.resetModifyForecastForm();
+                    modifyModal.style.display = 'block';
+                    modifyModal.setAttribute('aria-hidden', 'false');
+                    document.body.style.overflow = 'hidden';
+                    var firstInput = modifyModal.querySelector('input, select, button');
+                    if (firstInput) firstInput.focus();
+                }
+                function closeModifyModal() {
+                    modifyModal.style.display = 'none';
+                    modifyModal.setAttribute('aria-hidden', 'true');
+                    document.body.style.overflow = '';
+                }
                 addBtn && addBtn.addEventListener('click', openModal);
                 modalClose && modalClose.addEventListener('click', closeModal);
                 modalOverlay && modalOverlay.addEventListener('click', closeModal);
                 modalCancel && modalCancel.addEventListener('click', closeModal);
+                modifyBtn && modifyBtn.addEventListener('click', openModifyModal);
+                modifyModalClose && modifyModalClose.addEventListener('click', closeModifyModal);
+                modifyModalOverlay && modifyModalOverlay.addEventListener('click', closeModifyModal);
+                modifyModalCancel && modifyModalCancel.addEventListener('click', closeModifyModal);
                 document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
             })();
         </script>
@@ -551,6 +646,8 @@
             (function () {
                 var poSelect = document.getElementById('po_select');
                 var deptSelect = document.getElementById('department_select');
+                var poSelectM = document.getElementById('po_select_modify');
+                var deptSelectM = document.getElementById('department_select_modify');
 
                 function rebuildDeptOptions(options) {
                     if (!deptSelect) return;
@@ -620,6 +717,49 @@
                         }
                     });
                 }
+                // Modify modal dependencies
+                function rebuildDeptOptionsM(options) {
+                    if (!deptSelectM) return;
+                    var current = deptSelectM.value;
+                    while (deptSelectM.firstChild) deptSelectM.removeChild(deptSelectM.firstChild);
+                    var placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Select Department';
+                    deptSelectM.appendChild(placeholder);
+                    options.forEach(function (d) {
+                        var name = d && d.name ? d.name : (typeof d === 'string' ? d : '');
+                        if (!name) return;
+                        var opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = name;
+                        deptSelectM.appendChild(opt);
+                    });
+                    if (current && Array.from(deptSelectM.options).some(function (o) { return o.value === current; })) {
+                        deptSelectM.value = current;
+                    } else {
+                        deptSelectM.value = '';
+                    }
+                }
+                function fetchServerFilteredDepartmentsM() {
+                    if (!poSelectM || !deptSelectM) return;
+                    var poVal = poSelectM.value || '';
+                    if (!poVal) return;
+                    fetch('/manual_input/departments?po=' + encodeURIComponent(poVal))
+                        .then(function (res) { return res.json(); })
+                        .then(function (json) {
+                            if (json && Array.isArray(json.departments)) rebuildDeptOptionsM(json.departments);
+                        })
+                        .catch(function () { });
+                }
+                if (poSelectM && deptSelectM) {
+                    fetchServerFilteredDepartmentsM();
+                    poSelectM.addEventListener('change', function(){
+                        // update server-side selection as well
+                        var val = poSelectM.value || '';
+                        fetch('/manual_input/po_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ po: val }) }).catch(function(){});
+                        fetchServerFilteredDepartmentsM();
+                    });
+                }
             })();
         </script>
         <script>
@@ -628,6 +768,9 @@
                 var poSelect = document.getElementById('po_select');
                 var deptSelect = document.getElementById('department_select');
                 var fySelect = document.querySelector('select[name="fiscal_year"]');
+                var poSelectM = document.getElementById('po_select_modify');
+                var deptSelectM = document.getElementById('department_select_modify');
+                var fySelectM = document.getElementById('fiscal_year_modify');
 
                 function rebuildProjectOptions(options) {
                     // There may be multiple selects named Project_Name in the template; update all
@@ -666,6 +809,41 @@
                         // after rebuilding projects, if a project is selected fetch IOs for it
                         var firstProj = document.querySelector('select[name="Project_Name"]');
                         if (firstProj && firstProj.value) fetchAndRebuildIOs(firstProj.value);
+                    }).catch(function () { });
+                }
+                function rebuildProjectOptionsM(options) {
+                    var sel = document.getElementById('project_name_modify');
+                    if (!sel) return;
+                    var current = sel.value;
+                    while (sel.firstChild) sel.removeChild(sel.firstChild);
+                    var placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.textContent = 'Select Project';
+                    sel.appendChild(placeholder);
+                    options.forEach(function (p) {
+                        var name = p && p.name ? p.name : (typeof p === 'string' ? p : '');
+                        if (!name) return;
+                        var opt = document.createElement('option');
+                        opt.value = name;
+                        opt.textContent = name;
+                        sel.appendChild(opt);
+                    });
+                    if (current && Array.from(sel.options).some(function (o) { return o.value === current; })) sel.value = current; else sel.value = '';
+                }
+                function fetchAndRebuildProjectsM() {
+                    var po = (poSelectM && poSelectM.value) ? poSelectM.value : '';
+                    var dept = (deptSelectM && deptSelectM.value) ? deptSelectM.value : '';
+                    var fy = (fySelectM && fySelectM.value) ? fySelectM.value : '';
+                    var qs = [];
+                    if (po) qs.push('po=' + encodeURIComponent(po));
+                    if (dept) qs.push('department=' + encodeURIComponent(dept));
+                    if (fy) qs.push('fiscal_year=' + encodeURIComponent(fy));
+                    var url = '/manual_input/projects' + (qs.length ? ('?' + qs.join('&')) : '');
+                    fetch(url).then(function (res) { return res.json(); }).then(function (data) {
+                        if (!data || !data.projects) return;
+                        rebuildProjectOptionsM(data.projects);
+                        var firstProj = document.getElementById('project_name_modify');
+                        if (firstProj && firstProj.value) { fetchAndRebuildCategoriesM(firstProj.value); fetchAndRebuildIOsM(firstProj.value); }
                     }).catch(function () { });
                 }
 
@@ -709,12 +887,26 @@
                         }).catch(function () { }).finally(function () { fetchAndRebuildProjects(); });
                     });
                 }
+                if (deptSelectM) {
+                    deptSelectM.addEventListener('change', function(){
+                        var val = deptSelectM.value || '';
+                        fetch('/manual_input/department_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department: val }) }).catch(function () { }).finally(function () { fetchAndRebuildProjectsM(); });
+                    });
+                }
+                if (fySelectM) {
+                    fySelectM.addEventListener('change', function(){
+                        var val = fySelectM.value || '';
+                        fetch('/manual_input/fiscal_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscal_year: val }) }).catch(function () { }).finally(function () { fetchAndRebuildProjectsM(); });
+                    });
+                }
 
                 // Expose for other scripts in this file to call after PO changes
                 window.fetchAndRebuildProjects = fetchAndRebuildProjects;
+                window.fetchAndRebuildProjectsM = fetchAndRebuildProjectsM;
 
                 // Initialize on load in case preselected values exist
                 if (document.readyState === 'complete' || document.readyState === 'interactive') fetchAndRebuildProjects(); else document.addEventListener('DOMContentLoaded', fetchAndRebuildProjects);
+                if (document.readyState === 'complete' || document.readyState === 'interactive') fetchAndRebuildProjectsM(); else document.addEventListener('DOMContentLoaded', fetchAndRebuildProjectsM);
             })();
         </script>
         <script>
@@ -756,6 +948,17 @@
                 if (typeof originalFetch === 'function') {
                     window.fetchAndRebuildProjects = function () { originalFetch(); setTimeout(bindProjectSelects, 50); };
                 }
+                // Bind project select in modify modal
+                function bindProjectSelectModify(){
+                    var sel = document.getElementById('project_name_modify');
+                    if (!sel) return;
+                    sel.addEventListener('change', function(){
+                        var val = sel.value || '';
+                        fetch('/manual_input/project_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: val }) }).catch(function () { });
+                        if (val) { fetchAndRebuildCategoriesM(val); fetchAndRebuildIOsM(val); }
+                    });
+                }
+                if (document.readyState === 'complete' || document.readyState === 'interactive') bindProjectSelectModify(); else document.addEventListener('DOMContentLoaded', bindProjectSelectModify);
             })();
         </script>
         <script>
@@ -776,17 +979,56 @@
         <script>
         // Send selected Fiscal Year to manual_input endpoint to update module-level selected_fiscal_year (manual page specific)
         (function () {
-            var fySelect = document.querySelector('select[name="fiscal_year"]');
-            if (!fySelect) return;
-            fySelect.addEventListener('change', function () {
-                var val = fySelect.value || '';
-                fetch('/manual_input/fiscal_year_selection', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ fiscal_year: val })
-                }).catch(function () { });
-            });
+            function bindFY(el){
+                if (!el) return;
+                el.addEventListener('change', function(){
+                    var val = el.value || '';
+                    fetch('/manual_input/fiscal_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscal_year: val }) }).catch(function () { });
+                });
+            }
+            bindFY(document.querySelector('select[name="fiscal_year"]'));
+            bindFY(document.getElementById('fiscal_year_modify'));
         })();
+        </script>
+        <script>
+            // Helpers and reset for Modify modal (categories & IOs)
+            (function(){
+                function rebuildCategoryOptionsM(options){
+                    var inp = document.getElementById('project_category_modify');
+                    if (!inp) return;
+                    if (options && options.length > 0) inp.value = options[0]; else inp.value = '';
+                }
+                window.fetchAndRebuildCategoriesM = function(project){
+                    var qs = project ? ('?project=' + encodeURIComponent(project)) : '';
+                    fetch('/manual_input/project_categories' + qs).then(function (res) { return res.json(); }).then(function (data) {
+                        if (!data || !data.project_categories) return;
+                        rebuildCategoryOptionsM(data.project_categories);
+                    }).catch(function () { });
+                }
+                function rebuildIOOptionsM(options){
+                    var inp = document.getElementById('io_modify');
+                    if (!inp) return;
+                    if (options && options.length > 0) inp.value = options[0]; else inp.value = '';
+                }
+                window.fetchAndRebuildIOsM = function(project){
+                    var qs = project ? ('?project=' + encodeURIComponent(project)) : '';
+                    fetch('/manual_input/ios' + qs).then(function (res) { return res.json(); }).then(function (data) {
+                        if (!data || !Array.isArray(data.ios)) return;
+                        rebuildIOOptionsM(data.ios);
+                    }).catch(function () { });
+                }
+                window.resetModifyForecastForm = function(){
+                    try{
+                        var form = document.getElementById('modify_forecast');
+                        if (!form) return;
+                        var selects = Array.from(form.querySelectorAll('select'));
+                        selects.forEach(function(s){ if (s.options && s.options.length) s.selectedIndex = 0; });
+                        var inputs = Array.from(form.querySelectorAll('input[type="text"], input[type="number"]'));
+                        inputs.forEach(function(i){ i.value = ''; });
+                        var fte = document.getElementById('Human_resource_FTE_modify'); if (fte) fte.value = '0';
+                    }catch(e){ console.warn('resetModifyForecastForm failed', e); }
+                }
+            })();
         </script>
         <style>
             /* Modal styles reused */
