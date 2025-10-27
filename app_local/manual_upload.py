@@ -860,5 +860,17 @@ def upload_forecast_merged():
         except Exception as e:
             results.append(f"Personnel upload failed: {e}")
     if not results:
-        return "No forecast data provided. Please fill at least one forecast field.", 400
-    return "<br>".join(results)
+        # No data provided: flash a message and redirect back to the manual input page
+        try:
+            flash('No forecast data provided. Please fill at least one forecast field.', 'warning')
+        except Exception:
+            pass
+        return redirect(url_for('manual_upload.render_mannual_input'))
+
+    # On success, flash each result message and redirect back to the manual input page
+    try:
+        for msg in results:
+            flash(msg, 'success')
+    except Exception:
+        pass
+    return redirect(url_for('manual_upload.render_mannual_input'))

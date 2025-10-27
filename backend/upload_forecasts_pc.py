@@ -31,9 +31,12 @@ def upload_pc_forecasts_local_m(df_upload):
     conn = cl.connect_local()
     engine, cursor, cnxn = conn.connect_to_db(engine=True)
     df_fin = upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, 'local')
-    existing_values = select_columns_from_table(cursor, "project_forecasts_pc", table_column_dict["project_forecasts_nonpc"])
+    existing_values = select_columns_from_table(cursor, "project_forecasts_pc", table_column_dict["project_forecasts_pc"])
+    print(df_fin)
+    print(existing_values)
     
     shared_columns = [col for col in df_fin.columns if col in existing_values.columns and col != 'personnel_expense']
+    print(shared_columns)
     # Remove rows from df_fin that exist in existing_values based on shared columns
     merged = df_fin.merge(existing_values[shared_columns], on=shared_columns, how='left', indicator=True)
     df_filtered = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])

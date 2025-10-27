@@ -208,7 +208,7 @@ def get_statistics():
 
         # load dataframes
         # project_forecasts_nonpc: non-personnel forecasts
-        nonpc = get_nonpc_display(xw)
+        nonpc = get_nonpc_display()
         # project_forecasts_pc: personnel forecasts (personnel_expense)
         pc = get_pc_display()
         # budgetsxw
@@ -222,32 +222,52 @@ def get_statistics():
             if df is None or df.empty:
                 return pd.DataFrame()
             out = df.copy()
-            # helper to match selection keys across variants
+
+            # Use pandas boolean masking for clear, fast filtering
+            mask = pd.Series(True, index=out.index)
+
+            def find_col(candidates):
+                # case-insensitive lookup of first matching column
+                col_map = {c.lower(): c for c in out.columns}
+                for cand in candidates:
+                    key = cand.lower()
+                    if key in col_map:
+                        return col_map[key]
+                return None
+
             # PO
             if selected_po and selected_po != '' and selected_po != 'All':
-                po_cols = [c for c in out.columns if c.lower() in ('po', 'po_name', 'po_id')]
-                if po_cols:
-                    col = po_cols[0]
-                    out = out[out[col].astype(str) == str(selected_po)]
+                po_col = find_col(['po', 'po_name', 'po name', 'po_id', 'poid'])
+                if po_col is not None:
+                    mask &= out[po_col].astype(str) == str(selected_po)
+                else:
+                    mask &= False
+
             # Department
             if selected_department and selected_department != '' and selected_department != 'All':
-                dept_cols = [c for c in out.columns if c.lower() in ('department', 'department_name')]
-                if dept_cols:
-                    col = dept_cols[0]
-                    out = out[out[col].astype(str) == str(selected_department)]
+                dept_col = find_col(['department', 'department_name', 'department name', 'dept', 'dept_name'])
+                if dept_col is not None:
+                    mask &= out[dept_col].astype(str) == str(selected_department)
+                else:
+                    mask &= False
+
             # Fiscal year
             if selected_fiscal_year and selected_fiscal_year != '' and selected_fiscal_year != 'All':
-                fy_cols = [c for c in out.columns if c.lower() in ('fiscal_year', 'fiscal year', 'fy')]
-                if fy_cols:
-                    col = fy_cols[0]
-                    out = out[out[col].astype(str) == str(selected_fiscal_year)]
+                fy_col = find_col(['fiscal_year', 'fiscal year', 'fy', 'year', 'cap_year'])
+                if fy_col is not None:
+                    mask &= out[fy_col].astype(str) == str(selected_fiscal_year)
+                else:
+                    mask &= False
+
             # Project
             if selected_project and selected_project != '' and selected_project != 'All':
-                proj_cols = [c for c in out.columns if c.lower() in ('project_name', 'project', 'project name', 'name')]
-                if proj_cols:
-                    col = proj_cols[0]
-                    out = out[out[col].astype(str) == str(selected_project)]
-            return out
+                proj_col = find_col(['project_name', 'project', 'project name', 'name'])
+                if proj_col is not None:
+                    mask &= out[proj_col].astype(str) == str(selected_project)
+                else:
+                    mask &= False
+
+            return out.loc[mask]
 
         # apply filters and sum
         nonpc_f = apply_filters(nonpc)
@@ -268,7 +288,7 @@ def get_statistics():
             return 0.0
 
         non_personnel_forecast = sum_column(nonpc_f, ['non_personnel_expense', 'Non-personnel Expense', 'Non-personnel cost', 'non_personnel_cost'])
-        personnel_forecast = sum_column(pc_f, ['personnel_expense', 'Personnel Expense', 'personnel_cost'])
+        personnel_forecast = sum_column(pc_f, ['Personnel Cost'])
         total_forecast = non_personnel_forecast + personnel_forecast
 
         budget_sum = sum_column(budgets_f, ['non_personnel_expense', 'human_resource_expense', 'Non-personnel Budget', 'Personnel Budget'])
