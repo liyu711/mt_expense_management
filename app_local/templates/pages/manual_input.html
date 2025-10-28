@@ -113,9 +113,9 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="Department">Department</label>
+                        <label for="Department">BU</label>
                         <select name="Department" id="department_select" required>
-                            <option value="">Select Department</option>
+                            <option value="">Select BU</option>
                             {% for dept in departments %}
                             {# dept is dict with keys id, name, po_id #}
                             <option value="{{ dept.name }}" data-po-id="{{ dept.po_id }}">{{ dept.name }}</option>
@@ -196,9 +196,9 @@
                         </select>
                     </div>
                     <div class="form-group">
-                        <label for="Department_modify">Department</label>
+                        <label for="Department_modify">BU</label>
                         <select name="Department" id="department_select_modify" required>
-                            <option value="" selected disabled>Select Department</option>
+                            <option value="" selected disabled>Select BU</option>
                         </select>
                     </div>
                     <div class="form-group">
@@ -658,7 +658,7 @@
                     // Placeholder
                     var placeholder = document.createElement('option');
                     placeholder.value = '';
-                    placeholder.textContent = 'Select Department';
+                    placeholder.textContent = 'Select BU';
                     deptSelect.appendChild(placeholder);
                     // Add filtered options
                     options.forEach(function (d) {
@@ -724,7 +724,7 @@
                     while (deptSelectM.firstChild) deptSelectM.removeChild(deptSelectM.firstChild);
                     var placeholder = document.createElement('option');
                     placeholder.value = '';
-                    placeholder.textContent = 'Select Department';
+                    placeholder.textContent = 'Select BU';
                     deptSelectM.appendChild(placeholder);
                     options.forEach(function (d) {
                         var name = d && d.name ? d.name : (typeof d === 'string' ? d : '');

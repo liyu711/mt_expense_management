@@ -53,7 +53,8 @@ modify_table_config = {
         'fields': [
             {'name': 'name', 'type': 'text', 'label': 'Project Name'},
             {'name': 'category', 'type': 'select', 'label': 'Category Name', 'options': []},
-            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []}
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'BU', 'options': []}
             ,{'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []}
         ],
         'merge_on': 'name',
@@ -251,6 +252,15 @@ def modify_table_router(action):
         for field in config['fields']:
             if field['name'] == 'category' and field['type'] == 'select':
                 field['options'] = options
+            if field['name'] == 'po' and field['type'] == 'select':
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    pdf = select_all_from_table(cursor, cnxn, 'pos')
+                    po_options = pdf['name'].tolist() if pdf is not None and 'name' in pdf.columns else []
+                except Exception:
+                    po_options = []
+                field['options'] = po_options
             if field['name'] == 'department' and field['type'] == 'select':
                 try:
                     db = connect_local()
@@ -296,8 +306,70 @@ def modify_table_router(action):
 
     if request.method == 'POST':
         form_data = dict(request.form)
+        # Support combined Project+IO page: a hidden field 'form_kind' can override handling
+        form_kind = form_data.get('form_kind')
         table_name = form_data.pop('table_name', config['table_name'])
-        # Only use fields defined in config
+
+        # If we're on the modify_project route but the form_kind indicates IO,
+        # handle this POST as an IO submission.
+        if action == 'modify_project' and form_kind == 'io':
+            # Build df_upload using IO config fields
+            try:
+                io_fields_cfg = modify_table_config.get('modify_io', {}).get('fields', [])
+                io_field_names = [f['name'] for f in io_fields_cfg]
+                io_row = {k: v for k, v in form_data.items() if k in io_field_names}
+                df_upload = pd.DataFrame([io_row])
+
+                # Accept empty IO input; default to -1 when missing/empty
+                try:
+                    if 'IO' in df_upload.columns:
+                        df_upload['IO'] = pd.to_numeric(df_upload['IO'], errors='coerce').fillna(-1).astype(int)
+                except Exception:
+                    try:
+                        df_upload['IO'] = -1
+                    except Exception:
+                        pass
+
+                # Prevent duplicate IOs for the same project_id
+                skip_io_insert = False
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    proj_df = select_all_from_table(cursor, cnxn, 'projects')
+                    ios_df = select_all_from_table(cursor, cnxn, 'ios')
+                    proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+                    proj_name_val = None
+                    if 'project_name' in df_upload.columns and not df_upload.empty:
+                        try:
+                            proj_name_val = df_upload.iloc[0]['project_name']
+                        except Exception:
+                            proj_name_val = None
+                    project_id_val = proj_map.get(proj_name_val)
+                    if project_id_val is not None and 'project_id' in ios_df.columns:
+                        try:
+                            existing_ids = set(ios_df['project_id'].dropna().astype(int).tolist())
+                        except Exception:
+                            existing_ids = set(ios_df['project_id'].dropna().tolist())
+                        if int(project_id_val) in existing_ids:
+                            skip_io_insert = True
+                except Exception:
+                    skip_io_insert = False
+
+                # Insert IO only if not duplicate
+                try:
+                    if not skip_io_insert:
+                        merge_columns = modify_table_config.get('modify_io', {}).get('columns', list(io_row.keys()))
+                        merge_on = modify_table_config.get('modify_io', {}).get('merge_on', list(io_row.keys())[0] if io_row else None)
+                        res = add_entry(df_upload, 'ios', merge_columns, merge_on)
+                except Exception:
+                    pass
+            except Exception:
+                pass
+
+            # redirect back to combined page
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_project'))
+
+        # Only use fields defined in config for normal handling
         field_names = [f['name'] for f in config['fields']]
         row = {k: v for k, v in form_data.items() if k in field_names}
         if action == 'upload_budget':
@@ -314,7 +386,42 @@ def modify_table_router(action):
             df_upload = pd.DataFrame([row])
             # Special handling for modify_funding: map PO and Department names to their local ids
             if action == 'modify_io':
-                df_upload['IO'] = df_upload['IO'].astype(int)
+                # Accept empty IO input; default to -1 when missing/empty
+                try:
+                    if 'IO' in df_upload.columns:
+                        df_upload['IO'] = pd.to_numeric(df_upload['IO'], errors='coerce').fillna(-1).astype(int)
+                except Exception:
+                    # last-resort fallback
+                    try:
+                        df_upload['IO'] = -1
+                    except Exception:
+                        pass
+
+                # Prevent duplicate IOs for the same project_id: if an IO already exists for this project, skip insert
+                skip_io_insert = False
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    proj_df = select_all_from_table(cursor, cnxn, 'projects')
+                    ios_df = select_all_from_table(cursor, cnxn, 'ios')
+                    proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+                    proj_name_val = None
+                    if 'project_name' in df_upload.columns and not df_upload.empty:
+                        try:
+                            proj_name_val = df_upload.iloc[0]['project_name']
+                        except Exception:
+                            proj_name_val = None
+                    project_id_val = proj_map.get(proj_name_val)
+                    if project_id_val is not None and 'project_id' in ios_df.columns:
+                        try:
+                            existing_ids = set(ios_df['project_id'].dropna().astype(int).tolist())
+                        except Exception:
+                            existing_ids = set(ios_df['project_id'].dropna().tolist())
+                        if int(project_id_val) in existing_ids:
+                            skip_io_insert = True
+                except Exception:
+                    # If duplicate check fails, don't block; proceed to attempt insert
+                    skip_io_insert = False
 
             if action == 'modify_funding':
                 try:
@@ -429,9 +536,55 @@ def modify_table_router(action):
             merge_columns = modify_table_config.get(action).get('columns', list(row.keys()))
             merge_on = modify_table_config.get(action).get('merge_on', list(row.keys())[0] if row else None)
             if action == 'modify_project':
-                conn = connect_local()
-                engine, cursor, cnxn = conn.connect_to_db(engine=True)
-                df_upload.to_sql(table_name, con=engine, if_exists='append', index=False)
+                # Prevent duplicate projects by (name, department_id)
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    existing = select_all_from_table(cursor, cnxn, 'projects')
+                except Exception:
+                    existing = None
+
+                insert_rows = []
+                try:
+                    # Normalize name for compare
+                    if existing is not None and not existing.empty:
+                        existing = existing.copy()
+                        if 'name' in existing.columns:
+                            existing['__name_norm__'] = existing['name'].astype(str).str.strip().str.lower()
+                        if 'department_id' in existing.columns:
+                            try:
+                                existing['__dept_id__'] = existing['department_id'].astype('Int64')
+                            except Exception:
+                                existing['__dept_id__'] = existing['department_id']
+
+                    for _, r in df_upload.iterrows():
+                        name_val = str(r.get('name')) if 'name' in df_upload.columns else None
+                        dept_val = r.get('department_id') if 'department_id' in df_upload.columns else None
+                        name_norm = (name_val or '').strip().lower()
+                        try:
+                            dept_norm = int(dept_val) if dept_val not in (None, '') else None
+                        except Exception:
+                            dept_norm = None
+
+                        is_dup = False
+                        if existing is not None and not existing.empty and name_norm and dept_norm is not None:
+                            try:
+                                dup_mask = (existing.get('__name_norm__') == name_norm) & (existing.get('__dept_id__') == dept_norm)
+                                is_dup = bool(dup_mask.any())
+                            except Exception:
+                                is_dup = False
+
+                        if not is_dup:
+                            insert_rows.append(r)
+                except Exception:
+                    # If duplicate check fails, fall back to inserting
+                    insert_rows = [r for _, r in df_upload.iterrows()]
+
+                if insert_rows:
+                    to_insert = pd.DataFrame(insert_rows)
+                    conn = connect_local()
+                    engine, _cursor, _cnxn = conn.connect_to_db(engine=True)
+                    to_insert.to_sql(table_name, con=engine, if_exists='append', index=False)
             elif action == 'capex_forecast':
                 # Custom handling for capex_forecast: map names to IDs, check duplicates, and upsert accordingly
                 try:
@@ -529,56 +682,152 @@ def modify_table_router(action):
                 except Exception:
                     # On error, fall back to no-op to avoid breaking the request
                     pass
+            elif action == 'modify_io':
+                # Only insert when no existing IO for the same project_id
+                try:
+                    if not locals().get('skip_io_insert', False):
+                        res = add_entry(df_upload, table_name, merge_columns, merge_on)
+                except Exception:
+                    # fall back silently
+                    pass
             else:
                 res = add_entry(df_upload, table_name, merge_columns, merge_on)
             
 
-    # After handling POST (or on GET), fetch table contents to display below the form
+    # After handling POST (or on GET), prepare table contents to display
     try:
         db = connect_local()
         cursor, cnxn = db.connect_to_db()
-        df_table = select_all_from_table(cursor, cnxn, config['table_name'])
-        # Map id columns to names similarly to select_data (do this BEFORE transform_table
-        # so the select/modify views match the same column names and ordering)
-        id_name_map = {
-            'department_id': ('departments', 'id', 'name', 'Department'),
-            'po_id': ('POs', 'id', 'name', 'PO'),
-            'PO_id': ('POs', 'id', 'name', 'PO'),
-            'project_id': ('projects', 'id', 'name', 'Project'),
-            'io_id': ('IOs', 'id', 'IO_num', 'IO'),
-            'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
-        }
-        for id_col, (ref_table, ref_id, ref_name, new_col_name) in id_name_map.items():
-            if id_col in df_table.columns:
-                ref_df = select_all_from_table(cursor, cnxn, ref_table)
-                ref_dict = dict(zip(ref_df[ref_id], ref_df[ref_name]))
-                df_table[new_col_name] = df_table[id_col].map(ref_dict)
-        drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in df_table.columns]
-        if drop_cols:
-            df_table = df_table.drop(columns=drop_cols)
 
-        # Now apply the same table-specific transforms as select view so projects
-        # show project category name instead of category_id, and other renames
-        try:
-            df_table = transform_table(df_table, config['table_name'], cursor, cnxn)
-        except Exception:
-            # non-fatal: if transform fails, continue with raw df_table
-            pass
+        # Helper to load and transform a table for display
+        def load_table(tbl_name):
+            try:
+                df_tbl = select_all_from_table(cursor, cnxn, tbl_name)
+            except Exception:
+                df_tbl = pd.DataFrame()
+            # Map id columns to names
+            id_name_map = {
+                'department_id': ('departments', 'id', 'name', 'Department'),
+                'po_id': ('POs', 'id', 'name', 'PO'),
+                'PO_id': ('POs', 'id', 'name', 'PO'),
+                'project_id': ('projects', 'id', 'name', 'Project'),
+                'io_id': ('IOs', 'id', 'IO_num', 'IO'),
+                'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
+            }
+            for id_col, (ref_table, ref_id, ref_name, new_col_name) in id_name_map.items():
+                if id_col in getattr(df_tbl, 'columns', []):
+                    try:
+                        ref_df = select_all_from_table(cursor, cnxn, ref_table)
+                        ref_dict = dict(zip(ref_df[ref_id], ref_df[ref_name]))
+                        df_tbl[new_col_name] = df_tbl[id_col].map(ref_dict)
+                    except Exception:
+                        pass
+            drop_cols = [col for col in ['department_id', 'po_id', 'PO_id', 'project_id', 'io_id', 'project_category_id'] if col in getattr(df_tbl, 'columns', [])]
+            if drop_cols:
+                try:
+                    df_tbl = df_tbl.drop(columns=drop_cols)
+                except Exception:
+                    pass
+            # Transform for display
+            try:
+                df_tbl = transform_table(df_tbl, tbl_name, cursor, cnxn)
+            except Exception:
+                pass
+            try:
+                return df_tbl.columns.tolist(), df_tbl.values.tolist()
+            except Exception:
+                return [], []
 
-        columns = df_table.columns.tolist()
-        data = df_table.values.tolist()
+        # If action is modify_project, render combined page with both Projects and IOs
+        if action == 'modify_project':
+            columns_project, data_project = load_table('projects')
+            columns_io, data_io = load_table('ios')
+
+            # Prepare fields for both forms
+            project_fields = modify_table_config.get('modify_project', {}).get('fields', [])
+            # Ensure options are populated (already done earlier for modify_project)
+            project_fields = config['fields']
+
+            # IO fields: populate project_name options
+            io_fields = [dict(f) for f in modify_table_config.get('modify_io', {}).get('fields', [])]
+            try:
+                proj_df = select_all_from_table(cursor, cnxn, 'projects')
+                proj_options = proj_df['name'].dropna().astype(str).tolist() if 'name' in proj_df.columns else []
+            except Exception:
+                proj_options = []
+            for f in io_fields:
+                if f.get('name') == 'project_name' and f.get('type') == 'select':
+                    f['options'] = proj_options
+
+            # Provide project list (id + name) for edit dropdown
+            project_names = []
+            try:
+                if 'id' in proj_df.columns and 'name' in proj_df.columns:
+                    project_names = [{ 'id': int(r['id']), 'name': str(r['name']) } for _, r in proj_df[['id','name']].dropna().iterrows()]
+                else:
+                    project_names = [{ 'id': None, 'name': n } for n in proj_options]
+            except Exception:
+                project_names = [{ 'id': None, 'name': n } for n in proj_options]
+
+            # Provide IO entries (id, IO number, project name) for IO edit dropdown
+            io_entries = []
+            try:
+                ios_df = select_all_from_table(cursor, cnxn, 'ios')
+                if ios_df is None:
+                    ios_df = pd.DataFrame()
+                # Map project_id to name
+                pmap = {}
+                try:
+                    if 'id' in proj_df.columns and 'name' in proj_df.columns:
+                        pmap = dict(zip(proj_df['id'], proj_df['name']))
+                except Exception:
+                    pmap = {}
+                for _, r in ios_df.iterrows():
+                    io_id = int(r['id']) if 'id' in ios_df.columns and pd.notna(r.get('id')) else None
+                    io_num = int(r['IO_num']) if 'IO_num' in ios_df.columns and pd.notna(r.get('IO_num')) else None
+                    pname = None
+                    try:
+                        if 'project_id' in ios_df.columns and pd.notna(r.get('project_id')):
+                            pname = pmap.get(int(r['project_id']))
+                    except Exception:
+                        pname = None
+                    io_entries.append({'id': io_id, 'io': io_num, 'project_name': pname})
+            except Exception:
+                io_entries = []
+
+            return render_template(
+                'pages/modify_project_io.html',
+                title='Modify Project & IO',
+                project_fields=project_fields,
+                io_fields=io_fields,
+                columns_project=columns_project,
+                data_project=data_project,
+                columns_io=columns_io,
+                data_io=data_io,
+                project_names=project_names,
+                io_entries=io_entries,
+            )
+        else:
+            # Default: render single table view
+            columns, data = load_table(config['table_name'])
+            return render_template(
+                'pages/modify_table.html',
+                title=config['title'],
+                table_name=config['table_name'],
+                fields=config['fields'],
+                columns=columns,
+                data=data,
+            )
     except Exception:
-        columns = []
-        data = []
-
-    return render_template(
-        'pages/modify_table.html',
-        title=config['title'],
-        table_name=config['table_name'],
-        fields=config['fields'],
-        columns=columns if 'columns' in locals() else [],
-        data=data if 'data' in locals() else []
-    )
+        # Fallback to generic empty render
+        return render_template(
+            'pages/modify_table.html',
+            title=config['title'],
+            table_name=config['table_name'],
+            fields=config['fields'],
+            columns=[],
+            data=[],
+        )
 
 
 @modify_tables.route('/change_staff_cost', methods=['POST'])
@@ -700,6 +949,309 @@ def change_capex_forecast():
         pass
 
     return redirect(url_for('modify_tables.modify_table_router', action='capex_forecast'))
+
+
+@modify_tables.route('/modify_project/details', methods=['GET'])
+def get_project_details():
+    """Return JSON details for a given project by name or id.
+
+    Query params:
+    - name: project name (preferred)
+    - id: project id (optional)
+    Response: { id, name, category, department, fiscal_year, po }
+    """
+    try:
+        name = request.args.get('name')
+        pid = request.args.get('id')
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+        if proj_df is None or proj_df.empty:
+            return {'error': 'no projects'}, 404
+
+        row = None
+        if pid is not None and 'id' in proj_df.columns:
+            try:
+                pid_int = int(pid)
+                row = proj_df[proj_df['id'] == pid_int].head(1)
+            except Exception:
+                row = None
+        if (row is None or row.empty) and name is not None and 'name' in proj_df.columns:
+            row = proj_df[proj_df['name'].astype(str) == str(name)].head(1)
+        if row is None or row.empty:
+            return {'error': 'not found'}, 404
+
+        row = row.iloc[0]
+        out = {
+            'id': int(row['id']) if 'id' in proj_df.columns else None,
+            'name': row['name'] if 'name' in proj_df.columns else None,
+            'fiscal_year': int(row['fiscal_year']) if 'fiscal_year' in proj_df.columns and pd.notna(row['fiscal_year']) else None,
+        }
+
+        # Map ids to names
+        cat_name = None
+        try:
+            if 'category_id' in proj_df.columns and pd.notna(row.get('category_id')):
+                cats = select_all_from_table(cursor, cnxn, 'project_categories')
+                cdict = dict(zip(cats['id'], cats['category'])) if 'id' in cats.columns and 'category' in cats.columns else {}
+                cat_name = cdict.get(int(row['category_id']))
+        except Exception:
+            pass
+
+        dept_name, po_name = None, None
+        try:
+            if 'department_id' in proj_df.columns and pd.notna(row.get('department_id')):
+                depts = select_all_from_table(cursor, cnxn, 'departments')
+                ddict = dict(zip(depts['id'], depts['name'])) if 'id' in depts.columns and 'name' in depts.columns else {}
+                dept_id = int(row['department_id'])
+                dept_name = ddict.get(dept_id)
+                # get PO from departments.po_id -> POs.name
+                if 'po_id' in depts.columns:
+                    try:
+                        po_id = int(depts[depts['id'] == dept_id]['po_id'].iloc[0])
+                        pos = select_all_from_table(cursor, cnxn, 'POs')
+                        pdict = dict(zip(pos['id'], pos['name'])) if 'id' in pos.columns and 'name' in pos.columns else {}
+                        po_name = pdict.get(po_id)
+                    except Exception:
+                        po_name = None
+        except Exception:
+            pass
+
+        out.update({'category': cat_name, 'department': dept_name, 'po': po_name})
+        return out, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
+@modify_tables.route('/modify_project/change_project', methods=['POST'])
+def change_project():
+    """Update an existing project row by id or name."""
+    form = dict(request.form)
+    project_id = form.get('project_id')
+    existing_name = form.get('existing_project') or form.get('existing_name')
+    name = form.get('name')
+    category = form.get('category')
+    department = form.get('department')
+    fiscal_year = form.get('fiscal_year')
+
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Map category and department to ids
+        cat_id = None
+        dept_id = None
+        try:
+            cats = select_all_from_table(cursor, cnxn, 'project_categories')
+            cdict = dict(zip(cats['category'], cats['id'])) if 'category' in cats.columns and 'id' in cats.columns else {}
+            if category in cdict:
+                cat_id = int(cdict[category])
+        except Exception:
+            pass
+        try:
+            depts = select_all_from_table(cursor, cnxn, 'departments')
+            ddict = dict(zip(depts['name'], depts['id'])) if 'name' in depts.columns and 'id' in depts.columns else {}
+            if department in ddict:
+                dept_id = int(ddict[department])
+        except Exception:
+            pass
+
+        # Coerce fiscal year
+        fy_val = None
+        try:
+            fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
+        except Exception:
+            fy_val = None
+
+        # Resolve target project id
+        pid_val = None
+        if project_id not in (None, ''):
+            try:
+                pid_val = int(project_id)
+            except Exception:
+                pid_val = None
+        if pid_val is None and existing_name:
+            try:
+                proj_df = select_all_from_table(cursor, cnxn, 'projects')
+                if 'name' in proj_df.columns and 'id' in proj_df.columns:
+                    match = proj_df[proj_df['name'].astype(str) == str(existing_name)].head(1)
+                    if not match.empty:
+                        pid_val = int(match.iloc[0]['id'])
+            except Exception:
+                pid_val = None
+
+        if pid_val is None:
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_project'))
+
+        # Build update fields and execute
+        sets = []
+        params = []
+        if name not in (None, ''):
+            sets.append('name = ?')
+            params.append(name)
+        if cat_id is not None:
+            sets.append('category_id = ?')
+            params.append(cat_id)
+        if dept_id is not None:
+            sets.append('department_id = ?')
+            params.append(dept_id)
+        if fy_val is not None:
+            sets.append('fiscal_year = ?')
+            params.append(fy_val)
+
+        if sets:
+            q = f"UPDATE projects SET {', '.join(sets)} WHERE id = ?"
+            params.append(pid_val)
+            cursor.execute(q, tuple(params))
+            cnxn.commit()
+    except Exception:
+        # swallow errors for now
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='modify_project'))
+
+
+@modify_tables.route('/modify_io/details', methods=['GET'])
+def get_io_details():
+    """Return JSON details for a given IO by id, io number, or project name.
+
+    Query params: id (preferred) or io or project_name
+    Response: { id, io, project_name }
+    """
+    try:
+        q_id = request.args.get('id')
+        q_io = request.args.get('io')
+        q_project = request.args.get('project_name')
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        ios_df = select_all_from_table(cursor, cnxn, 'ios')
+        if ios_df is None or ios_df.empty:
+            return {'error': 'no ios'}, 404
+
+        row = None
+        if q_id is not None and 'id' in ios_df.columns:
+            try:
+                qi = int(q_id)
+                row = ios_df[ios_df['id'] == qi].head(1)
+            except Exception:
+                row = None
+        if (row is None or row.empty) and q_io is not None and 'IO_num' in ios_df.columns:
+            try:
+                qin = int(q_io)
+                row = ios_df[ios_df['IO_num'].astype(int) == qin].head(1)
+            except Exception:
+                row = ios_df[ios_df['IO_num'].astype(str) == str(q_io)].head(1)
+        if (row is None or row.empty) and q_project is not None and 'project_id' in ios_df.columns:
+            # resolve project name -> id
+            proj_df = select_all_from_table(cursor, cnxn, 'projects')
+            pmap = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+            pid = pmap.get(q_project)
+            if pid is not None:
+                row = ios_df[ios_df['project_id'] == pid].head(1)
+        if row is None or row.empty:
+            return {'error': 'not found'}, 404
+
+        row = row.iloc[0]
+        io_id = int(row['id']) if 'id' in ios_df.columns else None
+        io_num = int(row['IO_num']) if 'IO_num' in ios_df.columns and pd.notna(row.get('IO_num')) else None
+        project_name = None
+        try:
+            if 'project_id' in ios_df.columns:
+                proj_df = select_all_from_table(cursor, cnxn, 'projects')
+                pmap2 = dict(zip(proj_df['id'], proj_df['name'])) if 'id' in proj_df.columns and 'name' in proj_df.columns else {}
+                project_name = pmap2.get(int(row['project_id']))
+        except Exception:
+            pass
+        return {'id': io_id, 'io': io_num, 'project_name': project_name}, 200
+    except Exception as e:
+        return {'error': str(e)}, 500
+
+
+@modify_tables.route('/modify_io/change_io', methods=['POST'])
+def change_io():
+    """Update an existing IO row by id or project."""
+    form = dict(request.form)
+    io_id = form.get('io_id') or form.get('existing_io_id')
+    existing_project = form.get('existing_project') or form.get('existing_project_name')
+    new_io = form.get('IO') or form.get('io')
+    new_project = form.get('project_name')
+
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        ios_df = select_all_from_table(cursor, cnxn, 'ios')
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+
+        # Resolve target IO row id
+        target_id = None
+        if io_id not in (None, ''):
+            try:
+                target_id = int(io_id)
+            except Exception:
+                target_id = None
+        if target_id is None and existing_project:
+            try:
+                pmap = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+                pid = pmap.get(existing_project)
+                if pid is not None and 'project_id' in ios_df.columns and 'id' in ios_df.columns:
+                    match = ios_df[ios_df['project_id'] == int(pid)].head(1)
+                    if not match.empty:
+                        target_id = int(match.iloc[0]['id'])
+            except Exception:
+                target_id = None
+
+        if target_id is None:
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_project'))
+
+        # Build new values
+        set_parts = []
+        params = []
+        # New IO number (optional; default remains unchanged if not provided)
+        if new_io not in (None, ''):
+            try:
+                new_io_val = int(float(new_io))
+            except Exception:
+                # keep as is; if cannot coerce, skip update to IO
+                new_io_val = None
+            if new_io_val is not None:
+                set_parts.append('IO_num = ?')
+                params.append(new_io_val)
+
+        # New project mapping (respect duplicate guard: only allow if the new project has no existing IO)
+        if new_project not in (None, ''):
+            try:
+                pmap2 = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+                new_pid = pmap2.get(new_project)
+            except Exception:
+                new_pid = None
+            if new_pid is not None:
+                # Check current row's project_id
+                current_row = ios_df[ios_df['id'] == target_id].head(1)
+                current_pid = int(current_row.iloc[0]['project_id']) if not current_row.empty and 'project_id' in current_row.columns and pd.notna(current_row.iloc[0]['project_id']) else None
+                if current_pid is None or current_pid != int(new_pid):
+                    # ensure no other IO exists for the target project
+                    try:
+                        existing_ids = set(ios_df['project_id'].dropna().astype(int).tolist()) if 'project_id' in ios_df.columns else set()
+                    except Exception:
+                        existing_ids = set(ios_df['project_id'].dropna().tolist()) if 'project_id' in ios_df.columns else set()
+                    if int(new_pid) in existing_ids:
+                        # duplicate exists; do not switch project
+                        pass
+                    else:
+                        set_parts.append('project_id = ?')
+                        params.append(int(new_pid))
+
+        if set_parts:
+            q = f"UPDATE ios SET {', '.join(set_parts)} WHERE id = ?"
+            params.append(target_id)
+            cursor.execute(q, tuple(params))
+            cnxn.commit()
+    except Exception:
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='modify_project'))
 
 @modify_tables.route('/capex_forecast/po_selection', methods=['POST'])
 def modify_po_selection():
@@ -824,3 +1376,31 @@ def capex_project_update():
         return {'projects': projects}, 200
     except Exception as e:
         return {'projects': [], 'error': str(e)}, 500
+
+
+@modify_tables.route('/modify_project/departments', methods=['GET'])
+def modify_project_department_update():
+    """Return a JSON list of departments filtered by PO for Modify Project modal.
+
+    Query params:
+    - po: PO name to filter by
+    Response: { 'departments': [ ... ] }
+    """
+    try:
+        po = request.args.get('po')
+        df = get_departments_display()
+        if df is None or df.empty:
+            return {'departments': []}, 200
+        # get_departments_display returns columns name_departments and name_po
+        filt = df
+        if po and 'name_po' in filt.columns:
+            filt = filt[filt['name_po'].astype(str) == str(po)]
+        depts = []
+        if 'name_departments' in filt.columns:
+            try:
+                depts = filt['name_departments'].dropna().astype(str).tolist()
+            except Exception:
+                depts = filt['name_departments'].tolist()
+        return {'departments': list(dict.fromkeys(depts))}, 200
+    except Exception as e:
+        return {'departments': [], 'error': str(e)}, 500

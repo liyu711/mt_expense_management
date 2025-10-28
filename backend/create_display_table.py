@@ -614,6 +614,151 @@ def get_nonpc_display():
 
 	return out.reset_index(drop=True)
 
+
+def get_budget_display_table():
+	"""Return a grouped DataFrame for budgets joined with PO and Department.
+
+	Behavior:
+	- Reads `budgets`, `pos`, and `departments` from the local database using select_all_from_table
+	- Joins budgets.po_id -> pos.id and budgets.department_id -> departments.id when possible
+	- Groups by po_name, department_name, and fiscal_year and computes:
+	    - personnel_budget: sum of human_resource_expense (or close variants)
+	    - non_personnel_budget: sum of non_personnel_expense (or close variants)
+	- Returns a DataFrame with columns: po_name, department_name, fiscal_year, personnel_budget, non_personnel_budget
+	- Handles missing tables/columns gracefully (fills missing names/amounts with None/0.0)
+	"""
+
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	budgets = select_all_from_table(cursor, cnxn, 'budgets')
+	pos = select_all_from_table(cursor, cnxn, 'pos')
+	departments = select_all_from_table(cursor, cnxn, 'departments')
+
+	# If budgets missing return empty DataFrame
+	if budgets is None or budgets.empty:
+		return pd.DataFrame()
+
+	left = budgets.copy()
+
+	# detect fiscal year column
+	fiscal_col = next((c for c in ('fiscal_year', 'Fiscal Year', 'fy', 'year') if c in left.columns), None)
+	if fiscal_col is None:
+		left['fiscal_year'] = None
+		fiscal_col = 'fiscal_year'
+
+	# detect id columns
+	po_id_col = next((c for c in ('po_id', 'PO_id', 'po', 'PO') if c in left.columns), None)
+	dept_id_col = next((c for c in ('department_id', 'dept_id', 'department') if c in left.columns), None)
+
+	# detect budget amount columns (robust to common variants)
+	personnel_candidates = ['human_resource_expense', 'personnel_expense', 'human_resource_cost', 'personnel_budget']
+	nonpersonnel_candidates = ['non_personnel_expense', 'non_personnel_cost', 'non_personnel_budget', 'non_personnel', 'nonpersonnel_expense']
+
+	personnel_col = next((c for c in personnel_candidates if c in left.columns), None)
+	nonpersonnel_col = next((c for c in nonpersonnel_candidates if c in left.columns), None)
+
+	# Ensure numeric columns exist for aggregation
+	if personnel_col is None:
+		left['personnel_tmp'] = 0.0
+		personnel_col = 'personnel_tmp'
+	else:
+		left[personnel_col] = pd.to_numeric(left[personnel_col], errors='coerce').fillna(0.0)
+
+	if nonpersonnel_col is None:
+		left['nonpersonnel_tmp'] = 0.0
+		nonpersonnel_col = 'nonpersonnel_tmp'
+	else:
+		left[nonpersonnel_col] = pd.to_numeric(left[nonpersonnel_col], errors='coerce').fillna(0.0)
+
+	merged = left.copy()
+
+	# Join POs -> provide po_name
+	if pos is not None and not pos.empty and po_id_col is not None:
+		try:
+			merged['_po_key'] = pd.to_numeric(merged[po_id_col], errors='coerce')
+			right_po = pos.copy()
+			right_po['_po_key'] = pd.to_numeric(right_po['id'], errors='coerce')
+			merged = pd.merge(merged, right_po, how='left', left_on='_po_key', right_on='_po_key', suffixes=('','_po'))
+		except Exception:
+			try:
+				merged[po_id_col] = merged[po_id_col].astype(str)
+				right_po = pos.copy()
+				right_po['id'] = right_po['id'].astype(str)
+				merged = pd.merge(merged, right_po.rename(columns={'id': po_id_col}), how='left', left_on=po_id_col, right_on=po_id_col)
+			except Exception:
+				merged['po_name'] = None
+	else:
+		merged['po_name'] = None
+
+	# Join Departments -> provide department_name
+	if departments is not None and not departments.empty and dept_id_col is not None:
+		try:
+			merged['_dept_key'] = pd.to_numeric(merged[dept_id_col], errors='coerce')
+			right_dept = departments.copy()
+			right_dept['_dept_key'] = pd.to_numeric(right_dept['id'], errors='coerce')
+			merged = pd.merge(merged, right_dept, how='left', left_on='_dept_key', right_on='_dept_key', suffixes=('','_dept'))
+		except Exception:
+			try:
+				merged[dept_id_col] = merged[dept_id_col].astype(str)
+				right_dept = departments.copy()
+				right_dept['id'] = right_dept['id'].astype(str)
+				merged = pd.merge(merged, right_dept.rename(columns={'id': dept_id_col}), how='left', left_on=dept_id_col, right_on=dept_id_col)
+			except Exception:
+				merged['department_name'] = None
+	else:
+		merged['department_name'] = None
+
+	# Determine po_name column in merged
+	if 'name_po' in merged.columns:
+		merged['po_name'] = merged['name_po']
+	elif 'name' in pos.columns if pos is not None else False:
+		# sometimes merge kept 'name' from pos
+		if 'name' in merged.columns:
+			merged['po_name'] = merged['name']
+
+	# Determine department name column
+	if 'name_dept' in merged.columns:
+		merged['department_name'] = merged['name_dept']
+	elif 'name' in departments.columns if departments is not None else False:
+		if 'name' in merged.columns and merged.get('department_name') is None:
+			merged['department_name'] = merged['name']
+
+	# Ensure fiscal_year column exists in merged
+	if fiscal_col not in merged.columns:
+		merged[fiscal_col] = None
+
+	# Build grouping keys
+	group_cols = []
+	# po_name and department_name may be present; coerce to canonical names
+	if 'po_name' in merged.columns:
+		group_cols.append('po_name')
+	else:
+		merged['po_name'] = None
+		group_cols.append('po_name')
+
+	if 'department_name' in merged.columns:
+		group_cols.append('department_name')
+	else:
+		merged['department_name'] = None
+		group_cols.append('department_name')
+
+	group_cols.append(fiscal_col)
+
+	# Perform aggregation
+	agg_df = merged.groupby(group_cols, dropna=False).agg({personnel_col: 'sum', nonpersonnel_col: 'sum'}).reset_index()
+
+	# Rename aggregated columns to requested output names
+	agg_df = agg_df.rename(columns={personnel_col: 'personnel_budget', nonpersonnel_col: 'non_personnel_budget', fiscal_col: 'fiscal_year'})
+
+	# Ensure columns order
+	out_cols = ['po_name', 'department_name', 'fiscal_year', 'personnel_budget', 'non_personnel_budget']
+	for c in out_cols:
+		if c not in agg_df.columns:
+			agg_df[c] = None if 'budget' not in c else 0.0
+
+	return agg_df.loc[:, out_cols].reset_index(drop=True)
+
 def get_project_cateogory_display():
 	"""Return a DataFrame of projects with their project category.
 
@@ -784,3 +929,4 @@ def get_IO_display_table():
 	out = out[['IO', 'project_name']]
 
 	return out.reset_index(drop=True)
+

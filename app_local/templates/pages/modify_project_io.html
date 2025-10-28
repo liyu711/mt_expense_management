@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Modify Project & IO</title>
+    <style>
+        .form-group { display: flex; align-items: center; margin-bottom: 14px; }
+        .form-group label { flex: 1 1 33%; max-width: 33%; min-width: 120px; text-align: left; margin-right: 12px; }
+        .form-group input[type="text"],
+        .form-group input[type="password"],
+        .form-group input[type="number"] { flex: 2 1 67%; max-width: 67%; min-width: 0; }
+        .container { padding: 24px 0 0 0; }
+        .page-wrapper { display: flex; flex-direction: column; height: calc(100vh - 0px); box-sizing: border-box; }
+        .page-top { flex: 0 0 auto; box-sizing: border-box; padding: 24px 24px 0 24px; }
+        .tables-row { display: flex; gap: 24px; padding: 12px 24px 24px 24px; box-sizing: border-box; }
+        .table-half { flex: 1 1 50%; overflow: auto; }
+        .button-row { display: flex; gap: 12px; align-items: center; }
+        .button-row button { padding: 6px 12px; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; }
+        .modal-overlay { position: absolute; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.4); }
+        .modal-content { position: relative; max-width: 760px; margin: 60px auto; background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 2010; }
+        .modal-close { position: absolute; right: 10px; top: 8px; font-size: 24px; background: transparent; border: none; cursor: pointer; }
+    </style>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div class="page-wrapper">
+        <div class="page-top">
+            <div class="container">
+                <h1>Modify Project & IO</h1>
+                <div class="button-row">
+                    <button id="add_project_button" type="button">add_project</button>
+                    <button id="modify_project_button" type="button">modify_project</button>
+                    <button id="add_io_button" type="button">add_io</button>
+                    <button id="modify_io_button" type="button">modify_io</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Project Add/Modify Modal -->
+        <div id="projectModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="projectModalTitle">
+            <div class="modal-overlay" id="projectOverlay"></div>
+            <div class="modal-content" role="document">
+                <button class="modal-close" id="projectClose" aria-label="Close">&times;</button>
+                <h2 id="projectModalTitle">Project</h2>
+                <form method="POST" name="Modify_projects" id="projectForm">
+                    <input type="hidden" name="form_kind" value="project">
+                    <input type="hidden" name="table_name" value="projects">
+                    <input type="hidden" name="edit_mode" id="proj_edit_mode" value="0">
+                    <input type="hidden" name="project_id" id="proj_project_id" value="">
+                    <!-- Existing project selector (shown only in edit mode) -->
+                    <div class="form-group" id="proj_existing_container" style="display:none;">
+                        <label for="proj_existing_project">Existing Project</label>
+                        <select name="existing_project" id="proj_existing_project">
+                            <option value="" disabled selected>Select a project</option>
+                            {% for p in project_names %}
+                                <option value="{{ p.name }}" data-id="{{ p.id }}">{{ p.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% for field in project_fields %}
+                        <div class="form-group">
+                            <label for="proj_{{ field.name }}">{{ field.label }}</label>
+                            {% if field.type == 'select' %}
+                                <select name="{{ field.name }}" id="proj_{{ field.name }}" required>
+                                    <option value="" disabled selected>Select an option</option>
+                                    {% for option in field.options %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
+                                <input type="{{ field.type }}" name="{{ field.name }}" id="proj_{{ field.name }}" required>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <div style="margin-top:12px;">
+                        <button type="submit">Submit</button>
+                        <button type="button" id="projectCancel">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- IO Add Modal -->
+        <div id="ioModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="ioModalTitle">
+            <div class="modal-overlay" id="ioOverlay"></div>
+            <div class="modal-content" role="document">
+                <button class="modal-close" id="ioClose" aria-label="Close">&times;</button>
+                <h2 id="ioModalTitle">IO</h2>
+                <form method="POST" name="Modify_ios" id="ioForm">
+                    <input type="hidden" name="form_kind" value="io">
+                    <input type="hidden" name="table_name" value="ios">
+                    <input type="hidden" name="io_edit_mode" id="io_edit_mode" value="0">
+                    <input type="hidden" name="io_id" id="io_id" value="">
+                    <!-- Existing IO selector (shown only in edit mode) -->
+                    <div class="form-group" id="io_existing_container" style="display:none;">
+                        <label for="io_existing_select">Existing IO</label>
+                        <select id="io_existing_select" name="existing_io">
+                            <option value="" disabled selected>Select an IO</option>
+                            {% for io in io_entries %}
+                                <option value="{{ io.id }}" data-io="{{ io.io }}" data-project="{{ io.project_name }}">{{ io.io }}{% if io.project_name %} - {{ io.project_name }}{% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    {% for field in io_fields %}
+                        <div class="form-group">
+                            <label for="io_{{ field.name }}">{{ field.label }}</label>
+                            {% if field.type == 'select' %}
+                                <select name="{{ field.name }}" id="io_{{ field.name }}" required>
+                                    <option value="" disabled selected>Select an option</option>
+                                    {% for option in field.options %}
+                                        <option value="{{ option }}">{{ option }}</option>
+                                    {% endfor %}
+                                </select>
+                            {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
+                                <input type="{{ field.type }}" name="{{ field.name }}" id="io_{{ field.name }}"{% if not (field.name|lower in ['io','io_num','io number','io_number']) %} required{% endif %}>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                    <div style="margin-top:12px;">
+                        <button type="submit">Submit</button>
+                        <button type="button" id="ioCancel">Cancel</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="tables-row">
+            <div class="table-half">
+                <h3>Projects</h3>
+                {% if columns_project and data_project %}
+                <table id="projects_table" class="display" style="width:100%" border="1">
+                    <thead>
+                        <tr>
+                            {% for col in columns_project %}
+                            <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data_project %}
+                        <tr>
+                            {% for item in row %}
+                            <td>{{ item }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+            <div class="table-half">
+                <h3>IOs</h3>
+                {% if columns_io and data_io %}
+                <table id="ios_table" class="display" style="width:100%" border="1">
+                    <thead>
+                        <tr>
+                            {% for col in columns_io %}
+                            <th>{{ col }}</th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for row in data_io %}
+                        <tr>
+                            {% for item in row %}
+                            <td>{{ item }}</td>
+                            {% endfor %}
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Basic modal open/close wiring
+        (function(){
+            function open(modal){ modal.style.display='block'; modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
+                var firstInput = modal.querySelector('input,select,button'); if(firstInput) firstInput.focus(); }
+            function close(modal){ modal.style.display='none'; modal.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
+
+            var projModal = document.getElementById('projectModal');
+            var addProjBtn = document.getElementById('add_project_button');
+            var modProjBtn = document.getElementById('modify_project_button');
+            var projClose = document.getElementById('projectClose');
+            var projOverlay = document.getElementById('projectOverlay');
+            var projCancel = document.getElementById('projectCancel');
+            // Add mode
+            addProjBtn && addProjBtn.addEventListener('click', function(){
+                // Reset edit mode
+                var form = document.getElementById('projectForm');
+                document.getElementById('proj_edit_mode').value = '0';
+                document.getElementById('proj_project_id').value = '';
+                var existC = document.getElementById('proj_existing_container');
+                if (existC) existC.style.display = 'none';
+                // reset form action to default (post back to same route)
+                form.removeAttribute('action');
+                // clear fields
+                try { form.reset(); } catch(e){}
+                open(projModal);
+            });
+            // Edit mode
+            modProjBtn && modProjBtn.addEventListener('click', function(){
+                var form = document.getElementById('projectForm');
+                document.getElementById('proj_edit_mode').value = '1';
+                var existC = document.getElementById('proj_existing_container');
+                if (existC) existC.style.display = '';
+                // set form action to change endpoint
+                form.action = '/modify_project/change_project';
+                open(projModal);
+            });
+            [projClose, projOverlay, projCancel].forEach(function(el){ el && el.addEventListener('click', function(){ close(projModal); }); });
+
+            var ioModal = document.getElementById('ioModal');
+            var addIoBtn = document.getElementById('add_io_button');
+            var modIoBtn = document.getElementById('modify_io_button');
+            var ioClose = document.getElementById('ioClose');
+            var ioOverlay = document.getElementById('ioOverlay');
+            var ioCancel = document.getElementById('ioCancel');
+            // Add IO
+            addIoBtn && addIoBtn.addEventListener('click', function(){
+                var form = document.getElementById('ioForm');
+                document.getElementById('io_edit_mode').value = '0';
+                document.getElementById('io_id').value = '';
+                var existC = document.getElementById('io_existing_container');
+                if (existC) existC.style.display = 'none';
+                form.removeAttribute('action');
+                try { form.reset(); } catch(e){}
+                open(ioModal);
+            });
+            // Modify IO
+            modIoBtn && modIoBtn.addEventListener('click', function(){
+                var form = document.getElementById('ioForm');
+                document.getElementById('io_edit_mode').value = '1';
+                var existC = document.getElementById('io_existing_container');
+                if (existC) existC.style.display = '';
+                form.action = '/modify_io/change_io';
+                open(ioModal);
+            });
+            [ioClose, ioOverlay, ioCancel].forEach(function(el){ el && el.addEventListener('click', function(){ close(ioModal); }); });
+        })();
+    </script>
+
+    <script>
+        // Filter Department options by selected PO within the Project modal
+        (function(){
+            var modal = document.getElementById('projectModal');
+            if (!modal) return;
+            function attachHandlers(){
+                var poSel = modal.querySelector('select[name="po"], #proj_po');
+                var deptSel = modal.querySelector('select[name="department"], #proj_department');
+                var existSel = document.getElementById('proj_existing_project');
+                if (!poSel || !deptSel) return;
+                function rebuildDeptOptions(list){
+                    try{
+                        while (deptSel.firstChild) deptSel.removeChild(deptSel.firstChild);
+                        var placeholder = document.createElement('option');
+                        placeholder.value = ''; placeholder.disabled = true; placeholder.selected = true; placeholder.textContent = 'Select an option';
+                        deptSel.appendChild(placeholder);
+                        (list || []).forEach(function(name){
+                            var opt = document.createElement('option'); opt.value = name; opt.textContent = name; deptSel.appendChild(opt);
+                        });
+                    }catch(e){}
+                }
+                function fetchDepartments(){
+                    var val = poSel.value || '';
+                    if (!val) { rebuildDeptOptions([]); return; }
+                    fetch('/modify_project/departments?po=' + encodeURIComponent(val))
+                        .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
+                        .then(function(json){ rebuildDeptOptions(json && json.departments ? json.departments : []); })
+                        .catch(function(){ rebuildDeptOptions([]); });
+                }
+                poSel.addEventListener('change', fetchDepartments);
+                fetchDepartments();
+
+                // When existing project is selected, fetch details and prefill form
+                if (existSel) {
+                    existSel.addEventListener('change', function(){
+                        var name = existSel.value || '';
+                        if (!name) return;
+                        fetch('/modify_project/details?name=' + encodeURIComponent(name))
+                            .then(function(res){ return res.ok ? res.json() : null; })
+                            .then(function(info){
+                                if (!info) return;
+                                try {
+                                    // set hidden id
+                                    var hid = document.getElementById('proj_project_id');
+                                    if (hid) hid.value = info.id || '';
+                                    // Fill fields: name, category, po, then dept after options refreshed, fiscal_year
+                                    var nameInput = document.getElementById('proj_name');
+                                    if (nameInput && info.name != null) nameInput.value = info.name;
+                                    var catSel = document.getElementById('proj_category');
+                                    if (catSel && info.category != null) catSel.value = info.category;
+                                    if (poSel && info.po != null) {
+                                        poSel.value = info.po;
+                                        // refresh departments then set department
+                                        fetch('/modify_project/departments?po=' + encodeURIComponent(info.po))
+                                            .then(function(res){ return res.ok ? res.json() : {departments: []}; })
+                                            .then(function(json){
+                                                rebuildDeptOptions(json && json.departments ? json.departments : []);
+                                                if (deptSel && info.department != null) {
+                                                    deptSel.value = info.department;
+                                                }
+                                            })
+                                            .catch(function(){
+                                                if (deptSel && info.department != null) deptSel.value = info.department;
+                                            });
+                                    }
+                                    var fySel = document.getElementById('proj_fiscal_year');
+                                    if (fySel && info.fiscal_year != null) fySel.value = String(info.fiscal_year);
+                                } catch(e) {}
+                            })
+                            .catch(function(){});
+                    });
+                }
+            }
+            if (document.readyState === 'complete' || document.readyState === 'interactive') attachHandlers(); else document.addEventListener('DOMContentLoaded', attachHandlers);
+        })();
+    </script>
+
+    <script>
+        // Prefill IO modal fields when selecting an existing IO in edit mode
+        (function(){
+            var ioModal = document.getElementById('ioModal');
+            if (!ioModal) return;
+            function attachHandlers(){
+                var existSel = document.getElementById('io_existing_select');
+                var ioInput = document.getElementById('io_IO');
+                var projSel = document.getElementById('io_project_name');
+                if (!existSel || !projSel) return;
+                existSel.addEventListener('change', function(){
+                    var id = existSel.value || '';
+                    if (!id) return;
+                    fetch('/modify_io/details?id=' + encodeURIComponent(id))
+                        .then(function(res){ return res.ok ? res.json() : null; })
+                        .then(function(info){
+                            if (!info) return;
+                            try {
+                                var hid = document.getElementById('io_id');
+                                if (hid) hid.value = info.id || '';
+                                if (ioInput && info.io != null) ioInput.value = info.io;
+                                if (projSel && info.project_name != null) projSel.value = info.project_name;
+                            } catch(e){}
+                        })
+                        .catch(function(){});
+                });
+            }
+            if (document.readyState === 'complete' || document.readyState === 'interactive') attachHandlers(); else document.addEventListener('DOMContentLoaded', attachHandlers);
+        })();
+    </script>
+</body>
+</html>

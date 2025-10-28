@@ -3,7 +3,7 @@ from backend.connect_local import connect_local, select_all_from_table
 from backend.display_names import DISPLAY_NAMES
 from backend import \
     get_departments_display, get_forecasts_display, get_pc_display, get_projects_display,\
-    get_nonpc_display
+    get_nonpc_display, get_budget_display_table
 import pandas as pd
 
 data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates')
@@ -28,7 +28,7 @@ def data_summary():
     pc_forecast_df = get_pc_display()
     non_pc_forecast_df = get_forecasts_display()
     expense_df = select_all_from_table(cursor, cnxn, 'expenses')
-    budget_df = select_all_from_table(cursor, cnxn, 'budgets')
+    budget_df = get_budget_display_table()
     funding_df = select_all_from_table(cursor, cnxn, 'fundings')
     fiscal_years = [str(y) for y in range(2020, 2036)]
 
@@ -212,7 +212,7 @@ def get_statistics():
         # project_forecasts_pc: personnel forecasts (personnel_expense)
         pc = get_pc_display()
         # budgetsxw
-        budgets = select_all_from_table(cursor, cnxn, 'budgets')
+        budgets = get_budget_display_table()
         # fundings
         fundings = select_all_from_table(cursor, cnxn, 'fundings')
         # expenses
@@ -276,6 +276,7 @@ def get_statistics():
         fundings_f = apply_filters(fundings)
         expenses_f = apply_filters(expenses)
 
+
         def sum_column(df, candidates):
             if df is None or df.empty:
                 return 0.0
@@ -291,7 +292,7 @@ def get_statistics():
         personnel_forecast = sum_column(pc_f, ['Personnel Cost'])
         total_forecast = non_personnel_forecast + personnel_forecast
 
-        budget_sum = sum_column(budgets_f, ['non_personnel_expense', 'human_resource_expense', 'Non-personnel Budget', 'Personnel Budget'])
+        budget_sum = sum_column(budgets_f, ['personnel_budget', 'non_personnel_budget'])
         funding_sum = sum_column(fundings_f, ['funding', 'Funding'])
         total_budget = budget_sum + funding_sum
 
