@@ -75,14 +75,16 @@ modify_table_config = {
         'table_name': 'human_resource_categories',
         'fields': [
             {'name': 'category', 'type': 'text', 'label': 'Staff Category'},
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
         ],
         'merge_on': ['name'],
-        'columns': ['name']
+        'columns': ['name', 'po_id']
     },
     'modify_staff_cost': {
         'title': 'Modify Staff Cost',
         'table_name': 'human_resource_cost',
         'fields': [
+            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
             {'name': 'staff_category', 'type': 'select', 'label': 'Staff Category', 'options': []},
             {'name': 'year', 'type': 'select', 'label': 'Year', 'options': []},
             {'name': 'cost', 'type': 'number', 'label': 'Cost'}
@@ -280,11 +282,21 @@ def modify_table_router(action):
             if field['name'] == 'po' and field['type'] == 'select':
                 field['options'] = po_options
 
+    # If this is the modify_staff_categories form, fetch PO options for dropdown
+    if action == 'modify_staff_categories':
+        po_options = fetch_options('pos', 'name')
+        for field in config['fields']:
+            if field.get('name') == 'po' and field.get('type') == 'select':
+                field['options'] = po_options
+
     # If this is the modify_staff_cost form, populate staff category and year options
     if action == 'modify_staff_cost':
         staff_options = fetch_options('human_resource_categories', 'name')
+        po_options = fetch_options('pos', 'name')
         year_options = [str(y) for y in range(2020, 2031)]
         for field in config['fields']:
+            if field['name'] == 'po' and field['type'] == 'select':
+                field['options'] = po_options
             if field['name'] == 'staff_category' and field['type'] == 'select':
                 field['options'] = staff_options
             if field['name'] == 'year' and field['type'] == 'select':
@@ -384,6 +396,28 @@ def modify_table_router(action):
         else:
             # Default: use add_entry for other actions
             df_upload = pd.DataFrame([row])
+            # Special handling for modify_staff_categories: map PO to po_id and rename to expected columns
+            if action == 'modify_staff_categories':
+                try:
+                    db = connect_local()
+                    cursor, cnxn = db.connect_to_db()
+                    pos_df = select_all_from_table(cursor, cnxn, 'pos')
+                    po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+                    # Map selected PO name to po_id
+                    df_upload['po_id'] = df_upload.get('po').map(po_map) if 'po' in df_upload.columns else None
+                except Exception:
+                    # Fallback: leave po_id as None if mapping fails
+                    pass
+                # Rename UI field to backend column
+                try:
+                    df_upload = df_upload.rename(columns={'category': 'name'})
+                except Exception:
+                    pass
+                # Keep only expected columns
+                expected_cols = modify_table_config.get(action, {}).get('columns', [])
+                keep_cols = [c for c in expected_cols if c in df_upload.columns]
+                if keep_cols:
+                    df_upload = df_upload[keep_cols]
             # Special handling for modify_funding: map PO and Department names to their local ids
             if action == 'modify_io':
                 # Accept empty IO input; default to -1 when missing/empty
@@ -1404,3 +1438,52 @@ def modify_project_department_update():
         return {'departments': list(dict.fromkeys(depts))}, 200
     except Exception as e:
         return {'departments': [], 'error': str(e)}, 500
+
+
+@modify_tables.route('/modify_staff_cost/categories', methods=['GET'])
+def staff_cost_categories_update():
+    """Return a JSON list of staff categories filtered by PO.
+
+    Query params:
+    - po: optional PO name to filter by; if omitted, returns all categories
+    Response: { 'categories': [ ... ] }
+    """
+    try:
+        po_name = request.args.get('po')
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Map PO name -> id
+        po_id = None
+        if po_name:
+            try:
+                pos_df = select_all_from_table(cursor, cnxn, 'pos')
+                if pos_df is not None and not pos_df.empty and 'name' in pos_df.columns and 'id' in pos_df.columns:
+                    pmap = dict(zip(pos_df['name'], pos_df['id']))
+                    pid = pmap.get(po_name)
+                    po_id = int(pid) if pid is not None else None
+            except Exception:
+                po_id = None
+
+        # Load human_resource_categories and filter by po_id if provided
+        cats_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+        if cats_df is None or cats_df.empty:
+            return {'categories': []}, 200
+        filt = cats_df
+        if po_id is not None and 'po_id' in filt.columns:
+            try:
+                filt = filt[filt['po_id'].astype('Int64') == po_id]
+            except Exception:
+                filt = filt[filt['po_id'] == po_id]
+
+        names = []
+        if 'name' in filt.columns:
+            try:
+                names = filt['name'].dropna().astype(str).tolist()
+            except Exception:
+                names = filt['name'].tolist()
+        # de-duplicate while preserving order
+        names = list(dict.fromkeys(names))
+        return {'categories': names}, 200
+    except Exception as e:
+        return {'categories': [], 'error': str(e)}, 500

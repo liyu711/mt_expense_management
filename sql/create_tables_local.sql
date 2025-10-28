@@ -68,7 +68,9 @@ CREATE TABLE IO_CE_connection(
 
 CREATE TABLE human_resource_categories(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    po_id INTEGER,
+    FOREIGN KEY (po_id) REFERENCES POs(id)
 );
 
 CREATE TABLE human_resource_cost(

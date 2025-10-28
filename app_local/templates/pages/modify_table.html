@@ -451,6 +451,57 @@
         })();
     </script>
     {% endif %}
+    {% if table_name == 'human_resource_cost' %}
+    <script>
+        // For Staff Cost: filter Staff Category options by selected PO within both Add and Modify modals
+        (function(){
+            function rebuildOptions(selectEl, values){
+                if (!selectEl) return;
+                try {
+                    while (selectEl.firstChild) selectEl.removeChild(selectEl.firstChild);
+                    var placeholder = document.createElement('option');
+                    placeholder.value = '';
+                    placeholder.disabled = true;
+                    placeholder.selected = true;
+                    placeholder.textContent = 'Select an option';
+                    selectEl.appendChild(placeholder);
+                    (values || []).forEach(function(v){
+                        var o = document.createElement('option');
+                        o.value = v;
+                        o.textContent = v;
+                        selectEl.appendChild(o);
+                    });
+                } catch(e) {}
+            }
+            function attachHandlersForModal(modalEl){
+                if (!modalEl) return;
+                var poSel = modalEl.querySelector('select[name="po"]');
+                var catSel = modalEl.querySelector('select[name="staff_category"]');
+                if (!poSel || !catSel) return;
+                function refreshCategories(){
+                    var po = poSel.value || '';
+                    if (!po){ rebuildOptions(catSel, []); return; }
+                    fetch('/modify_staff_cost/categories?po=' + encodeURIComponent(po))
+                        .then(function(res){ return res.ok ? res.json() : { categories: [] }; })
+                        .then(function(json){ rebuildOptions(catSel, (json && json.categories) ? json.categories : []); })
+                        .catch(function(){ rebuildOptions(catSel, []); });
+                }
+                poSel.addEventListener('change', refreshCategories);
+                // Initialize once in case a PO is preselected
+                refreshCategories();
+            }
+            function onReady(){
+                attachHandlersForModal(document.getElementById('modifyModal'));
+                attachHandlersForModal(document.getElementById('modifyModalChange'));
+            }
+            if (document.readyState === 'complete' || document.readyState === 'interactive') onReady(); else document.addEventListener('DOMContentLoaded', onReady);
+            var addBtn = document.getElementById('add_button');
+            var modifyBtn = document.getElementById('modify_button');
+            if (addBtn) addBtn.addEventListener('click', function(){ setTimeout(onReady, 30); });
+            if (modifyBtn) modifyBtn.addEventListener('click', function(){ setTimeout(onReady, 30); });
+        })();
+    </script>
+    {% endif %}
     <style>
         /* Modal styles */
         .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; }

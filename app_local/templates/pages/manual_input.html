@@ -649,6 +649,69 @@
                 var poSelectM = document.getElementById('po_select_modify');
                 var deptSelectM = document.getElementById('department_select_modify');
 
+                // Rebuild Human Resource Category options in both Add and Modify modals
+                function rebuildHrCategoryOptions(options){
+                    // Add modal
+                    var hrSel = document.querySelector('select[name="Human_resource_category"]');
+                    if (hrSel){
+                        var current = hrSel.value;
+                        while (hrSel.firstChild) hrSel.removeChild(hrSel.firstChild);
+                        var placeholder = document.createElement('option');
+                        placeholder.value = '';
+                        placeholder.textContent = 'Select Human Resource Category';
+                        hrSel.appendChild(placeholder);
+                        (options || []).forEach(function(h){
+                            var opt = document.createElement('option');
+                            opt.value = h;
+                            opt.textContent = h;
+                            hrSel.appendChild(opt);
+                        });
+                        if (current && Array.from(hrSel.options).some(function(o){ return o.value === current; })){
+                            hrSel.value = current;
+                        } else {
+                            hrSel.value = '';
+                        }
+                    }
+                    // Modify modal
+                    var hrSelM = document.getElementById('hr_category_modify');
+                    if (hrSelM){
+                        var currentM = hrSelM.value;
+                        while (hrSelM.firstChild) hrSelM.removeChild(hrSelM.firstChild);
+                        var placeholderM = document.createElement('option');
+                        placeholderM.value = '';
+                        placeholderM.textContent = 'Select Human Resource Category';
+                        hrSelM.appendChild(placeholderM);
+                        (options || []).forEach(function(h){
+                            var opt = document.createElement('option');
+                            opt.value = h;
+                            opt.textContent = h;
+                            hrSelM.appendChild(opt);
+                        });
+                        if (currentM && Array.from(hrSelM.options).some(function(o){ return o.value === currentM; })){
+                            hrSelM.value = currentM;
+                        } else {
+                            hrSelM.value = '';
+                        }
+                    }
+                }
+
+                function fetchAndRebuildHrCategories(poVal){
+                    if (!poVal){
+                        rebuildHrCategoryOptions([]);
+                        return;
+                    }
+                    fetch('/manual_input/hr_categories?po=' + encodeURIComponent(poVal))
+                        .then(function(res){ return res.json(); })
+                        .then(function(json){
+                            if (!json || !Array.isArray(json.human_resource_categories)){
+                                rebuildHrCategoryOptions([]);
+                                return;
+                            }
+                            rebuildHrCategoryOptions(json.human_resource_categories);
+                        })
+                        .catch(function(){ rebuildHrCategoryOptions([]); });
+                }
+
                 function rebuildDeptOptions(options) {
                     if (!deptSelect) return;
                     // Remember current value to try to preserve selection if still valid
@@ -692,6 +755,8 @@
                 if (poSelect && deptSelect) {
                     // Initialize once on load (handles preselected PO) using server-side filtering
                     fetchServerFilteredDepartments();
+                    // Initialize HR categories on load as well
+                    if (poSelect.value){ fetchAndRebuildHrCategories(poSelect.value); }
                     // On change: post to server and update UI immediately
                     poSelect.addEventListener('change', function () {
                         var val = poSelect.value || '';
@@ -705,6 +770,8 @@
                         if (!val) {
                             // reset entire form except PO itself
                             window.resetForecastForm && window.resetForecastForm();
+                            // reset HR categories as well
+                            rebuildHrCategoryOptions([]);
                             // notify server that department/fiscal_year/project are cleared
                             fetch('/manual_input/department_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department: '' }) }).catch(function(){});
                             fetch('/manual_input/fiscal_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscal_year: '' }) }).catch(function(){});
@@ -714,6 +781,8 @@
                             fetchServerFilteredDepartments();
                             // Also refresh projects list filtered by new PO
                             if (window.fetchAndRebuildProjects) window.fetchAndRebuildProjects();
+                            // And refresh HR categories filtered by new PO
+                            fetchAndRebuildHrCategories(val);
                         }
                     });
                 }
@@ -758,6 +827,8 @@
                         var val = poSelectM.value || '';
                         fetch('/manual_input/po_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ po: val }) }).catch(function(){});
                         fetchServerFilteredDepartmentsM();
+                        // refresh HR categories in modify modal
+                        fetchAndRebuildHrCategories(val);
                     });
                 }
             })();

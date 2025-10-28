@@ -9,7 +9,7 @@ from backend import \
     upload_nonpc_forecasts_local_m, upload_pc_forecasts_local_m,\
     upload_budgets_local_m, upload_expenses_local, upload_fundings_local, \
     upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local, get_projects_display,\
-    get_project_cateogory_display, get_IO_display_table
+    get_project_cateogory_display, get_IO_display_table, get_hr_category_display
 from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_df, upload_nonpc_forecasts_local_m
 import pandas as pd
 
@@ -546,6 +546,118 @@ def manual_projects():
     print(result)
     print(deduped)
     return jsonify({'projects': deduped}), 200
+
+
+@manual_upload.route('/manual_input/hr_categories', methods=['GET'])
+def manual_hr_categories():
+    """Return human resource categories filtered by the provided PO name (query param 'po')
+    or by the current module-level selected_po if no query param is provided.
+    Response JSON: {"human_resource_categories": [<str>, ...]}
+    """
+    po_name = request.args.get('po') or selected_po
+    # If no PO selected, return empty list to enforce hierarchy
+    if not po_name or str(po_name).strip() == '' or str(po_name) == 'All':
+        return jsonify({'human_resource_categories': []}), 200
+
+    try:
+        df = get_hr_category_display()
+    except Exception as e:
+        # If display table cannot be built, surface an empty list with error
+        return jsonify({'human_resource_categories': [], 'error': str(e)}), 500
+
+    if df is None or getattr(df, 'empty', True):
+        return jsonify({'human_resource_categories': []}), 200
+
+    # Find expected column names with defensive fallbacks
+    def find_col(cols, target):
+        if target in cols:
+            return target
+        # case-insensitive match
+        for c in cols:
+            if c.lower() == target.lower():
+                return c
+        # alternate names
+        if target.lower() == 'po name':
+            alts = ['PO Name', 'PO', 'po', 'po_name']
+        elif target.lower() == 'human resource category':
+            alts = ['Human resource category', 'Staff Category', 'Staff category', 'name', 'Category']
+        else:
+            alts = []
+        for alt in alts:
+            for c in cols:
+                if c.lower() == alt.lower():
+                    return c
+        return None
+
+    cols = list(df.columns)
+    po_col = find_col(cols, 'PO name')
+    hr_col = find_col(cols, 'Human Resource Category')
+
+    # If expected columns are not found, fallback to record-wise processing
+    if not po_col or not hr_col:
+        try:
+            records = df.to_dict(orient='records')
+        except Exception:
+            records = []
+        cats = []
+        seen = set()
+        for r in records:
+            p = r.get('PO name') or r.get('PO Name') or r.get('PO') or r.get('po') or r.get('po_name')
+            h = r.get('Human Resource Category') or r.get('Human resource category') or r.get('Staff Category') or r.get('Staff category') or r.get('name') or r.get('Category')
+            if not p or not h:
+                continue
+            try:
+                if str(p).strip() == str(po_name).strip():
+                    hv = str(h).strip()
+                    if hv and hv not in seen:
+                        seen.add(hv)
+                        cats.append(hv)
+            except Exception:
+                continue
+        return jsonify({'human_resource_categories': cats}), 200
+
+    # Column-based filtering
+    try:
+        mask = df[po_col].astype(str).str.strip().str.lower() == str(po_name).strip().lower()
+    except Exception:
+        # Fallback to record-wise if masking fails
+        try:
+            records = df.to_dict(orient='records')
+        except Exception:
+            records = []
+        cats = []
+        seen = set()
+        for r in records:
+            p = r.get(po_col)
+            h = r.get(hr_col)
+            if p is None or h is None:
+                continue
+            try:
+                if str(p).strip() == str(po_name).strip():
+                    hv = str(h).strip()
+                    if hv and hv not in seen:
+                        seen.add(hv)
+                        cats.append(hv)
+            except Exception:
+                continue
+        return jsonify({'human_resource_categories': cats}), 200
+
+    filtered = df[mask]
+    try:
+        values = filtered[hr_col].dropna().astype(str).str.strip().tolist()
+    except Exception:
+        try:
+            values = [str(v).strip() for v in list(filtered[hr_col]) if v is not None]
+        except Exception:
+            values = []
+    # Deduplicate preserving order
+    seen = set()
+    cats = []
+    for v in values:
+        if v and v not in seen:
+            seen.add(v)
+            cats.append(v)
+    return jsonify({'human_resource_categories': cats}), 200
 
 
 @manual_upload.route('/manual_input/fiscal_years', methods=['GET'])

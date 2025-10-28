@@ -73,7 +73,9 @@ create table IO_CE_connection(
 
 create table human_resource_categories(
 	id int identity(1,1) primary key,
-	name varchar(1000) not null
+	name varchar(1000) not null,
+	po_id int,
+	foreign key (po_id) references POs(id)
 );
 
 create table human_resource_expense(

@@ -885,6 +885,9 @@ def get_IO_display_table():
 		out['project_name'] = None
 		return out.reset_index(drop=True)
 
+
+
+
 	# Determine project name column on projects table
 	proj_name_col = 'name' if 'name' in project_table.columns else ('Project' if 'Project' in project_table.columns else project_table.columns[0])
 
@@ -927,6 +930,87 @@ def get_IO_display_table():
 
 	# Ensure exact column order
 	out = out[['IO', 'project_name']]
+
+	return out.reset_index(drop=True)
+
+
+
+def get_hr_category_display():
+	"""Return a DataFrame of human resource categories joined with PO names.
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	hr_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+	pos_df = select_all_from_table(cursor, cnxn, 'pos')
+
+	# If hr categories missing return empty DataFrame with desired column names
+	if hr_df is None or hr_df.empty:
+		out = pd.DataFrame(columns=['Human Resource Category', 'PO name'])
+		return out
+
+	# Determine hr name column
+	hr_name_col = 'name' if 'name' in hr_df.columns else (hr_df.columns[0] if len(hr_df.columns) > 0 else None)
+
+	# Determine po id column on hr table (common variants)
+	hr_po_col = next((c for c in ('po_id', 'PO_id', 'po', 'PO') if c in hr_df.columns), None)
+
+	# Determine pos name column
+	pos_name_col = 'name' if (pos_df is not None and 'name' in pos_df.columns) else (pos_df.columns[0] if pos_df is not None and len(pos_df.columns) > 0 else None)
+	pos_id_col = 'id'
+
+	# Left join hr_df with pos_df on hr_df.po_id == pos_df.id
+	left = hr_df.copy()
+	if pos_df is None or pos_df.empty or pos_id_col not in pos_df.columns or pos_name_col is None:
+		# No pos info; return hr names with PO name None
+		out = pd.DataFrame()
+		out['Human Resource Category'] = left[hr_name_col].where(pd.notna(left[hr_name_col]), None) if hr_name_col in left.columns else left.iloc[:, 0]
+		out['PO name'] = None
+		return out.reset_index(drop=True)
+
+	right = pos_df[[pos_id_col, pos_name_col]].copy()
+	# perform numeric-coerced merge then fallback to string join if needed
+	try:
+		left['_hr_po_key'] = pd.to_numeric(left[hr_po_col], errors='coerce') if hr_po_col in left.columns else pd.Series([None]*len(left))
+		right['_pos_key'] = pd.to_numeric(right[pos_id_col], errors='coerce')
+		merged = pd.merge(left, right, how='left', left_on='_hr_po_key', right_on='_pos_key', suffixes=('', '_pos'))
+	except Exception:
+		try:
+			merged = pd.merge(left, right.rename(columns={pos_id_col: hr_po_col}), how='left', left_on=hr_po_col, right_on=hr_po_col, suffixes=('', '_pos'))
+		except Exception:
+			merged = left.copy()
+
+	out = pd.DataFrame()
+	# map hr name -> Human Resource Category
+	if hr_name_col and hr_name_col in merged.columns:
+		out['Human Resource Category'] = merged[hr_name_col].where(pd.notna(merged[hr_name_col]), None)
+	else:
+		out['Human Resource Category'] = merged.iloc[:, 0].where(pd.notna(merged.iloc[:, 0]), None)
+
+	# map pos name -> PO name
+	# After merge, the right-hand pos name may be suffixed (e.g., 'name_pos') if both tables had a 'name' column.
+	pos_col_in_merged = None
+	if pos_name_col is not None:
+		suffixed = f"{pos_name_col}_pos"
+		if suffixed in merged.columns:
+			pos_col_in_merged = suffixed
+		elif pos_name_col in merged.columns and pos_name_col != hr_name_col:
+			# left and right used different names, safe to use pos_name_col
+			pos_col_in_merged = pos_name_col
+		elif pos_name_col in merged.columns and suffixed not in merged.columns:
+			# both columns present but suffix absent (unlikely), prefer the right-hand by checking existence of original pos_df
+			pos_col_in_merged = pos_name_col
+
+	if pos_col_in_merged and pos_col_in_merged in merged.columns:
+		out['PO name'] = merged[pos_col_in_merged].where(pd.notna(merged[pos_col_in_merged]), None)
+	else:
+		out['PO name'] = None
+
+	# Drop any duplicates while preserving first occurrence
+	try:
+		out = out.drop_duplicates(keep='first')
+	except Exception:
+		pass
 
 	return out.reset_index(drop=True)
 
