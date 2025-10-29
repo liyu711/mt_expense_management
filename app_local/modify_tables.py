@@ -1,7 +1,7 @@
 
 from flask import Flask, render_template, Blueprint, request, redirect, url_for
 from backend.modify_table_local import add_entry
-from backend import upload_budgets_local
+from backend import upload_budgets_local, upload_budgets_local_m
 import pandas as pd
 import os
 from backend.connect_local import connect_local, select_all_from_table
@@ -389,7 +389,13 @@ def modify_table_router(action):
             # You can add your own database logic here
             df_upload = pd.DataFrame([row])
             df_upload.columns = ['PO', 'Department', 'fiscal_year', 'human_resource_expense', 'non_personnel_expense']
-            upload_budgets_local(df_upload)
+            # Use the de-duplicating uploader to avoid duplicates on (PO, Department, Fiscal Year)
+            # This function maps PO/Department to ids and appends only non-existing keys
+            try:
+                upload_budgets_local_m(df_upload)
+            except Exception:
+                # Fallback to original uploader if de-dup fails (should be rare)
+                upload_budgets_local(df_upload)
 
             # msg = f"Budget uploaded: {row}"
             # return msg
