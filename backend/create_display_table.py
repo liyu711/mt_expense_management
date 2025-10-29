@@ -759,6 +759,142 @@ def get_budget_display_table():
 
 	return agg_df.loc[:, out_cols].reset_index(drop=True)
 
+def create_funding_display():
+	"""Return a grouped DataFrame for fundings joined with PO and Department.
+
+	Behavior:
+	- Reads `fundings`, `pos`, and `departments` from the local database
+	- Joins fundings.po_id -> pos.id and fundings.department_id -> departments.id
+	- Groups by po_name, department_name, and fiscal year and computes total funding (sum of funding)
+	- Returns a DataFrame with columns: po_name, department_name, fiscal_year, funding
+	- Handles missing tables/columns gracefully
+	"""
+
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	fundings = select_all_from_table(cursor, cnxn, 'fundings')
+	pos = select_all_from_table(cursor, cnxn, 'pos')
+	departments = select_all_from_table(cursor, cnxn, 'departments')
+
+	# If fundings missing return empty DataFrame
+	if fundings is None or fundings.empty:
+		return pd.DataFrame(columns=['po_name', 'department_name', 'fiscal_year', 'funding'])
+
+	left = fundings.copy()
+
+	# detect fiscal year column
+	fiscal_col = next((c for c in ('fiscal_year', 'Fiscal Year', 'fy', 'year') if c in left.columns), None)
+	if fiscal_col is None:
+		left['fiscal_year'] = None
+		fiscal_col = 'fiscal_year'
+
+	# detect id columns
+	po_id_col = next((c for c in ('po_id', 'PO_id', 'po', 'PO') if c in left.columns), None)
+	dept_id_col = next((c for c in ('department_id', 'dept_id', 'department') if c in left.columns), None)
+
+	# detect funding amount column (common variants)
+	funding_col = next((c for c in ('funding', 'Funding', 'amount') if c in left.columns), None)
+	if funding_col is None:
+		# create a zero column if not present to allow grouping
+		left['funding'] = 0.0
+		funding_col = 'funding'
+	else:
+		try:
+			left[funding_col] = pd.to_numeric(left[funding_col], errors='coerce').fillna(0.0)
+		except Exception:
+			pass
+
+	merged = left.copy()
+
+	# Join POs -> provide po_name
+	if pos is not None and not pos.empty and po_id_col is not None:
+		try:
+			merged['_po_key'] = pd.to_numeric(merged[po_id_col], errors='coerce')
+			right_po = pos.copy()
+			right_po['_po_key'] = pd.to_numeric(right_po['id'], errors='coerce')
+			merged = pd.merge(merged, right_po, how='left', left_on='_po_key', right_on='_po_key', suffixes=('', '_po'))
+		except Exception:
+			try:
+				merged[po_id_col] = merged[po_id_col].astype(str)
+				right_po = pos.copy()
+				right_po['id'] = right_po['id'].astype(str)
+				merged = pd.merge(merged, right_po.rename(columns={'id': po_id_col}), how='left', left_on=po_id_col, right_on=po_id_col)
+			except Exception:
+				merged['po_name'] = None
+	else:
+		merged['po_name'] = None
+
+	# Join Departments -> provide department_name
+	if departments is not None and not departments.empty and dept_id_col is not None:
+		try:
+			merged['_dept_key'] = pd.to_numeric(merged[dept_id_col], errors='coerce')
+			right_dept = departments.copy()
+			right_dept['_dept_key'] = pd.to_numeric(right_dept['id'], errors='coerce')
+			merged = pd.merge(merged, right_dept, how='left', left_on='_dept_key', right_on='_dept_key', suffixes=('', '_dept'))
+		except Exception:
+			try:
+				merged[dept_id_col] = merged[dept_id_col].astype(str)
+				right_dept = departments.copy()
+				right_dept['id'] = right_dept['id'].astype(str)
+				merged = pd.merge(merged, right_dept.rename(columns={'id': dept_id_col}), how='left', left_on=dept_id_col, right_on=dept_id_col)
+			except Exception:
+				merged['department_name'] = None
+	else:
+		merged['department_name'] = None
+
+	# Determine po_name in merged
+	if 'name_po' in merged.columns:
+		merged['po_name'] = merged['name_po']
+	elif pos is not None and 'name' in pos.columns:
+		# If generic 'name' remains from pos join
+		if 'name' in merged.columns and merged.get('po_name') is None:
+			merged['po_name'] = merged['name']
+
+	# Determine department_name in merged
+	if 'name_dept' in merged.columns:
+		merged['department_name'] = merged['name_dept']
+	elif departments is not None and 'name' in departments.columns:
+		if 'name' in merged.columns and merged.get('department_name') is None:
+			merged['department_name'] = merged['name']
+
+	# Ensure fiscal_year column exists
+	if fiscal_col not in merged.columns:
+		merged[fiscal_col] = None
+
+	# Group and aggregate
+	group_cols = []
+	if 'po_name' in merged.columns:
+		group_cols.append('po_name')
+	else:
+		merged['po_name'] = None
+		group_cols.append('po_name')
+	if 'department_name' in merged.columns:
+		group_cols.append('department_name')
+	else:
+		merged['department_name'] = None
+		group_cols.append('department_name')
+	group_cols.append(fiscal_col)
+
+	try:
+		agg_df = merged.groupby(group_cols, dropna=False).agg({funding_col: 'sum'}).reset_index()
+	except Exception:
+		# Fallback with safe column name
+		merged['__funding__'] = pd.to_numeric(merged.get(funding_col, 0.0), errors='coerce').fillna(0.0)
+		agg_df = merged.groupby(group_cols, dropna=False).agg({'__funding__': 'sum'}).reset_index()
+		funding_col = '__funding__'
+
+	# Normalize output column names
+	agg_df = agg_df.rename(columns={funding_col: 'funding', fiscal_col: 'fiscal_year'})
+
+	# Ensure exact output order
+	out_cols = ['po_name', 'department_name', 'fiscal_year', 'funding']
+	for c in out_cols:
+		if c not in agg_df.columns:
+			agg_df[c] = None if c != 'funding' else 0.0
+
+	return agg_df.loc[:, out_cols].reset_index(drop=True)
+
 def get_project_cateogory_display():
 	"""Return a DataFrame of projects with their project category.
 

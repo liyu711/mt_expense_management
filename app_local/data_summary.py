@@ -3,7 +3,7 @@ from backend.connect_local import connect_local, select_all_from_table
 from backend.display_names import DISPLAY_NAMES
 from backend import \
     get_departments_display, get_forecasts_display, get_pc_display, get_projects_display,\
-    get_nonpc_display, get_budget_display_table
+    get_nonpc_display, get_budget_display_table, create_funding_display
 import pandas as pd
 
 data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates')
@@ -214,7 +214,7 @@ def get_statistics():
         # budgetsxw
         budgets = get_budget_display_table()
         # fundings
-        fundings = select_all_from_table(cursor, cnxn, 'fundings')
+        fundings = create_funding_display()
         # expenses
         expenses = select_all_from_table(cursor, cnxn, 'expenses')
 
