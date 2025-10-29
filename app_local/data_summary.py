@@ -292,7 +292,10 @@ def get_statistics():
         personnel_forecast = sum_column(pc_f, ['Personnel Cost'])
         total_forecast = non_personnel_forecast + personnel_forecast
 
-        budget_sum = sum_column(budgets_f, ['personnel_budget', 'non_personnel_budget'])
+        # Sum both personnel and non-personnel budgets (after filters)
+        personnel_budget_sum = sum_column(budgets_f, ['personnel_budget'])
+        non_personnel_budget_sum = sum_column(budgets_f, ['non_personnel_budget'])
+        budget_sum = personnel_budget_sum + non_personnel_budget_sum
         funding_sum = sum_column(fundings_f, ['funding', 'Funding'])
         total_budget = budget_sum + funding_sum
 
@@ -302,9 +305,11 @@ def get_statistics():
             'non_personnel_forecast': round(non_personnel_forecast, 2),
             'personnel_forecast': round(personnel_forecast, 2),
             'total_forecast': round(total_forecast, 2),
+            'personnel budget': round(personnel_budget_sum, 2),
+            'non personnel budget': round(non_personnel_budget_sum, 2),
             'budget': round(budget_sum, 2),
             'funding': round(funding_sum, 2),
-            'total_budget': round(total_budget, 2),
+            'total_budget and funding': round(total_budget, 2),
             'actual_expense': round(actual_expense, 2)
         }
         print(result)

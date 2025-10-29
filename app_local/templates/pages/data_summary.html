@@ -96,6 +96,9 @@
                             document.getElementById('stat_non_personnel').textContent = data.non_personnel_forecast != null ? data.non_personnel_forecast : '-';
                             document.getElementById('stat_personnel').textContent = data.personnel_forecast != null ? data.personnel_forecast : '-';
                             document.getElementById('stat_total_forecast').textContent = data.total_forecast != null ? data.total_forecast : '-';
+                            // populate budget breakdown values (backend returns keys with spaces)
+                            document.getElementById('stat_personnel_budget').textContent = data['personnel budget'] != null ? data['personnel budget'] : '-';
+                            document.getElementById('stat_non_personnel_budget').textContent = data['non personnel budget'] != null ? data['non personnel budget'] : '-';
                             document.getElementById('stat_budget').textContent = data.budget != null ? data.budget : '-';
                             document.getElementById('stat_funding').textContent = data.funding != null ? data.funding : '-';
                             document.getElementById('stat_total_budget').textContent = data.total_budget != null ? data.total_budget : '-';
@@ -211,6 +214,14 @@
             <div>
                 <label>Personnel forecast: </label>
                 <span id="stat_personnel">-</span>
+            </div>
+            <div>
+                <label>Personnel budget: </label>
+                <span id="stat_personnel_budget">-</span>
+            </div>
+            <div>
+                <label>Non personnel budget: </label>
+                <span id="stat_non_personnel_budget">-</span>
             </div>
             <div>
                 <label>Total forecast: </label>
