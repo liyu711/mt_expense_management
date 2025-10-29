@@ -30,13 +30,23 @@
     </div>
 
     <div class="nav-group">
+        <div class="nav-link nav-group-title collapsible" id="create-funding-toggle">
+            Create Funding
+            <span class="collapse-arrow" id="create-funding-arrow">&#9654;</span>
+        </div>
+        <div class="nav-sublinks collapsible-content" id="create-funding-content" style="display:none;">
+            <a href="/modify_funding" class="nav-link nav-sublink{% if request.path == '/modify_funding' %} active{% endif %}" id="nav-create-funding">Create funding</a>
+        </div>
+    </div>
+
+    <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="create-budgets-toggle">
             Create Budgets
             <span class="collapse-arrow" id="create-budgets-arrow">&#9654;</span>
         </div>
         <div class="nav-sublinks collapsible-content" id="create-budgets-content" style="display:none;">
             <a href="/upload_budget" class="nav-link nav-sublink{% if request.path == '/upload_budget' %} active{% endif %}" id="nav-upload-budget">Create budget</a>
-            <a href="/modify_funding" class="nav-link nav-sublink{% if request.path == '/moidfy_funding' %} active{% endif %}">Create funding</a>
+            <!-- <a href="/modify_funding" class="nav-link nav-sublink{% if request.path == '/moidfy_funding' %} active{% endif %}">Create funding</a> -->
             <a href="/capex_budget" class="nav-link nav-sublink{% if request.path == '/capex_budget' %} active{% endif %}">Capex budget</a>
         </div>
     </div>
@@ -116,6 +126,32 @@ document.addEventListener('DOMContentLoaded', function() {
             if (e.target === createToggle || e.target === createArrow) {
                 var isExpanded = createContent.style.display === 'block';
                 setCreateState(!isExpanded);
+            }
+        });
+    }
+
+    // Create Funding collapsible
+    var createFundingToggle = document.getElementById('create-funding-toggle');
+    var createFundingContent = document.getElementById('create-funding-content');
+    var createFundingArrow = document.getElementById('create-funding-arrow');
+    var createFundingExpanded = localStorage.getItem('createFundingExpanded') === 'true';
+    function setCreateFundingState(expanded) {
+        if (expanded) {
+            createFundingContent.style.display = 'block';
+            createFundingArrow.style.transform = 'rotate(90deg)';
+        } else {
+            createFundingContent.style.display = 'none';
+            createFundingArrow.style.transform = 'rotate(0deg)';
+        }
+        localStorage.setItem('createFundingExpanded', expanded);
+    }
+    if (createFundingToggle && createFundingContent && createFundingArrow) {
+        setCreateFundingState(createFundingExpanded);
+        createFundingArrow.style.transition = 'transform 0.2s';
+        createFundingToggle.addEventListener('click', function(e) {
+            if (e.target === createFundingToggle || e.target === createFundingArrow) {
+                var isExpanded = createFundingContent.style.display === 'block';
+                setCreateFundingState(!isExpanded);
             }
         });
     }
