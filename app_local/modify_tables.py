@@ -991,6 +991,77 @@ def change_capex_forecast():
     return redirect(url_for('modify_tables.modify_table_router', action='capex_forecast'))
 
 
+@modify_tables.route('/upload_budget/change_budget', methods=['POST'])
+def change_budget():
+    """Handle modify action to change an existing budget entry.
+
+    Expects form fields: po, department, fiscal_year, human_resource_expense, non_personnel_expense
+    Updates budgets row identified by (po_id, department_id, fiscal_year).
+    """
+    form = dict(request.form)
+    po = form.get('po')
+    department = form.get('department')
+    fiscal_year = form.get('fiscal_year')
+    hr_exp = form.get('human_resource_expense')
+    nonpc_exp = form.get('non_personnel_expense')
+
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Map names to IDs
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+
+        po_id = po_map.get(po)
+        department_id = dept_map.get(department)
+
+        # Coerce numeric types
+        fy_val = None
+        try:
+            fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
+        except Exception:
+            fy_val = fiscal_year
+
+        hr_val = None
+        try:
+            hr_val = float(hr_exp) if hr_exp not in (None, '') else None
+        except Exception:
+            hr_val = None
+
+        nonpc_val = None
+        try:
+            nonpc_val = float(nonpc_exp) if nonpc_exp not in (None, '') else None
+        except Exception:
+            nonpc_val = None
+
+        if po_id is None or department_id is None or fy_val is None or hr_val is None or nonpc_val is None:
+            # Missing required identifiers or values; redirect back without change
+            return redirect(url_for('modify_tables.modify_table_router', action='upload_budget'))
+
+        # Perform update
+        cursor.execute(
+            """
+            UPDATE budgets
+               SET human_resource_expense = ?,
+                   non_personnel_expense = ?
+             WHERE po_id = ?
+               AND department_id = ?
+               AND fiscal_year = ?
+            """,
+            (hr_val, nonpc_val, int(po_id), int(department_id), fy_val),
+        )
+        cnxn.commit()
+    except Exception:
+        # ignore errors and redirect back
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='upload_budget'))
+
+
 @modify_tables.route('/modify_project/details', methods=['GET'])
 def get_project_details():
     """Return JSON details for a given project by name or id.
