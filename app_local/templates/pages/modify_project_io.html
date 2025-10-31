@@ -28,10 +28,8 @@
             <div class="container">
                 <h1>Modify Project & IO</h1>
                 <div class="button-row">
-                    <button id="add_project_button" type="button">add_project</button>
+                    <button id="add_project_button" type="button">add</button>
                     <button id="modify_project_button" type="button">modify_project</button>
-                    <button id="add_io_button" type="button">add_io</button>
-                    <button id="modify_io_button" type="button">modify_io</button>
                 </div>
             </div>
         </div>
@@ -72,6 +70,17 @@
                             {% endif %}
                         </div>
                     {% endfor %}
+                    <!-- IO numbers for merged add flow (supports multiple) -->
+                    <div class="form-group" id="proj_io_group">
+                        <label>IO Number(s)</label>
+                        <div id="ioInputs" style="display:flex;flex-direction:column;gap:8px;">
+                            <div class="io-row" style="display:flex;gap:8px;align-items:center;">
+                                <input type="number" name="IO" class="proj_io_input" placeholder="Optional: IO number for this project">
+                                <button type="button" class="io-add">+</button>
+                                <button type="button" class="io-del">-</button>
+                            </div>
+                        </div>
+                    </div>
                     <div style="margin-top:12px;">
                         <button type="submit">Submit</button>
                         <button type="button" id="projectCancel">Cancel</button>
@@ -80,97 +89,55 @@
             </div>
         </div>
 
-        <!-- IO Add Modal -->
-        <div id="ioModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="ioModalTitle">
-            <div class="modal-overlay" id="ioOverlay"></div>
-            <div class="modal-content" role="document">
-                <button class="modal-close" id="ioClose" aria-label="Close">&times;</button>
-                <h2 id="ioModalTitle">IO</h2>
-                <form method="POST" name="Modify_ios" id="ioForm">
-                    <input type="hidden" name="form_kind" value="io">
-                    <input type="hidden" name="table_name" value="ios">
-                    <input type="hidden" name="io_edit_mode" id="io_edit_mode" value="0">
-                    <input type="hidden" name="io_id" id="io_id" value="">
-                    <!-- Existing IO selector (shown only in edit mode) -->
-                    <div class="form-group" id="io_existing_container" style="display:none;">
-                        <label for="io_existing_select">Existing IO</label>
-                        <select id="io_existing_select" name="existing_io">
-                            <option value="" disabled selected>Select an IO</option>
-                            {% for io in io_entries %}
-                                <option value="{{ io.id }}" data-io="{{ io.io }}" data-project="{{ io.project_name }}">{{ io.io }}{% if io.project_name %} - {{ io.project_name }}{% endif %}</option>
-                            {% endfor %}
-                        </select>
-                    </div>
-                    {% for field in io_fields %}
-                        <div class="form-group">
-                            <label for="io_{{ field.name }}">{{ field.label }}</label>
-                            {% if field.type == 'select' %}
-                                <select name="{{ field.name }}" id="io_{{ field.name }}" required>
-                                    <option value="" disabled selected>Select an option</option>
-                                    {% for option in field.options %}
-                                        <option value="{{ option }}">{{ option }}</option>
-                                    {% endfor %}
-                                </select>
-                            {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
-                                <input type="{{ field.type }}" name="{{ field.name }}" id="io_{{ field.name }}"{% if not (field.name|lower in ['io','io_num','io number','io_number']) %} required{% endif %}>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                    <div style="margin-top:12px;">
-                        <button type="submit">Submit</button>
-                        <button type="button" id="ioCancel">Cancel</button>
-                    </div>
-                </form>
+    
+        
+            <!-- Interactive generic tables (Projects & IOs) -->
+            <div class="tables-row">
+                <div class="table-half">
+                    <h3>Projects</h3>
+                    <div id="gt-projects" style="height:300px;"></div>
+                </div>
+                <div class="table-half">
+                    <h3>IOs</h3>
+                    <div id="gt-ios" style="height:300px;"></div>
+                </div>
             </div>
-        </div>
+    </div>
 
-        <div class="tables-row">
-            <div class="table-half">
-                <h3>Projects</h3>
-                {% if columns_project and data_project %}
-                <table id="projects_table" class="display" style="width:100%" border="1">
-                    <thead>
-                        <tr>
-                            {% for col in columns_project %}
-                            <th>{{ col }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in data_project %}
-                        <tr>
-                            {% for item in row %}
-                            <td>{{ item }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% endif %}
-            </div>
-            <div class="table-half">
-                <h3>IOs</h3>
-                {% if columns_io and data_io %}
-                <table id="ios_table" class="display" style="width:100%" border="1">
-                    <thead>
-                        <tr>
-                            {% for col in columns_io %}
-                            <th>{{ col }}</th>
-                            {% endfor %}
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for row in data_io %}
-                        <tr>
-                            {% for item in row %}
-                            <td>{{ item }}</td>
-                            {% endfor %}
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-                {% endif %}
-            </div>
+        <!-- Generic table module -->
+        <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
+
+    <!-- IO Modify Modal (reintroduced for IO row click edits) -->
+    <div id="ioModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="ioModalTitle">
+        <div class="modal-overlay" id="ioOverlay"></div>
+        <div class="modal-content" role="document">
+            <button class="modal-close" id="ioClose" aria-label="Close">&times;</button>
+            <h2 id="ioModalTitle">Modify IO</h2>
+            <form method="POST" name="Modify_ios" id="ioForm" action="/modify_io/change_io">
+                <input type="hidden" name="form_kind" value="io">
+                <input type="hidden" name="table_name" value="ios">
+                <input type="hidden" name="io_edit_mode" id="io_edit_mode" value="1">
+                <input type="hidden" name="io_id" id="io_id" value="">
+                {% for field in io_fields %}
+                    <div class="form-group">
+                        <label for="io_{{ field.name }}">{{ field.label }}</label>
+                        {% if field.type == 'select' %}
+                            <select name="{{ field.name }}" id="io_{{ field.name }}" required>
+                                <option value="" disabled selected>Select an option</option>
+                                {% for option in field.options %}
+                                    <option value="{{ option }}">{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
+                            <input type="{{ field.type }}" name="{{ field.name }}" id="io_{{ field.name }}"{% if not (field.name|lower in ['io','io_num','io number','io_number']) %} required{% endif %}>
+                        {% endif %}
+                    </div>
+                {% endfor %}
+                <div style="margin-top:12px;">
+                    <button type="submit">Submit</button>
+                    <button type="button" id="ioCancel">Cancel</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -187,6 +154,10 @@
             var projClose = document.getElementById('projectClose');
             var projOverlay = document.getElementById('projectOverlay');
             var projCancel = document.getElementById('projectCancel');
+            function setIoFieldVisible(visible){
+                var grp = document.getElementById('proj_io_group');
+                if(grp) grp.style.display = visible ? '' : 'none';
+            }
             // Add mode
             addProjBtn && addProjBtn.addEventListener('click', function(){
                 // Reset edit mode
@@ -199,6 +170,10 @@
                 form.removeAttribute('action');
                 // clear fields
                 try { form.reset(); } catch(e){}
+                // Show IO field in add mode
+                setIoFieldVisible(true);
+                // Reset IO inputs to a single empty row
+                try { if (window.IOInputs && typeof window.IOInputs.reset === 'function') window.IOInputs.reset(); } catch(e){}
                 open(projModal);
             });
             // Edit mode
@@ -209,37 +184,96 @@
                 if (existC) existC.style.display = '';
                 // set form action to change endpoint
                 form.action = '/modify_project/change_project';
+                // Show IO field in edit mode (IO can be added/removed)
+                setIoFieldVisible(true);
                 open(projModal);
             });
             [projClose, projOverlay, projCancel].forEach(function(el){ el && el.addEventListener('click', function(){ close(projModal); }); });
 
-            var ioModal = document.getElementById('ioModal');
-            var addIoBtn = document.getElementById('add_io_button');
-            var modIoBtn = document.getElementById('modify_io_button');
-            var ioClose = document.getElementById('ioClose');
-            var ioOverlay = document.getElementById('ioOverlay');
-            var ioCancel = document.getElementById('ioCancel');
-            // Add IO
-            addIoBtn && addIoBtn.addEventListener('click', function(){
-                var form = document.getElementById('ioForm');
-                document.getElementById('io_edit_mode').value = '0';
-                document.getElementById('io_id').value = '';
-                var existC = document.getElementById('io_existing_container');
-                if (existC) existC.style.display = 'none';
-                form.removeAttribute('action');
-                try { form.reset(); } catch(e){}
-                open(ioModal);
-            });
-            // Modify IO
-            modIoBtn && modIoBtn.addEventListener('click', function(){
-                var form = document.getElementById('ioForm');
-                document.getElementById('io_edit_mode').value = '1';
-                var existC = document.getElementById('io_existing_container');
-                if (existC) existC.style.display = '';
-                form.action = '/modify_io/change_io';
-                open(ioModal);
-            });
-            [ioClose, ioOverlay, ioCancel].forEach(function(el){ el && el.addEventListener('click', function(){ close(ioModal); }); });
+            // IO modification is integrated into the Project modal
+        })();
+    </script>
+
+    <script>
+        // Mount generic tables and wire row-click to open the existing edit modals
+        (function(){
+            function fetchJSON(url){
+                return fetch(url).then(function(r){ return r.ok ? r.json() : {columns:[], rows:[]}; }).catch(function(){ return {columns:[], rows:[]}; });
+            }
+            function mountTable(elId, title, listUrl, onRowClick){
+                var el = document.getElementById(elId);
+                if(!el) return;
+                fetchJSON(listUrl).then(function(data){
+                    if(!window.GenericTable || !GenericTable.create) return;
+                    GenericTable.create(el, {
+                        title: title,
+                        columns: data.columns || [],
+                        rows: data.rows || [],
+                        onRowClick: onRowClick
+                    });
+                });
+            }
+
+            function openProjectEdit(row){
+                try{
+                    // Switch to edit mode (triggers showing existing project selector)
+                    var modBtn = document.getElementById('modify_project_button');
+                    if(modBtn) modBtn.click();
+                    // Set existing project and trigger details fetch (handled by existing change listener)
+                    var existSel = document.getElementById('proj_existing_project');
+                    if(existSel && row && row.Project){
+                        existSel.value = row.Project;
+                        existSel.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                }catch(e){}
+            }
+
+            function openIoEdit(row){
+                try{
+                    var modal = document.getElementById('ioModal');
+                    var overlay = document.getElementById('ioOverlay');
+                    var closeBtn = document.getElementById('ioClose');
+                    var cancelBtn = document.getElementById('ioCancel');
+                    function open(){
+                        modal.style.display='block';
+                        modal.setAttribute('aria-hidden','false');
+                        document.body.style.overflow='hidden';
+                        var first = modal.querySelector('input,select,button'); if(first) first.focus();
+                    }
+                    function close(){
+                        modal.style.display='none';
+                        modal.setAttribute('aria-hidden','true');
+                        document.body.style.overflow='';
+                    }
+                    [overlay, closeBtn, cancelBtn].forEach(function(el){ if(el) el.onclick = close; });
+
+                    // Prefill fields using the IO value from the row
+                    var ioInput = document.getElementById('io_IO');
+                    var projSel = document.getElementById('io_project_name');
+                    var hid = document.getElementById('io_id');
+                    var editMode = document.getElementById('io_edit_mode');
+                    if (editMode) editMode.value = '1';
+                    if (ioInput && row && row.IO != null) ioInput.value = String(row.IO);
+                    // Fetch additional details by IO number to set hidden id and project
+                    if (row && row.IO != null){
+                        fetch('/modify_io/details?io=' + encodeURIComponent(row.IO))
+                            .then(function(res){ return res.ok ? res.json() : null; })
+                            .then(function(info){
+                                if(!info) return;
+                                try{
+                                    if (hid && info.id != null) hid.value = String(info.id);
+                                    if (projSel && info.project_name != null) projSel.value = String(info.project_name);
+                                }catch(e){}
+                            })
+                            .catch(function(){});
+                    }
+                    open();
+                }catch(e){}
+            }
+
+            // Mount both tables
+            mountTable('gt-projects', 'Projects', "{{ url_for('modify_tables.list_projects') }}", openProjectEdit);
+            mountTable('gt-ios', 'IOs', "{{ url_for('modify_tables.list_ios') }}", openIoEdit);
         })();
     </script>
 
@@ -269,7 +303,7 @@
                     if (!val) { rebuildDeptOptions([]); return; }
                     fetch('/modify_project/departments?po=' + encodeURIComponent(val))
                         .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
-                        .then(function(json){ rebuildDeptOptions(json && json.departments ? json.departments : []); })
+                                            .then(function(json){ rebuildDeptOptions(json && json.departments ? json.departments : []); })
                         .catch(function(){ rebuildDeptOptions([]); });
                 }
                 poSel.addEventListener('change', fetchDepartments);
@@ -310,6 +344,31 @@
                                     }
                                     var fySel = document.getElementById('proj_fiscal_year');
                                     if (fySel && info.fiscal_year != null) fySel.value = String(info.fiscal_year);
+                                    // Prefill IO inputs with existing IOs for this project
+                                    try {
+                                        var pid = (hid && hid.value) ? hid.value : null;
+                                        if (pid) {
+                                            fetch('/modify_project/project_ios?project_id=' + encodeURIComponent(pid))
+                                                .then(function(r){ return r.ok ? r.json() : { ios: [] }; })
+                                                .then(function(json){
+                                                    var ios = (json && Array.isArray(json.ios)) ? json.ios : [];
+                                                    if (window.IOInputs && typeof window.IOInputs.reset === 'function') {
+                                                        window.IOInputs.reset();
+                                                        var container = document.getElementById('ioInputs');
+                                                        if (container) {
+                                                            var firstInput = container.querySelector('input.proj_io_input');
+                                                            if (ios.length > 0) {
+                                                                if (firstInput) firstInput.value = ios[0];
+                                                                for (var i = 1; i < ios.length; i++) {
+                                                                    if (window.IOInputs.addRow) window.IOInputs.addRow(String(ios[i]));
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                })
+                                                .catch(function(){});
+                                        }
+                                    } catch(e){}
                                 } catch(e) {}
                             })
                             .catch(function(){});
@@ -317,6 +376,65 @@
                 }
             }
             if (document.readyState === 'complete' || document.readyState === 'interactive') attachHandlers(); else document.addEventListener('DOMContentLoaded', attachHandlers);
+        })();
+    </script>
+
+    <script>
+        // Dynamic add/remove IO input rows for the Project modal (supports multiple IOs)
+        (function(){
+            function getContainer(){ return document.getElementById('ioInputs'); }
+            function addRow(prefill){
+                var container = getContainer();
+                if(!container) return;
+                var row = document.createElement('div');
+                row.className = 'io-row';
+                row.style.display = 'flex';
+                row.style.gap = '8px';
+                row.style.alignItems = 'center';
+                var input = document.createElement('input');
+                input.type = 'number';
+                input.name = 'IO';
+                input.className = 'proj_io_input';
+                input.placeholder = 'Optional: IO number for this project';
+                if(prefill != null) input.value = prefill;
+                var addBtn = document.createElement('button');
+                addBtn.type = 'button';
+                addBtn.className = 'io-add';
+                addBtn.textContent = '+';
+                var delBtn = document.createElement('button');
+                delBtn.type = 'button';
+                delBtn.className = 'io-del';
+                delBtn.textContent = '-';
+                row.appendChild(input);
+                row.appendChild(addBtn);
+                row.appendChild(delBtn);
+                container.appendChild(row);
+            }
+            function reset(){
+                var container = getContainer();
+                if(!container) return;
+                container.innerHTML = '';
+                addRow();
+            }
+            function onClick(e){
+                var t = e.target;
+                if(t.classList && t.classList.contains('io-add')){
+                    e.preventDefault();
+                    addRow();
+                }
+                if(t.classList && t.classList.contains('io-del')){
+                    e.preventDefault();
+                    var row = t.closest('.io-row');
+                    if(row && row.parentNode){ row.parentNode.removeChild(row); }
+                }
+            }
+            document.addEventListener('DOMContentLoaded', function(){
+                var container = getContainer();
+                if(!container) return;
+                container.addEventListener('click', onClick);
+            });
+            // Expose minimal API for other scripts
+            window.IOInputs = { addRow: addRow, reset: reset };
         })();
     </script>
 

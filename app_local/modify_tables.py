@@ -325,54 +325,49 @@ def modify_table_router(action):
         # If we're on the modify_project route but the form_kind indicates IO,
         # handle this POST as an IO submission.
         if action == 'modify_project' and form_kind == 'io':
-            # Build df_upload using IO config fields
+            # Build df_upload using IO config fields and insert only if IO number not used globally
             try:
                 io_fields_cfg = modify_table_config.get('modify_io', {}).get('fields', [])
                 io_field_names = [f['name'] for f in io_fields_cfg]
                 io_row = {k: v for k, v in form_data.items() if k in io_field_names}
                 df_upload = pd.DataFrame([io_row])
 
-                # Accept empty IO input; default to -1 when missing/empty
+                # Normalize IO number
+                io_val = None
                 try:
                     if 'IO' in df_upload.columns:
-                        df_upload['IO'] = pd.to_numeric(df_upload['IO'], errors='coerce').fillna(-1).astype(int)
+                        io_val = int(float(df_upload.iloc[0]['IO']))
                 except Exception:
-                    try:
-                        df_upload['IO'] = -1
-                    except Exception:
-                        pass
+                    io_val = None
 
-                # Prevent duplicate IOs for the same project_id
-                skip_io_insert = False
+                # Map project_name to project_id
+                pid_val = None
                 try:
                     db = connect_local()
                     cursor, cnxn = db.connect_to_db()
                     proj_df = select_all_from_table(cursor, cnxn, 'projects')
-                    ios_df = select_all_from_table(cursor, cnxn, 'ios')
-                    proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
-                    proj_name_val = None
-                    if 'project_name' in df_upload.columns and not df_upload.empty:
-                        try:
-                            proj_name_val = df_upload.iloc[0]['project_name']
-                        except Exception:
-                            proj_name_val = None
-                    project_id_val = proj_map.get(proj_name_val)
-                    if project_id_val is not None and 'project_id' in ios_df.columns:
-                        try:
-                            existing_ids = set(ios_df['project_id'].dropna().astype(int).tolist())
-                        except Exception:
-                            existing_ids = set(ios_df['project_id'].dropna().tolist())
-                        if int(project_id_val) in existing_ids:
-                            skip_io_insert = True
+                    if proj_df is not None and not proj_df.empty and 'name' in proj_df.columns and 'id' in proj_df.columns:
+                        pmap = dict(zip(proj_df['name'], proj_df['id']))
+                        pname = df_upload.iloc[0].get('project_name') if not df_upload.empty else None
+                        if pname in pmap:
+                            pid_val = int(pmap[pname])
                 except Exception:
-                    skip_io_insert = False
+                    pid_val = None
 
-                # Insert IO only if not duplicate
+                # Insert a new IO row only if IO_num not already used globally
                 try:
-                    if not skip_io_insert:
-                        merge_columns = modify_table_config.get('modify_io', {}).get('columns', list(io_row.keys()))
-                        merge_on = modify_table_config.get('modify_io', {}).get('merge_on', list(io_row.keys())[0] if io_row else None)
-                        res = add_entry(df_upload, 'ios', merge_columns, merge_on)
+                    if io_val is not None and pid_val is not None:
+                        db = connect_local()
+                        cursor, cnxn = db.connect_to_db()
+                        # check global uniqueness on IO_num
+                        try:
+                            cursor.execute("SELECT 1 FROM ios WHERE IO_num = ? LIMIT 1", (int(io_val),))
+                            exists = cursor.fetchone() is not None
+                        except Exception:
+                            exists = False
+                        if not exists:
+                            cursor.execute("INSERT INTO ios (IO_num, project_id) VALUES (?, ?)", (int(io_val), int(pid_val)))
+                            cnxn.commit()
                 except Exception:
                     pass
             except Exception:
@@ -426,42 +421,40 @@ def modify_table_router(action):
                     df_upload = df_upload[keep_cols]
             # Special handling for modify_funding: map PO and Department names to their local ids
             if action == 'modify_io':
-                # Accept empty IO input; default to -1 when missing/empty
-                try:
-                    if 'IO' in df_upload.columns:
-                        df_upload['IO'] = pd.to_numeric(df_upload['IO'], errors='coerce').fillna(-1).astype(int)
-                except Exception:
-                    # last-resort fallback
-                    try:
-                        df_upload['IO'] = -1
-                    except Exception:
-                        pass
-
-                # Prevent duplicate IOs for the same project_id: if an IO already exists for this project, skip insert
-                skip_io_insert = False
+                # Insert only if IO number is unique globally; allow multiple IO rows per project
                 try:
                     db = connect_local()
                     cursor, cnxn = db.connect_to_db()
-                    proj_df = select_all_from_table(cursor, cnxn, 'projects')
-                    ios_df = select_all_from_table(cursor, cnxn, 'ios')
-                    proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
-                    proj_name_val = None
-                    if 'project_name' in df_upload.columns and not df_upload.empty:
-                        try:
-                            proj_name_val = df_upload.iloc[0]['project_name']
-                        except Exception:
-                            proj_name_val = None
-                    project_id_val = proj_map.get(proj_name_val)
-                    if project_id_val is not None and 'project_id' in ios_df.columns:
-                        try:
-                            existing_ids = set(ios_df['project_id'].dropna().astype(int).tolist())
-                        except Exception:
-                            existing_ids = set(ios_df['project_id'].dropna().tolist())
-                        if int(project_id_val) in existing_ids:
-                            skip_io_insert = True
+                    # Normalize IO number
+                    io_val = None
+                    try:
+                        if 'IO' in df_upload.columns:
+                            io_val = int(float(df_upload.iloc[0]['IO']))
+                    except Exception:
+                        io_val = None
+                    # Map project name to id
+                    pid_val = None
+                    try:
+                        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+                        if proj_df is not None and not proj_df.empty and 'name' in proj_df.columns and 'id' in proj_df.columns:
+                            pmap = dict(zip(proj_df['name'], proj_df['id']))
+                            pname = df_upload.iloc[0].get('project_name') if not df_upload.empty else None
+                            if pname in pmap:
+                                pid_val = int(pmap[pname])
+                    except Exception:
+                        pid_val = None
+                    # Insert only if unique IO_num
+                    try:
+                        if io_val is not None and pid_val is not None:
+                            cursor.execute("SELECT 1 FROM ios WHERE IO_num = ? LIMIT 1", (int(io_val),))
+                            exists = cursor.fetchone() is not None
+                            if not exists:
+                                cursor.execute("INSERT INTO ios (IO_num, project_id) VALUES (?, ?)", (int(io_val), int(pid_val)))
+                                cnxn.commit()
+                    except Exception:
+                        pass
                 except Exception:
-                    # If duplicate check fails, don't block; proceed to attempt insert
-                    skip_io_insert = False
+                    pass
 
             if action == 'modify_funding':
                 try:
@@ -625,6 +618,78 @@ def modify_table_router(action):
                     conn = connect_local()
                     engine, _cursor, _cnxn = conn.connect_to_db(engine=True)
                     to_insert.to_sql(table_name, con=engine, if_exists='append', index=False)
+
+                # Also handle optional IO creation in the same submit (merged add flow)
+                # New behavior: Insert only if IO_num doesn't already exist globally; allow multiple IOs per project
+                try:
+                    # Gather all IO values from potentially multiple inputs named 'IO'
+                    raw_list = []
+                    try:
+                        raw_list = request.form.getlist('IO')
+                    except Exception:
+                        # Fallback to single value if getlist isn't available
+                        val = form_data.get('IO') or form_data.get('io')
+                        raw_list = [val] if val not in (None, '') else []
+
+                    # Resolve project id by (name, department_id)
+                    proj_name = row.get('name')
+                    dept_id_val = None
+                    try:
+                        if 'department_id' in df_upload.columns and not df_upload.empty:
+                            dept_id_val = int(df_upload.iloc[0]['department_id']) if pd.notna(df_upload.iloc[0]['department_id']) else None
+                    except Exception:
+                        dept_id_val = None
+
+                    pid_val = None
+                    try:
+                        proj_tbl = select_all_from_table(cursor, cnxn, 'projects')
+                        if proj_tbl is not None and not proj_tbl.empty:
+                            cand = proj_tbl[proj_tbl.get('name', proj_tbl.columns[0]).astype(str).str.strip() == str(proj_name).strip()]
+                            if dept_id_val is not None and 'department_id' in proj_tbl.columns:
+                                try:
+                                    cand = cand[cand['department_id'].astype(int) == int(dept_id_val)]
+                                except Exception:
+                                    cand = cand[cand['department_id'] == dept_id_val]
+                            if not cand.empty and 'id' in cand.columns:
+                                pid_val = int(cand.iloc[0]['id'])
+                    except Exception:
+                        pid_val = None
+
+                    if pid_val is not None and raw_list:
+                        # Normalize and de-duplicate IO values
+                        io_vals = []
+                        for io_raw in raw_list:
+                            if io_raw in (None, ''):
+                                continue
+                            try:
+                                f = float(io_raw)
+                                io_vals.append(int(f))
+                            except Exception:
+                                # skip values that cannot be coerced
+                                continue
+                        seen = set()
+                        io_unique = []
+                        for v in io_vals:
+                            if v not in seen:
+                                seen.add(v)
+                                io_unique.append(v)
+
+                        for io_val in io_unique:
+                            try:
+                                cursor.execute("SELECT 1 FROM ios WHERE IO_num = ? LIMIT 1", (int(io_val),))
+                                exists = cursor.fetchone() is not None
+                            except Exception:
+                                exists = False
+                            if not exists:
+                                try:
+                                    cursor.execute("INSERT INTO ios (IO_num, project_id) VALUES (?, ?)", (int(io_val), int(pid_val)))
+                                    cnxn.commit()
+                                except Exception:
+                                    # best-effort; do not break project add
+                                    pass
+                except Exception:
+                    # swallow IO upsert errors to not break project add
+                    pass
             elif action == 'capex_forecast':
                 # Custom handling for capex_forecast: map names to IDs, check duplicates, and upsert accordingly
                 try:
@@ -723,13 +788,8 @@ def modify_table_router(action):
                     # On error, fall back to no-op to avoid breaking the request
                     pass
             elif action == 'modify_io':
-                # Only insert when no existing IO for the same project_id
-                try:
-                    if not locals().get('skip_io_insert', False):
-                        res = add_entry(df_upload, table_name, merge_columns, merge_on)
-                except Exception:
-                    # fall back silently
-                    pass
+                # handled above (manual insert with global uniqueness check)
+                pass
             else:
                 res = add_entry(df_upload, table_name, merge_columns, merge_on)
             
@@ -1062,6 +1122,45 @@ def change_budget():
     return redirect(url_for('modify_tables.modify_table_router', action='upload_budget'))
 
 
+@modify_tables.route('/modify_po/change_po', methods=['POST'])
+def change_po():
+    """Update an existing PO row name.
+
+    Expects form fields:
+    - existing_name: current PO name to match
+    - PO (or name): new PO name value
+    - po_id (optional): if provided, update by id for precise changes
+    """
+    form = dict(request.form)
+    existing_name = form.get('existing_name') or form.get('existing_PO') or form.get('existing')
+    new_name = form.get('PO') or form.get('name')
+    po_id = form.get('po_id') or form.get('id')
+
+    try:
+        if not new_name:
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_po'))
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Prefer id-based update when available
+        if po_id not in (None, ''):
+            try:
+                pid = int(po_id)
+                cursor.execute("UPDATE pos SET name = ? WHERE id = ?", (str(new_name), int(pid)))
+            except Exception:
+                # fallback to name-based update below
+                cursor.execute("UPDATE pos SET name = ? WHERE name = ?", (str(new_name), str(existing_name or '')))
+        else:
+            # Name-based update (may affect multiple rows if duplicates exist)
+            cursor.execute("UPDATE pos SET name = ? WHERE name = ?", (str(new_name), str(existing_name or '')))
+        cnxn.commit()
+    except Exception:
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='modify_po'))
+
+
 @modify_tables.route('/modify_project/details', methods=['GET'])
 def get_project_details():
     """Return JSON details for a given project by name or id.
@@ -1216,6 +1315,67 @@ def change_project():
             params.append(pid_val)
             cursor.execute(q, tuple(params))
             cnxn.commit()
+
+        # Handle IO updates as part of merged modify form
+        try:
+            # Submitted IO values (may be multiple inputs named 'IO')
+            try:
+                submitted_raw = request.form.getlist('IO')
+            except Exception:
+                val = form.get('IO') or form.get('io')
+                submitted_raw = [val] if val not in (None, '') else []
+            # Normalize to integers; de-duplicate
+            submitted = []
+            for v in submitted_raw:
+                if v in (None, ''):
+                    continue
+                try:
+                    iv = int(float(v))
+                except Exception:
+                    continue
+                if iv not in submitted:
+                    submitted.append(iv)
+
+            # Current IOs for this project
+            current = []
+            try:
+                ios_df = select_all_from_table(cursor, cnxn, 'ios')
+                if ios_df is not None and not ios_df.empty:
+                    cur = ios_df[ios_df['project_id'].astype(int) == int(pid_val)] if 'project_id' in ios_df.columns else ios_df.iloc[0:0]
+                    if not cur.empty and 'IO_num' in cur.columns:
+                        try:
+                            current = cur['IO_num'].dropna().astype(int).tolist()
+                        except Exception:
+                            current = [int(float(x)) for x in cur['IO_num'].dropna().tolist()]
+            except Exception:
+                current = []
+
+            to_delete = [x for x in current if x not in submitted]
+            to_insert = [x for x in submitted if x not in current]
+
+            # Delete removed IOs
+            for io_val in to_delete:
+                try:
+                    cursor.execute("DELETE FROM ios WHERE project_id = ? AND IO_num = ?", (int(pid_val), int(io_val)))
+                except Exception:
+                    pass
+
+            # Insert new IOs if globally unique
+            for io_val in to_insert:
+                try:
+                    cursor.execute("SELECT 1 FROM ios WHERE IO_num = ? LIMIT 1", (int(io_val),))
+                    exists = cursor.fetchone() is not None
+                except Exception:
+                    exists = False
+                if not exists:
+                    try:
+                        cursor.execute("INSERT INTO ios (IO_num, project_id) VALUES (?, ?)", (int(io_val), int(pid_val)))
+                    except Exception:
+                        pass
+            cnxn.commit()
+        except Exception:
+            # ignore IO update errors to not block project update
+            pass
     except Exception:
         # swallow errors for now
         pass
@@ -1319,18 +1479,27 @@ def change_io():
         # Build new values
         set_parts = []
         params = []
-        # New IO number (optional; default remains unchanged if not provided)
+        # New IO number (optional; enforce global uniqueness excluding the current row)
         if new_io not in (None, ''):
             try:
                 new_io_val = int(float(new_io))
             except Exception:
-                # keep as is; if cannot coerce, skip update to IO
                 new_io_val = None
             if new_io_val is not None:
-                set_parts.append('IO_num = ?')
-                params.append(new_io_val)
+                # Check global uniqueness excluding current id
+                try:
+                    cursor.execute("SELECT 1 FROM ios WHERE IO_num = ? AND id <> ? LIMIT 1", (int(new_io_val), int(target_id)))
+                    dup_exists = cursor.fetchone() is not None
+                except Exception:
+                    dup_exists = False
+                if not dup_exists:
+                    set_parts.append('IO_num = ?')
+                    params.append(int(new_io_val))
+                else:
+                    # Skip updating IO_num if duplicate detected
+                    pass
 
-        # New project mapping (respect duplicate guard: only allow if the new project has no existing IO)
+        # New project mapping (allow multiple IOs per project per current policy)
         if new_project not in (None, ''):
             try:
                 pmap2 = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
@@ -1338,21 +1507,8 @@ def change_io():
             except Exception:
                 new_pid = None
             if new_pid is not None:
-                # Check current row's project_id
-                current_row = ios_df[ios_df['id'] == target_id].head(1)
-                current_pid = int(current_row.iloc[0]['project_id']) if not current_row.empty and 'project_id' in current_row.columns and pd.notna(current_row.iloc[0]['project_id']) else None
-                if current_pid is None or current_pid != int(new_pid):
-                    # ensure no other IO exists for the target project
-                    try:
-                        existing_ids = set(ios_df['project_id'].dropna().astype(int).tolist()) if 'project_id' in ios_df.columns else set()
-                    except Exception:
-                        existing_ids = set(ios_df['project_id'].dropna().tolist()) if 'project_id' in ios_df.columns else set()
-                    if int(new_pid) in existing_ids:
-                        # duplicate exists; do not switch project
-                        pass
-                    else:
-                        set_parts.append('project_id = ?')
-                        params.append(int(new_pid))
+                set_parts.append('project_id = ?')
+                params.append(int(new_pid))
 
         if set_parts:
             q = f"UPDATE ios SET {', '.join(set_parts)} WHERE id = ?"
@@ -1363,6 +1519,65 @@ def change_io():
         pass
 
     return redirect(url_for('modify_tables.modify_table_router', action='modify_project'))
+
+@modify_tables.route('/modify_project/project_ios', methods=['GET'])
+def get_project_ios():
+    """Return all IO numbers for a given project.
+
+    Query params: project_id or name
+    Response: { ios: [ ... ] }
+    """
+    try:
+        q_pid = request.args.get('project_id')
+        q_name = request.args.get('name') or request.args.get('project_name')
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+        if proj_df is None or proj_df.empty:
+            return {'ios': []}, 200
+
+        pid = None
+        if q_pid not in (None, ''):
+            try:
+                pid = int(q_pid)
+            except Exception:
+                pid = None
+        if pid is None and q_name not in (None, ''):
+            try:
+                if 'name' in proj_df.columns and 'id' in proj_df.columns:
+                    match = proj_df[proj_df['name'].astype(str) == str(q_name)].head(1)
+                    if not match.empty:
+                        pid = int(match.iloc[0]['id'])
+            except Exception:
+                pid = None
+
+        if pid is None:
+            return {'ios': []}, 200
+
+        ios_df = select_all_from_table(cursor, cnxn, 'ios')
+        if ios_df is None or ios_df.empty or 'project_id' not in ios_df.columns or 'IO_num' not in ios_df.columns:
+            return {'ios': []}, 200
+
+        try:
+            subset = ios_df[ios_df['project_id'].astype(int) == int(pid)]
+        except Exception:
+            subset = ios_df[ios_df['project_id'] == pid]
+        out = []
+        if not subset.empty:
+            try:
+                out = subset['IO_num'].dropna().astype(int).tolist()
+            except Exception:
+                # best effort conversion
+                out = []
+                for v in subset['IO_num'].dropna().tolist():
+                    try:
+                        out.append(int(float(v)))
+                    except Exception:
+                        pass
+        return {'ios': out}, 200
+    except Exception as e:
+        return {'ios': [], 'error': str(e)}, 500
 
 @modify_tables.route('/capex_forecast/po_selection', methods=['POST'])
 def modify_po_selection():
@@ -1564,3 +1779,151 @@ def staff_cost_categories_update():
         return {'categories': names}, 200
     except Exception as e:
         return {'categories': [], 'error': str(e)}, 500
+
+
+@modify_tables.route('/modify_project/list', methods=['GET'])
+def list_projects():
+    """Return a JSON list of projects for the generic table.
+
+    Response: { columns: [...], rows: [ {col: val, ...}, ... ] }
+    """
+    try:
+        # Base display (friendly names)
+        df = get_projects_display()
+        if df is None or df.empty:
+            return {'columns': [], 'rows': []}, 200
+
+        # Normalize for frontend (friendly column headers)
+        rename_map = {}
+        for cand_in, cand_out in [
+            ('project_name','Project'), ('name','Project'),
+            ('po_name','PO'), ('name_po','PO'), ('po','PO'),
+            ('department_name','BU'), ('name_departments','BU'), ('department','BU'),
+            ('fiscal_year','Fiscal Year'), ('Fiscal Year','Fiscal Year')
+        ]:
+            if cand_in in df.columns:
+                rename_map[cand_in] = cand_out
+        out = df.rename(columns=rename_map).copy()
+
+        # Try to attach the underlying project id from local DB
+        try:
+            db = connect_local()
+            cursor, cnxn = db.connect_to_db()
+            proj_tbl = select_all_from_table(cursor, cnxn, 'projects')
+            dept_tbl = select_all_from_table(cursor, cnxn, 'departments')
+
+            # Build department id -> name map
+            dept_map = {}
+            if dept_tbl is not None and not dept_tbl.empty and 'id' in dept_tbl.columns and 'name' in dept_tbl.columns:
+                dept_map = dict(zip(dept_tbl['id'], dept_tbl['name']))
+
+            # Prepare a key in projects table: (name, dept_name, fiscal_year)
+            key_series = None
+            if proj_tbl is not None and not proj_tbl.empty:
+                p = proj_tbl.copy()
+                # map department_id -> dept name for keying
+                if 'department_id' in p.columns:
+                    try:
+                        p['__dept_name__'] = p['department_id'].map(dept_map).fillna('')
+                    except Exception:
+                        p['__dept_name__'] = ''
+                else:
+                    p['__dept_name__'] = ''
+
+                def mkkey_p(row):
+                    n = str(row.get('name','')).strip().lower()
+                    d = str(row.get('__dept_name__','')).strip().lower()
+                    fy = str(row.get('fiscal_year','')).strip()
+                    return f"{n}|||{d}|||{fy}"
+
+                p['__key__'] = p.apply(mkkey_p, axis=1)
+                id_by_key = dict(zip(p['__key__'], p['id'])) if 'id' in p.columns else {}
+            else:
+                id_by_key = {}
+
+            # Build same key on the display table and map id
+            def mkkey_out(row):
+                n = str(row.get('Project','')).strip().lower()
+                d = str(row.get('BU','')).strip().lower()
+                fy = str(row.get('Fiscal Year','')).strip()
+                return f"{n}|||{d}|||{fy}"
+
+            out['id'] = out.apply(lambda r: id_by_key.get(mkkey_out(r)), axis=1)
+        except Exception:
+            # If mapping fails, keep id as None
+            out['id'] = None
+
+        # Reorder columns: show id first if present, then the rest
+        desired = []
+        if 'id' in out.columns:
+            desired.append('id')
+        for c in ['Project','PO','BU','Fiscal Year']:
+            if c in out.columns:
+                desired.append(c)
+        if desired:
+            out = out[desired]
+        rows = out.fillna('').to_dict(orient='records')
+        return {'columns': list(out.columns), 'rows': rows}, 200
+    except Exception as e:
+        return {'columns': [], 'rows': [], 'error': str(e)}, 200
+
+
+@modify_tables.route('/modify_io/list', methods=['GET'])
+def list_ios():
+    """Return a JSON list of IOs for the generic table.
+
+    Response: { columns: [...], rows: [ {col: val, ...}, ... ] }
+    """
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        ios_df = select_all_from_table(cursor, cnxn, 'ios')
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+        name_map = {}
+        if proj_df is not None and not proj_df.empty and 'id' in proj_df.columns:
+            name_col = 'name' if 'name' in proj_df.columns else (proj_df.columns[0] if len(proj_df.columns)>0 else None)
+            if name_col:
+                try:
+                    name_map = dict(zip(proj_df['id'], proj_df[name_col]))
+                except Exception:
+                    name_map = {}
+        out_rows = []
+        if ios_df is not None and not ios_df.empty:
+            for _, r in ios_df.iterrows():
+                # include raw IO id
+                io_id = None
+                try:
+                    if 'id' in ios_df.columns and pd.notna(r.get('id')):
+                        io_id = int(r.get('id'))
+                except Exception:
+                    io_id = r.get('id')
+                # Normalize IO number: prefer integer-like string without decimals
+                io_raw = r['IO_num'] if 'IO_num' in ios_df.columns else (r.get('io') if isinstance(r, dict) else None)
+                io_str = ''
+                if pd.notna(io_raw):
+                    try:
+                        f = float(io_raw)
+                        # If value is integer-like (e.g., 123456.0), display without .0
+                        if float(f).is_integer():
+                            io_str = str(int(f))
+                        else:
+                            io_str = str(io_raw)
+                    except Exception:
+                        # Fallback to plain string
+                        io_str = str(io_raw)
+
+                # Map project_id to project name robustly (cast to int when possible)
+                pid = r['project_id'] if 'project_id' in ios_df.columns else None
+                proj_name = ''
+                try:
+                    if pd.notna(pid):
+                        pid_int = int(pid)
+                        proj_name = name_map.get(pid_int, '')
+                except Exception:
+                    proj_name = name_map.get(pid, '')
+
+                out_rows.append({'id': io_id, 'IO': io_str, 'Project': proj_name})
+        # Ensure id is first column when present
+        return {'columns': ['id','IO','Project'], 'rows': out_rows}, 200
+    except Exception as e:
+        return {'columns': [], 'rows': [], 'error': str(e)}, 200

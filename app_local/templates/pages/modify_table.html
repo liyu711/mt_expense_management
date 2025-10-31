@@ -108,15 +108,21 @@
         </div>
 
                     <!-- Modify modal: single instance that submits to /change_staff_cost (render only for staff cost page) -->
-            {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' %}
+            {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'pos' %}
                     <div id="modifyModalChange" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modalTitleChange">
                         <div class="modal-overlay" id="modalOverlayChange"></div>
                         <div class="modal-content" role="document">
                             <button class="modal-close" id="modalCloseChange" aria-label="Close">&times;</button>
                             <h2 id="modalTitleChange">Modify {{ title }}</h2>
                     <form method="POST"
-                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% endif %}"
+                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('modify_tables.change_po') }}{% endif %}"
                                   name="Change_{{ table_name }}" id="changeForm">
+                                {% if table_name == 'pos' %}
+                                <!-- Hidden field to carry the original PO name for update lookup -->
+                                <input type="hidden" name="existing_name" id="change_existing_name" value="">
+                                <!-- Hidden field to carry the PO id for precise updates -->
+                                <input type="hidden" name="po_id" id="change_po_id" value="">
+                                {% endif %}
                                 <input type="hidden" name="table_name" value="{{ table_name }}">
                                 {% for field in fields %}
                                     <div class="form-group">
@@ -145,67 +151,110 @@
                 <div class="table-container">
                 {% if columns and data %}
                     <h3>Current table data</h3>
-                    <table id="modify_data_table" class="display" style="width:100%" border="1">
-                        <thead>
-                            <tr>
-                                {% for col in columns %}
-                                <th>{{ col }}</th>
-                                {% endfor %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for row in data %}
-                            <tr>
-                                {% for item in row %}
-                                {% set colname = columns[loop.index0] if columns|length > loop.index0 else '' %}
-                                {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname == 'IO number' or colname == 'IO Number' or colname|lower == 'po' or colname|lower == 'io' or colname|lower == 'io number' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year' or colname == 'Capital Year' or colname|lower == 'capital year' or colname|lower == 'capital_year' or colname == 'Year' or colname|lower == 'year') %}
-                                    <td>{{ item|as_int }}</td>
-                                {% else %}
-                                    <td>{{ item|one_decimal }}</td>
-                                {% endif %}
-                                {% endfor %}
-                            </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                    <!-- jQuery and DataTables JS (CDN with local fallback) -->
-                    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+                    <div id="gt-generic" style="height:60vh;" data-cols='{{ columns|tojson|safe }}' data-rows='{{ data|tojson|safe }}' data-table='{{ table_name }}'></div>
+                    <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
                     <script>
-                        if (typeof jQuery === 'undefined') {
-                            var s = document.createElement('script');
-                            s.src = "{{ url_for('static', filename='vendor/jquery-3.7.1.min.js') }}";
-                            document.head.appendChild(s);
-                        }
-                    </script>
-                    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-                    <script>
-                        (function ensureDataTables(){
-                            if (window.jQuery && (!jQuery.fn || !jQuery.fn.dataTable)) {
-                                var s = document.createElement('script');
-                                s.src = "{{ url_for('static', filename='vendor/jquery.dataTables.min.js') }}";
-                                document.head.appendChild(s);
-                            }
+                        (function(){
+                            try{
+                                var el = document.getElementById('gt-generic');
+                                if(!el) return;
+                                var cols = JSON.parse(el.getAttribute('data-cols') || '[]');
+                                var data = JSON.parse(el.getAttribute('data-rows') || '[]');
+                                var rows = (data || []).map(function(arr){
+                                    var obj = {}; (cols||[]).forEach(function(c,i){ obj[c] = (arr||[])[i]; }); return obj;
+                                });
+                                if(!window.GenericTable || !GenericTable.create) return;
+                                var modalEl = document.getElementById('modifyModalChange');
+                                var opts = { title: '', columns: cols, rows: rows };
+                                if(modalEl){
+                                    opts.rowClickEditModal = { selector: '#modifyModalChange' };
+                                    // Special prefill for PO page: set both existing_name and the new input value
+                                    var tableName = el.getAttribute('data-table') || '';
+                                    if(tableName === 'pos'){
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                // Handle various display column names: 'PO Name' (from transform), or fallbacks
+                                                var existing = row['PO Name'] || row.PO || row.name || row.Name || '';
+                                                var ex = modal.querySelector('input[name="existing_name"]');
+                                                if(ex) ex.value = existing;
+                                                // Prefer id-based update
+                                                var idIn = modal.querySelector('input[name="po_id"]');
+                                                if(idIn && (row.id != null && row.id !== '')) idIn.value = row.id;
+                                                var input = modal.querySelector('#change_PO') || modal.querySelector('input[name="PO"]');
+                                                if(input) input.value = existing;
+                                            }catch(e){}
+                                        };
+                                    }
+                                }
+                                GenericTable.create(el, opts);
+                            }catch(e){}
                         })();
-                    </script>
-                    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-                    <script>
-                    (function initModifyTable(retries){
-                        retries = retries || 20;
-                        function init(){
-                            if (window.jQuery && window.jQuery.fn && window.jQuery.fn.dataTable) {
-                                $('#modify_data_table').DataTable({ paging: true, searching: true, ordering: true, lengthMenu: [[10,25,50,100],[10,25,50,100]] });
-                            } else if (retries > 0) {
-                                setTimeout(function(){ initModifyTable(retries - 1); }, 200);
-                            } else {
-                                console.warn('DataTables not available for modify table.');
-                            }
-                        }
-                        if (document.readyState === 'complete' || document.readyState === 'interactive') init(); else document.addEventListener('DOMContentLoaded', init);
-                    })();
                     </script>
                 {% endif %}
                 </div>
             </div>
+            {% if table_name == 'projects' %}
+            <div style="padding: 0 24px 24px 24px;">
+                <h3>Projects</h3>
+                <div id="projectsTable" style="height:300px;"></div>
+                <h3 style="margin-top:16px;">IOs</h3>
+                <div id="iosTable" style="height:300px;"></div>
+            </div>
+            <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
+            <script>
+            (function(){
+                function fetchJSON(url){ return fetch(url).then(function(r){ return r.ok ? r.json() : {columns:[], rows:[]}; }); }
+                function mountTable(elId, title, listUrl, onRowClick){
+                    var el = document.getElementById(elId);
+                    if(!el) return;
+                    fetchJSON(listUrl).then(function(data){
+                        var cols = data.columns || [];
+                        var rows = (data.rows || []).map(function(r){ return r; });
+                        GenericTable.create(el, {
+                            title: title,
+                            columns: cols,
+                            rows: rows,
+                            defaultPageSize: 10,
+                            onRowClick: onRowClick
+                        });
+                    });
+                }
+
+                function openProjectEdit(row){
+                    var addBtn = document.getElementById('add_button');
+                    if(addBtn) addBtn.click();
+                    setTimeout(function(){
+                        var modal = document.getElementById('modifyModal');
+                        if(!modal) return;
+                        var nameIn = modal.querySelector('input[name="name"]');
+                        if(nameIn && row.Project) nameIn.value = row.Project;
+                        var poSel = modal.querySelector('select[name="po"]');
+                        if(poSel && row.PO){ poSel.value = row.PO; poSel.dispatchEvent(new Event('change')); }
+                        var deptSel = modal.querySelector('select[name="department"]');
+                        if(deptSel && row.BU){ deptSel.value = row.BU; }
+                        var fySel = modal.querySelector('select[name="fiscal_year"]');
+                        if(fySel && row['Fiscal Year']){ fySel.value = String(row['Fiscal Year']); }
+                    }, 50);
+                }
+
+                function openIoEdit(row){
+                    var addBtn = document.getElementById('add_button');
+                    if(addBtn) addBtn.click();
+                    setTimeout(function(){
+                        var modal = document.getElementById('modifyModal');
+                        if(!modal) return;
+                        var ioIn = modal.querySelector('input[name="IO"], input[name="io"], input[name="IO_num"]');
+                        if(ioIn && row.IO != null){ ioIn.value = row.IO; }
+                        var projSel = modal.querySelector('select[name="project_name"]');
+                        if(projSel && row.Project){ projSel.value = row.Project; }
+                    }, 50);
+                }
+
+                mountTable('projectsTable', 'Projects', "{{ url_for('modify_tables.list_projects') }}", openProjectEdit);
+                mountTable('iosTable', 'IOs', "{{ url_for('modify_tables.list_ios') }}", openIoEdit);
+            })();
+            </script>
+            {% endif %}
     <script>
         // Modal open/close logic
         (function(){
