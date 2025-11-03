@@ -8,6 +8,58 @@ from backend.connect_local import connect_local, select_all_from_table
 from app_local.select_data import transform_table
 from backend.create_display_table import get_departments_display, get_projects_display
 
+# Shared column ordering helper
+def standardize_columns_order(columns, table_name=None):
+    """Reorder columns to a standard order across tables.
+
+    Priority (front to back):
+    1) PO
+    2) BU
+    3) Fiscal Year / Capex Year (whichever exists; if both, Fiscal Year first)
+    4) Project Category
+    5) Project (Project Name)
+    6) IO
+    Then: all remaining columns in their original order.
+
+    We match common synonyms but do not rename columns here.
+    """
+    if not columns:
+        return columns
+
+    cols = list(columns)
+
+    # Define synonym groups for detection
+    group_ID = ['id', 'ID']
+    group_PO = ['PO', 'po', 'po_name', 'name_po']
+    group_BU = ['BU', 'Department', 'department', 'department_name', 'name_departments']
+    group_FY = ['Fiscal Year', 'fiscal_year']
+    group_CapY = ['Capex Year', 'cap_year', 'Capital Year']
+    group_ProjCat = ['Project Category', 'project_category', 'category', 'category_name']
+    # For project name, prefer friendly 'Project'; only treat raw 'name' as project name for projects table
+    group_Project = ['Project'] + (['name', 'project_name'] if (table_name == 'projects') else ['project_name'])
+    group_IO = ['IO', 'IO_num', 'io']
+
+    priority_groups = [
+        group_ID,
+        group_PO,
+        group_BU,
+        group_FY,
+        group_CapY,
+        group_ProjCat,
+        group_Project,
+        group_IO,
+    ]
+
+    picked = []
+    for group in priority_groups:
+        for alias in group:
+            if alias in cols and alias not in picked:
+                picked.append(alias)
+
+    # Append remaining columns preserving original order
+    remaining = [c for c in cols if c not in picked]
+    return picked + remaining
+
 modify_tables = Blueprint('modify_tables', __name__, template_folder='templates')
 
 # module-level selected PO for modify forms (capex and others)
@@ -76,9 +128,10 @@ modify_table_config = {
         'fields': [
             {'name': 'category', 'type': 'text', 'label': 'Staff Category'},
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
         ],
         'merge_on': ['name'],
-        'columns': ['name', 'po_id']
+        'columns': ['name', 'po_id', 'department_id']
     },
     'modify_staff_cost': {
         'title': 'Modify Staff Cost',
@@ -285,9 +338,13 @@ def modify_table_router(action):
     # If this is the modify_staff_categories form, fetch PO options for dropdown
     if action == 'modify_staff_categories':
         po_options = fetch_options('pos', 'name')
+        dept_options = fetch_options('departments', 'name')
         for field in config['fields']:
             if field.get('name') == 'po' and field.get('type') == 'select':
                 field['options'] = po_options
+            if field.get('name') == 'department' and field.get('type') == 'select':
+                # Initial department options (will be filtered on PO selection client-side)
+                field['options'] = dept_options
 
     # If this is the modify_staff_cost form, populate staff category and year options
     if action == 'modify_staff_cost':
@@ -406,6 +463,13 @@ def modify_table_router(action):
                     po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
                     # Map selected PO name to po_id
                     df_upload['po_id'] = df_upload.get('po').map(po_map) if 'po' in df_upload.columns else None
+                    # Map selected Department name to department_id
+                    try:
+                        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+                        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+                    except Exception:
+                        dept_map = {}
+                    df_upload['department_id'] = df_upload.get('department').map(dept_map) if 'department' in df_upload.columns else None
                 except Exception:
                     # Fallback: leave po_id as None if mapping fails
                     pass
@@ -805,6 +869,30 @@ def modify_table_router(action):
                 df_tbl = select_all_from_table(cursor, cnxn, tbl_name)
             except Exception:
                 df_tbl = pd.DataFrame()
+            # If select_all_from_table returned no columns (empty DF), try to obtain column names from the DB schema
+            try:
+                cols = list(df_tbl.columns) if (df_tbl is not None and hasattr(df_tbl, 'columns')) else []
+                if not cols:
+                    # Try SQLite PRAGMA first
+                    try:
+                        cursor.execute(f"PRAGMA table_info({tbl_name})")
+                        info = cursor.fetchall()
+                        cols = [row[1] for row in info] if info else []
+                    except Exception:
+                        cols = []
+                    # Fallback: do a LIMIT 0 SELECT to get cursor.description (works for many DBs)
+                    if not cols:
+                        try:
+                            cursor.execute(f"SELECT * FROM {tbl_name} LIMIT 0")
+                            desc = cursor.description
+                            cols = [d[0] for d in desc] if desc else []
+                        except Exception:
+                            cols = []
+                    if cols:
+                        df_tbl = pd.DataFrame(columns=cols)
+            except Exception:
+                # best-effort; leave df_tbl as-is
+                pass
             # Map id columns to names
             id_name_map = {
                 'department_id': ('departments', 'id', 'name', 'Department'),
@@ -831,6 +919,12 @@ def modify_table_router(action):
             # Transform for display
             try:
                 df_tbl = transform_table(df_tbl, tbl_name, cursor, cnxn)
+            except Exception:
+                pass
+            # Reorder columns to standardized order
+            try:
+                ordered_cols = standardize_columns_order(df_tbl.columns.tolist(), table_name=tbl_name)
+                df_tbl = df_tbl[ordered_cols]
             except Exception:
                 pass
             try:
@@ -1791,7 +1885,9 @@ def list_projects():
         # Base display (friendly names)
         df = get_projects_display()
         if df is None or df.empty:
-            return {'columns': [], 'rows': []}, 200
+            # Ensure header shows up even when no data; apply standardized order
+            empty_cols = standardize_columns_order(['id', 'Project', 'PO', 'BU', 'Fiscal Year'], table_name='projects')
+            return {'columns': empty_cols, 'rows': []}, 200
 
         # Normalize for frontend (friendly column headers)
         rename_map = {}
@@ -1853,15 +1949,9 @@ def list_projects():
             # If mapping fails, keep id as None
             out['id'] = None
 
-        # Reorder columns: show id first if present, then the rest
-        desired = []
-        if 'id' in out.columns:
-            desired.append('id')
-        for c in ['Project','PO','BU','Fiscal Year']:
-            if c in out.columns:
-                desired.append(c)
-        if desired:
-            out = out[desired]
+        # Reorder columns by standardized order (PO, BU, FY/Cap Year, Project Category, Project, IO, then the rest)
+        ordered = standardize_columns_order(list(out.columns), table_name='projects')
+        out = out[[c for c in ordered if c in out.columns]]
         rows = out.fillna('').to_dict(orient='records')
         return {'columns': list(out.columns), 'rows': rows}, 200
     except Exception as e:
@@ -1923,7 +2013,9 @@ def list_ios():
                     proj_name = name_map.get(pid, '')
 
                 out_rows.append({'id': io_id, 'IO': io_str, 'Project': proj_name})
-        # Ensure id is first column when present
-        return {'columns': ['id','IO','Project'], 'rows': out_rows}, 200
+        # Apply standardized column order (Project before IO; others follow)
+        base_cols = ['id', 'IO', 'Project']
+        ordered_cols = standardize_columns_order(base_cols, table_name='ios')
+        return {'columns': ordered_cols, 'rows': out_rows}, 200
     except Exception as e:
         return {'columns': [], 'rows': [], 'error': str(e)}, 200

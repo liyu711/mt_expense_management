@@ -53,8 +53,22 @@
     const table = document.createElement('table');
     table.className = 'gt-table';
 
-    const thead = document.createElement('thead');
-    const headerRow = document.createElement('tr');
+  const thead = document.createElement('thead');
+  const headerRow = document.createElement('tr');
+  const filterRow = document.createElement('tr');
+
+    // Helpers to update sort button icons based on state
+    function updateSortIcon(th){
+      try {
+        const btn = th.querySelector('button.gt-sort');
+        if(!btn) return;
+        const st = th.dataset.sortState;
+        btn.textContent = (st === 'asc') ? '↑' : (st === 'desc' ? '↓' : '⇅');
+      } catch(e) {}
+    }
+    function updateAllSortIcons(){
+      Array.from(headerRow.children).forEach(function(th){ updateSortIcon(th); });
+    }
 
     // Column filter state
     const filters = {}; // colName -> selected value (or null)
@@ -71,20 +85,26 @@
       sortBtn.textContent = '⇅';
       sortBtn.title = 'Sort';
 
-      const filterSel = document.createElement('select');
-      filterSel.className = 'gt-filter';
-      const anyOpt = document.createElement('option');
-      anyOpt.value = '';
-      anyOpt.textContent = 'All';
-      filterSel.appendChild(anyOpt);
+  const filterSel = document.createElement('select');
+  filterSel.className = 'gt-filter';
+  const anyOpt = document.createElement('option');
+  anyOpt.value = '';
+  anyOpt.textContent = 'All';
+  filterSel.appendChild(anyOpt);
 
-      th.appendChild(label);
-      th.appendChild(sortBtn);
-      th.appendChild(filterSel);
-      headerRow.appendChild(th);
+  // header cell (label + sort)
+  th.appendChild(label);
+  th.appendChild(sortBtn);
+  headerRow.appendChild(th);
+
+  // second-row cell for the filter select (keeps filters on their own row)
+  const thFilter = document.createElement('th');
+  thFilter.appendChild(filterSel);
+  filterRow.appendChild(thFilter);
 
       // Sorting state: null | 'asc' | 'desc'
       th.dataset.sortState = '';
+      updateSortIcon(th);
       sortBtn.addEventListener('click', function(){
         const state = th.dataset.sortState;
         th.dataset.sortState = state === 'asc' ? 'desc' : (state === 'desc' ? '' : 'asc');
@@ -92,6 +112,7 @@
         Array.from(headerRow.children).forEach(function(otherTh){
           if(otherTh !== th) otherTh.dataset.sortState = '';
         });
+        updateAllSortIcons();
         refresh();
       });
 
@@ -100,7 +121,8 @@
         refresh();
       });
     });
-    thead.appendChild(headerRow);
+  thead.appendChild(headerRow);
+  thead.appendChild(filterRow);
 
     const tbody = document.createElement('tbody');
 
@@ -137,10 +159,11 @@
           if(v !== '') uniques[c].add(v);
         });
       });
-      // update selects
-      Array.from(headerRow.children).forEach(function(th, idx){
-        const col = cfg.columns[idx];
-        const sel = th.querySelector('select.gt-filter');
+      // update selects located in the filterRow
+      cfg.columns.forEach(function(col, idx){
+        const th = filterRow.children[idx];
+        const sel = th ? th.querySelector('select.gt-filter') : null;
+        if(!sel) return;
         const current = sel.value;
         sel.innerHTML = '';
         const anyOpt = document.createElement('option');
@@ -348,9 +371,9 @@
       .gt-table-wrap{overflow:auto;flex:1 1 auto;}
       .gt-table{border-collapse:collapse;width:100%;}
       .gt-table th,.gt-table td{border:1px solid #ddd;padding:6px 8px;}
-      .gt-table th{position:sticky;top:0;background:#f5f5f5;}
-      .gt-col-label{margin-right:6px;}
-      .gt-sort{margin:0 6px 0 0;padding:2px 6px;}
+  .gt-table th{position:sticky;top:0;background:#f5f5f5;white-space:nowrap;}
+  .gt-col-label{margin-right:6px;display:inline-block;vertical-align:middle;}
+  .gt-sort{margin:0 6px 0 0;padding:2px 6px;width:1.5em;display:inline-flex;justify-content:center;align-items:center;line-height:1;box-sizing:content-box;white-space:nowrap;overflow:hidden;}
       .gt-filter{padding:2px 6px;}
       .gt-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;}
       .gt-pager button{margin:0 4px;}

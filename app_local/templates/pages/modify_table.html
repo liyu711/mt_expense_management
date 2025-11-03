@@ -64,7 +64,7 @@
                     <label for="{{ field.name }}">{{ field.label }}</label>
                     {% if field.type == 'select' %}
                         <select name="{{ field.name }}" id="{{ field.name }}" required>
-                            <option value="" disabled selected>Select an option</option>
+                        <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
                             {% for option in field.options %}
                                 <option value="{{ option }}">{{ option }}</option>
                             {% endfor %}
@@ -149,7 +149,7 @@
                     {% endif %}
                 <!-- table container area -->
                 <div class="table-container">
-                {% if columns and data %}
+                {% if columns %}
                     <h3>Current table data</h3>
                     <div id="gt-generic" style="height:60vh;" data-cols='{{ columns|tojson|safe }}' data-rows='{{ data|tojson|safe }}' data-table='{{ table_name }}'></div>
                     <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>

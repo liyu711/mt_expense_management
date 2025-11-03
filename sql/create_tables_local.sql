@@ -70,7 +70,9 @@ CREATE TABLE human_resource_categories(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
     po_id INTEGER,
-    FOREIGN KEY (po_id) REFERENCES POs(id)
+    department_id INTEGER,
+    FOREIGN KEY (po_id) REFERENCES POs(id),
+    FOREIGN KEY (department_id) REFERENCES departments(id)
 );
 
 CREATE TABLE human_resource_cost(

@@ -108,7 +108,7 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
 
     df_upload_fin = pd.merge(df_upload, hr_categories_merged, left_on = 'Human resource category', right_on='name', how='left')
     df_upload_fin.rename(columns={'id': 'human_resource_category_id'}, inplace=True)
-    df_upload_fin.drop(['Human resource category', 'name', 'Department', 'po_id'], axis=1, inplace=True)
+    df_upload_fin.drop(['Human resource category', 'name', 'Department', 'po_id', 'department_id'], axis=1, inplace=True)
     df_upload_fin = pd.merge(df_upload_fin, projects_merged, left_on='Project Name', right_on='name', how='left')
     df_upload_fin.drop(['Project Category', 'Project Name', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'project_id', 'category_id': 'project_category_id'}, inplace=True)
