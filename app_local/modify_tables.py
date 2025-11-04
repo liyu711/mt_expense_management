@@ -71,7 +71,7 @@ selected_project = None
 # Map route to table and form fields
 modify_table_config = {
     'modify_department': {
-        'title': 'Modify Department',
+        'title': 'Modify BU',
         'table_name': 'departments',
         'fields': [
             {'name': 'Department', 'type': 'text', 'label': 'Department Name'},
@@ -1224,7 +1224,10 @@ def change_po():
     - existing_name: current PO name to match
     - PO (or name): new PO name value
     - po_id (optional): if provided, update by id for precise changes
+
+    Additionally prevents changing to a name that already exists on a different row.
     """
+
     form = dict(request.form)
     existing_name = form.get('existing_name') or form.get('existing_PO') or form.get('existing')
     new_name = form.get('PO') or form.get('name')
@@ -1237,11 +1240,42 @@ def change_po():
         db = connect_local()
         cursor, cnxn = db.connect_to_db()
 
-        # Prefer id-based update when available
+        # Duplicate name guard: if new_name already exists on a different row, block the change
+        try:
+            target_id = None
+            if po_id not in (None, ''):
+                try:
+                    target_id = int(po_id)
+                except Exception:
+                    target_id = None
+            elif existing_name not in (None, ''):
+                cursor.execute("SELECT id FROM pos WHERE name = ?", (existing_name,))
+                r = cursor.fetchone()
+                if r is not None:
+                    try:
+                        target_id = int(r[0])
+                    except Exception:
+                        target_id = None
+
+            cursor.execute("SELECT id FROM pos WHERE name = ?", (new_name,))
+            r2 = cursor.fetchone()
+            if r2 is not None:
+                try:
+                    conflict_id = int(r2[0])
+                except Exception:
+                    conflict_id = None
+                if target_id is None or (conflict_id is not None and conflict_id != target_id):
+                    # Another row already has this name; prevent change
+                    return redirect(url_for('modify_tables.modify_table_router', action='modify_po'))
+        except Exception:
+            # If duplicate check fails, proceed without blocking
+            pass
+
+        # Perform update
         if po_id not in (None, ''):
             try:
                 pid = int(po_id)
-                cursor.execute("UPDATE pos SET name = ? WHERE id = ?", (str(new_name), int(pid)))
+                cursor.execute("UPDATE pos SET name = ? WHERE id = ?", (str(new_name), pid))
             except Exception:
                 # fallback to name-based update below
                 cursor.execute("UPDATE pos SET name = ? WHERE name = ?", (str(new_name), str(existing_name or '')))
@@ -1253,6 +1287,102 @@ def change_po():
         pass
 
     return redirect(url_for('modify_tables.modify_table_router', action='modify_po'))
+
+
+@modify_tables.route('/modify_department/change_department', methods=['POST'])
+def change_department():
+    """Update an existing Department row.
+
+    Accepts form fields:
+    - existing_department (optional): current department name to match (fallbacks: existing_name, existing)
+    - department_id (optional): prefer id-based updates when provided (fallbacks: id)
+    - Department (or department/name): new department name
+    - po (or PO): target PO name to map (will be translated to po_id)
+    """
+    form = dict(request.form)
+    existing_name = form.get('existing_department') or form.get('existing_name') or form.get('existing')
+    dept_id = form.get('department_id') or form.get('id')
+    new_name = form.get('Department') or form.get('department') or form.get('name')
+    po_name = form.get('po') or form.get('PO')
+
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Map PO name to id (optional)
+        po_id = None
+        try:
+            pos_df = select_all_from_table(cursor, cnxn, 'pos')
+            if pos_df is not None and not pos_df.empty and 'name' in pos_df.columns and 'id' in pos_df.columns:
+                po_map = dict(zip(pos_df['name'], pos_df['id']))
+                po_id = po_map.get(po_name)
+        except Exception:
+            po_id = None
+
+        # Build update set clause
+        sets = []
+        params = []
+        if new_name not in (None, ''):
+            sets.append('name = ?')
+            params.append(new_name)
+        if po_id is not None:
+            sets.append('po_id = ?')
+            params.append(int(po_id))
+
+        if not sets:
+            # Nothing to update
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_department'))
+
+        # Duplicate name guard: if new_name already exists on a different row, block the change
+        try:
+            target_id = None
+            if dept_id not in (None, ''):
+                try:
+                    target_id = int(dept_id)
+                except Exception:
+                    target_id = None
+            elif existing_name not in (None, ''):
+                cursor.execute("SELECT id FROM departments WHERE name = ?", (existing_name,))
+                r = cursor.fetchone()
+                if r is not None:
+                    try:
+                        target_id = int(r[0])
+                    except Exception:
+                        target_id = None
+
+            # Only check duplicate if a new_name was provided
+            if new_name not in (None, ''):
+                cursor.execute("SELECT id FROM departments WHERE name = ?", (new_name,))
+                conflict = cursor.fetchone()
+                if conflict is not None:
+                    try:
+                        conflict_id = int(conflict[0])
+                    except Exception:
+                        conflict_id = None
+                    if target_id is None or (conflict_id is not None and conflict_id != target_id):
+                        # Another row already has this name; prevent change
+                        return redirect(url_for('modify_tables.modify_table_router', action='modify_department'))
+        except Exception:
+            # On any error during duplicate check, continue with normal update flow
+            pass
+
+        # Prefer id-based update when available
+        if dept_id not in (None, ''):
+            params.append(int(dept_id))
+            cursor.execute(f"UPDATE departments SET {', '.join(sets)} WHERE id = ?", params)
+        elif existing_name not in (None, ''):
+            params.append(existing_name)
+            cursor.execute(f"UPDATE departments SET {', '.join(sets)} WHERE name = ?", params)
+        else:
+            # No identifier provided; skip
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_department'))
+
+        cnxn.commit()
+    except Exception:
+        # Swallow errors for now and redirect back
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='modify_department'))
 
 
 @modify_tables.route('/modify_project/details', methods=['GET'])
