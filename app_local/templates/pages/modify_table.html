@@ -108,14 +108,14 @@
         </div>
 
                     <!-- Modify modal: single instance that submits to /change_staff_cost (render only for staff cost page) -->
-            {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'pos' or table_name == 'departments' %}
+            {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'pos' or table_name == 'departments' or table_name == 'project_categories' %}
                     <div id="modifyModalChange" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modalTitleChange">
                         <div class="modal-overlay" id="modalOverlayChange"></div>
                         <div class="modal-content" role="document">
                             <button class="modal-close" id="modalCloseChange" aria-label="Close">&times;</button>
                             <h2 id="modalTitleChange">Modify {{ title }}</h2>
                     <form method="POST"
-                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('modify_tables.change_po') }}{% elif table_name == 'departments' %}{{ url_for('modify_tables.change_department') }}{% endif %}"
+                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('modify_tables.change_po') }}{% elif table_name == 'departments' %}{{ url_for('modify_tables.change_department') }}{% elif table_name == 'project_categories' %}{{ url_for('modify_tables.change_porject_category') }}{% endif %}"
                                   name="Change_{{ table_name }}" id="changeForm">
                                 {% if table_name == 'pos' %}
                                 <!-- Hidden field to carry the original PO name for update lookup -->
@@ -126,6 +126,10 @@
                                 <!-- Hidden fields for Department change: existing name and id for precise update -->
                                 <input type="hidden" name="existing_department" id="change_existing_department" value="">
                                 <input type="hidden" name="department_id" id="change_department_id" value="">
+                                {% elif table_name == 'project_categories' %}
+                                <!-- Hidden fields for Project Category change: existing name and id for precise update -->
+                                <input type="hidden" name="existing_category" id="change_existing_category" value="">
+                                <input type="hidden" name="category_id" id="change_category_id" value="">
                                 {% endif %}
                                 <input type="hidden" name="table_name" value="{{ table_name }}">
                                 {% for field in fields %}
@@ -220,6 +224,27 @@
                                                 // PO select prefill if present
                                                 var poSel = modal.querySelector('#change_po') || modal.querySelector('select[name="po"]') || modal.querySelector('select[id="po"]');
                                                 if(poSel && poName){ poSel.value = poName; }
+                                            }catch(e){}
+                                        };
+                                    } else if (tableName === 'project_categories'){
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                // Determine category name from common keys
+                                                var candidateKeys = ['category','Category','Project Category','project_category','name','Name'];
+                                                var catName = '';
+                                                for(var i=0;i<candidateKeys.length;i++){
+                                                    var k = candidateKeys[i];
+                                                    if(row.hasOwnProperty(k) && row[k] != null && row[k] !== ''){ catName = row[k]; break; }
+                                                }
+                                                if(!catName){
+                                                    for(var k in row){ if(row[k] != null && row[k] !== ''){ catName = row[k]; break; } }
+                                                }
+                                                var ex = modal.querySelector('input[name="existing_category"]');
+                                                if(ex) ex.value = catName;
+                                                var idIn = modal.querySelector('input[name="category_id"]');
+                                                if(idIn && (row.id != null && row.id !== '')) idIn.value = row.id;
+                                                var input = modal.querySelector('#change_category') || modal.querySelector('input[name="category"]');
+                                                if(input) input.value = catName;
                                             }catch(e){}
                                         };
                                     }

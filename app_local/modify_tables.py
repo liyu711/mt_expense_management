@@ -1385,6 +1385,68 @@ def change_department():
     return redirect(url_for('modify_tables.modify_table_router', action='modify_department'))
 
 
+@modify_tables.route('/modify_porject_category/change_porject_category', methods=['POST'])
+def change_porject_category():
+    """Update an existing Project Category row.
+
+    Accepts form fields:
+    - existing_category (optional): current category name to match (fallbacks: existing_name, existing)
+    - category_id (optional): prefer id-based updates when provided (fallbacks: id)
+    - category (or Category/name): new category name
+
+    Prevents renaming to a name that already exists on a different row.
+    """
+    form = dict(request.form)
+    existing_name = form.get('existing_category') or form.get('existing_name') or form.get('existing')
+    cat_id = form.get('category_id') or form.get('id')
+    new_name = form.get('category') or form.get('Category') or form.get('name')
+
+    try:
+        if new_name in (None, ''):
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_porject_category'))
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Duplicate name guard: if new_name already exists on a different row, block the change
+        try:
+            cursor.execute("SELECT id FROM project_categories WHERE category = ?", (new_name,))
+            row = cursor.fetchone()
+            if row is not None:
+                existing_id_for_name = row[0]
+                # If we have a different id than the one being updated, it's a conflict
+                if (cat_id not in (None, '')):
+                    try:
+                        if int(existing_id_for_name) != int(cat_id):
+                            return redirect(url_for('modify_tables.modify_table_router', action='modify_porject_category'))
+                    except Exception:
+                        # If id is non-numeric or comparison fails, treat as conflict to be safe
+                        return redirect(url_for('modify_tables.modify_table_router', action='modify_porject_category'))
+                else:
+                    # No id provided; if the existing_name is different than new_name, it's a conflict
+                    if (existing_name or '').strip() != (new_name or '').strip():
+                        return redirect(url_for('modify_tables.modify_table_router', action='modify_porject_category'))
+        except Exception:
+            # If duplicate check fails, proceed cautiously without update
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_porject_category'))
+
+        # Perform update
+        if cat_id not in (None, ''):
+            cursor.execute("UPDATE project_categories SET category = ? WHERE id = ?", (new_name, int(cat_id)))
+        elif existing_name not in (None, ''):
+            cursor.execute("UPDATE project_categories SET category = ? WHERE category = ?", (new_name, existing_name))
+        else:
+            # Nothing to match on
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_porject_category'))
+
+        cnxn.commit()
+    except Exception:
+        # Swallow errors and redirect back
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='modify_porject_category'))
+
+
 @modify_tables.route('/modify_project/details', methods=['GET'])
 def get_project_details():
     """Return JSON details for a given project by name or id.
