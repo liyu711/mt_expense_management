@@ -231,15 +231,12 @@ modify_table_config = {
 }
 
 # Generic route for all admin table modifications
-
-
 @modify_tables.route('/<action>', methods=['GET', 'POST'])
 def modify_table_router(action):
 
     config = modify_table_config.get(action)
     if not config:
         return f"Unknown modification: {action}", 404
-
 
     # Helper: fetch options from DB
     def fetch_options(table, col='name'):
@@ -251,127 +248,81 @@ def modify_table_router(action):
         except Exception:
             return []
 
-    # Populate dropdowns for upload_budget
-    if action == 'upload_budget':
-        po_options = fetch_options('pos', 'name')
-        dept_options = fetch_options('departments', 'name')
-        year_options = [str(y) for y in range(2020, 2031)]
-        for field in config['fields']:
-            if field['name'] == 'po':
-                field['options'] = po_options
-            if field['name'] == 'department':
-                field['options'] = dept_options
-            if field['name'] == 'fiscal_year':
-                field['options'] = year_options
+    # DRY helper utilities for populating select options
+    def set_field_options(fields, field_name, options):
+        for f in fields:
+            if f.get('name') == field_name and f.get('type') == 'select':
+                f['options'] = options or []
 
-    # Populate dropdowns for modify_funding (PO, Department, Fiscal Year)
-    if action == 'modify_funding':
-        po_options = fetch_options('pos', 'name')
-        dept_options = fetch_options('departments', 'name')
-        year_options = [str(y) for y in range(2020, 2031)]
-        for field in config['fields']:
-            if field['name'] == 'po' and field.get('type') == 'select':
-                field['options'] = po_options
-            if field['name'] == 'department' and field.get('type') == 'select':
-                field['options'] = dept_options
-            if field['name'] == 'fiscal_year' and field.get('type') == 'select':
-                field['options'] = year_options
+    def get_years(start=2020, end=2031):
+        return [str(y) for y in range(start, end)]
 
-    # Populate dropdowns for capex_forecast and capex_budget
-    if action in ['capex_forecast', 'capex_budget']:
-        po_options = fetch_options('pos', 'name')
-        dept_options = fetch_options('departments', 'name')
-        project_options = fetch_options('projects', 'name')
-        year_options = [str(y) for y in range(2020, 2031)]
-        for field in config['fields']:
-            if field['name'] == 'po':
-                field['options'] = po_options
-            if field['name'] == 'department':
-                field['options'] = dept_options
-            if field['name'] == 'project_name':
-                field['options'] = project_options
-            if field['name'] == 'cap_year':
-                field['options'] = year_options
+    def populate_for_action(action_key, fields):
+        sources = {
+            'upload_budget': {
+                'po': ('table', 'pos', 'name'),
+                'department': ('table', 'departments', 'name'),
+                'fiscal_year': ('years', 2020, 2031),
+            },
+            'modify_funding': {
+                'po': ('table', 'pos', 'name'),
+                'department': ('table', 'departments', 'name'),
+                'fiscal_year': ('years', 2020, 2031),
+            },
+            'capex_forecast': {
+                'po': ('table', 'pos', 'name'),
+                'department': ('table', 'departments', 'name'),
+                'project_name': ('table', 'projects', 'name'),
+                'cap_year': ('years', 2020, 2031),
+            },
+            'capex_budget': {
+                'po': ('table', 'pos', 'name'),
+                'department': ('table', 'departments', 'name'),
+                'project_name': ('table', 'projects', 'name'),
+                'cap_year': ('years', 2020, 2031),
+            },
+            'modify_project': {
+                'category': ('table', 'project_categories', 'category'),
+                'po': ('table', 'pos', 'name'),
+                'department': ('table', 'departments', 'name'),
+                'fiscal_year': ('years', 2020, 2031),
+            },
+            'modify_department': {
+                'po': ('table', 'pos', 'name'),
+            },
+            'modify_staff_categories': {
+                'po': ('table', 'pos', 'name'),
+                'department': ('table', 'departments', 'name'),
+            },
+            'modify_staff_cost': {
+                'po': ('table', 'pos', 'name'),
+                'staff_category': ('table', 'human_resource_categories', 'name'),
+                'year': ('years', 2020, 2031),
+            },
+            'modify_io': {
+                'project_name': ('table', 'projects', 'name'),
+            },
+        }
 
-    # If this is the modify_project form, fetch category options from DB
-    if action == 'modify_project':
-        options = []
-        try:
-            db = connect_local()
-            cursor, cnxn = db.connect_to_db()
-            df = select_all_from_table(cursor, cnxn, 'project_categories')
-            options = df['category'].tolist() if 'category' in df.columns else []
-        except Exception as e:
-            options = []
-        # Update the config's field options
-        for field in config['fields']:
-            if field['name'] == 'category' and field['type'] == 'select':
-                field['options'] = options
-            if field['name'] == 'po' and field['type'] == 'select':
-                try:
-                    db = connect_local()
-                    cursor, cnxn = db.connect_to_db()
-                    pdf = select_all_from_table(cursor, cnxn, 'pos')
-                    po_options = pdf['name'].tolist() if pdf is not None and 'name' in pdf.columns else []
-                except Exception:
-                    po_options = []
-                field['options'] = po_options
-            if field['name'] == 'department' and field['type'] == 'select':
-                try:
-                    db = connect_local()
-                    cursor, cnxn = db.connect_to_db()
-                    ddf = select_all_from_table(cursor, cnxn, 'departments')
-                    dept_options = ddf['name'].tolist() if 'name' in ddf.columns else []
-                except Exception:
-                    dept_options = []
-                field['options'] = dept_options
-            if field['name'] == 'fiscal_year' and field['type'] == 'select':
-                field['options'] = [str(y) for y in range(2020, 2031)]
+        spec = sources.get(action_key)
+        if not spec:
+            return
+        for fname, src in spec.items():
+            try:
+                if not isinstance(src, tuple):
+                    continue
+                kind = src[0]
+                if kind == 'table':
+                    _, table, col = src
+                    opts = fetch_options(table, col)
+                    set_field_options(fields, fname, opts)
+                elif kind == 'years':
+                    _, start, end = src
+                    set_field_options(fields, fname, get_years(start, end))
+            except Exception:
+                set_field_options(fields, fname, [])
 
-    # If this is the modify_department form, fetch PO options for dropdown
-    if action == 'modify_department':
-        po_options = fetch_options('pos', 'name')
-        for field in config['fields']:
-            if field['name'] == 'po' and field['type'] == 'select':
-                field['options'] = po_options
-
-    # If this is the modify_staff_categories form, fetch PO options for dropdown
-    if action == 'modify_staff_categories':
-        po_options = fetch_options('pos', 'name')
-        dept_options = fetch_options('departments', 'name')
-        for field in config['fields']:
-            if field.get('name') == 'po' and field.get('type') == 'select':
-                field['options'] = po_options
-            if field.get('name') == 'department' and field.get('type') == 'select':
-                # Initial department options (will be filtered on PO selection client-side)
-                field['options'] = dept_options
-
-    # If this is the modify_staff_cost form, populate staff category and year options
-    if action == 'modify_staff_cost':
-        staff_options = fetch_options('human_resource_categories', 'name')
-        po_options = fetch_options('pos', 'name')
-        year_options = [str(y) for y in range(2020, 2031)]
-        for field in config['fields']:
-            if field['name'] == 'po' and field['type'] == 'select':
-                field['options'] = po_options
-            if field['name'] == 'staff_category' and field['type'] == 'select':
-                field['options'] = staff_options
-            if field['name'] == 'year' and field['type'] == 'select':
-                field['options'] = year_options
-
-    # If this is the modify_io form, fetch project names for dropdown
-    if action == 'modify_io':
-        project_options = []
-        try:
-            db = connect_local()
-            cursor, cnxn = db.connect_to_db()
-            df = select_all_from_table(cursor, cnxn, 'projects')
-            project_options = df['name'].tolist() if 'name' in df.columns else []
-        except Exception as e:
-            project_options = []
-        for field in config['fields']:
-            if field['name'] == 'project_name' and field['type'] == 'select':
-                field['options'] = project_options
+    populate_for_action(action, config['fields'])
 
     if request.method == 'POST':
         form_data = dict(request.form)
