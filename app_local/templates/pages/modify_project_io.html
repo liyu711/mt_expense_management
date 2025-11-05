@@ -272,8 +272,8 @@
             }
 
             // Mount both tables
-            mountTable('gt-projects', 'Projects', "{{ url_for('modify_tables.list_projects') }}", openProjectEdit);
-            mountTable('gt-ios', 'IOs', "{{ url_for('modify_tables.list_ios') }}", openIoEdit);
+            mountTable('gt-projects', 'Projects', "{{ url_for('project_routes.list_projects') }}", openProjectEdit);
+            mountTable('gt-ios', 'IOs', "{{ url_for('io_routes.list_ios') }}", openIoEdit);
         })();
     </script>
 

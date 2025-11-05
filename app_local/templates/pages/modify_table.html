@@ -57,25 +57,6 @@
                 <button id="modify_button" type="button">Modify</button>
                 {% endif %}
 
-        <!-- <form method="POST" name="Modify_{{ table_name }}">
-            <input type="hidden" name="table_name" value="{{ table_name }}">
-            {% for field in fields %}
-                <div class="form-group">
-                    <label for="{{ field.name }}">{{ field.label }}</label>
-                    {% if field.type == 'select' %}
-                        <select name="{{ field.name }}" id="{{ field.name }}" required>
-                        <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
-                            {% for option in field.options %}
-                                <option value="{{ option }}">{{ option }}</option>
-                            {% endfor %}
-                        </select>
-                    {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
-                        <input type="{{ field.type }}" name="{{ field.name }}" id="{{ field.name }}" required{% if field.type == 'number' %} step="0.1" onblur="if(this.value!==''){this.value = parseFloat(this.value).toFixed(1)}"{% endif %}>
-                    {% endif %}
-                </div>
-            {% endfor %}
-            <button type="submit">Submit</button>
-        </form> -->
         <!-- Modal structure: hidden by default -->
         <div id="modifyModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modalTitle">
             <div class="modal-overlay" id="modalOverlay"></div>
@@ -115,7 +96,7 @@
                             <button class="modal-close" id="modalCloseChange" aria-label="Close">&times;</button>
                             <h2 id="modalTitleChange">Modify {{ title }}</h2>
                     <form method="POST"
-                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('modify_tables.change_po') }}{% elif table_name == 'departments' %}{{ url_for('modify_tables.change_department') }}{% elif table_name == 'project_categories' %}{{ url_for('modify_tables.change_porject_category') }}{% endif %}"
+                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('po_routes.change_po') }}{% elif table_name == 'departments' %}{{ url_for('department_routes.change_department') }}{% elif table_name == 'project_categories' %}{{ url_for('project_category_routes.change_porject_category') }}{% endif %}"
                                   name="Change_{{ table_name }}" id="changeForm">
                                 {% if table_name == 'pos' %}
                                 <!-- Hidden field to carry the original PO name for update lookup -->
@@ -313,8 +294,8 @@
                     }, 50);
                 }
 
-                mountTable('projectsTable', 'Projects', "{{ url_for('modify_tables.list_projects') }}", openProjectEdit);
-                mountTable('iosTable', 'IOs', "{{ url_for('modify_tables.list_ios') }}", openIoEdit);
+                mountTable('projectsTable', 'Projects', "{{ url_for('project_routes.list_projects') }}", openProjectEdit);
+                mountTable('iosTable', 'IOs', "{{ url_for('io_routes.list_ios') }}", openIoEdit);
             })();
             </script>
             {% endif %}

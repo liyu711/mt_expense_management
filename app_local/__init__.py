@@ -9,6 +9,11 @@ from app_local.upload_file import upload_requests
 from app_local.manual_upload import manual_upload
 from app_local.select_data import select_data
 from app_local.modify_tables import modify_tables
+from app_local.po_routes import po_routes
+from app_local.department_routes import department_routes
+from app_local.project_category_routes import project_category_routes
+from app_local.project_routes import project_routes
+from app_local.io_routes import io_routes
 from app_local.data_vis import data_vis
 from app_local.data_summary import data_summary_bp
 from backend.connect_local import \
@@ -23,6 +28,11 @@ app.register_blueprint(upload_requests)
 app.register_blueprint(manual_upload)
 app.register_blueprint(select_data)
 app.register_blueprint(modify_tables)
+app.register_blueprint(po_routes)
+app.register_blueprint(department_routes)
+app.register_blueprint(project_category_routes)
+app.register_blueprint(project_routes)
+app.register_blueprint(io_routes)
 app.register_blueprint(data_vis)
 app.register_blueprint(data_summary_bp)
 
