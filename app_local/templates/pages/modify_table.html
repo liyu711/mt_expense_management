@@ -96,7 +96,7 @@
                             <button class="modal-close" id="modalCloseChange" aria-label="Close">&times;</button>
                             <h2 id="modalTitleChange">Modify {{ title }}</h2>
                     <form method="POST"
-                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('modify_tables.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('modify_tables.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('po_routes.change_po') }}{% elif table_name == 'departments' %}{{ url_for('department_routes.change_department') }}{% elif table_name == 'project_categories' %}{{ url_for('project_category_routes.change_porject_category') }}{% endif %}"
+                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('staff_cost_routes.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('capex_forecast_routes.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('po_routes.change_po') }}{% elif table_name == 'departments' %}{{ url_for('department_routes.change_department') }}{% elif table_name == 'project_categories' %}{{ url_for('project_category_routes.change_porject_category') }}{% endif %}"
                                   name="Change_{{ table_name }}" id="changeForm">
                                 {% if table_name == 'pos' %}
                                 <!-- Hidden field to carry the original PO name for update lookup -->
@@ -546,7 +546,8 @@
     {% endif %}
     {% if table_name == 'human_resource_cost' %}
     <script>
-        // For Staff Cost: filter Staff Category options by selected PO within both Add and Modify modals
+        // For Staff Cost: when PO changes, filter Department options by selected PO.
+        // Staff Category remains unfiltered (all categories pre-populated by the server).
         (function(){
             function rebuildOptions(selectEl, values){
                 if (!selectEl) return;
@@ -569,19 +570,19 @@
             function attachHandlersForModal(modalEl){
                 if (!modalEl) return;
                 var poSel = modalEl.querySelector('select[name="po"]');
-                var catSel = modalEl.querySelector('select[name="staff_category"]');
-                if (!poSel || !catSel) return;
-                function refreshCategories(){
+                var deptSel = modalEl.querySelector('select[name="department"]');
+                if (!poSel || !deptSel) return;
+                function refreshDepartments(){
                     var po = poSel.value || '';
-                    if (!po){ rebuildOptions(catSel, []); return; }
-                    fetch('/modify_staff_cost/categories?po=' + encodeURIComponent(po))
-                        .then(function(res){ return res.ok ? res.json() : { categories: [] }; })
-                        .then(function(json){ rebuildOptions(catSel, (json && json.categories) ? json.categories : []); })
-                        .catch(function(){ rebuildOptions(catSel, []); });
+                    if (!po){ rebuildOptions(deptSel, []); return; }
+                    fetch('/capex_forecast/department_update?po=' + encodeURIComponent(po))
+                        .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
+                        .then(function(json){ rebuildOptions(deptSel, (json && json.departments) ? json.departments : []); })
+                        .catch(function(){ rebuildOptions(deptSel, []); });
                 }
-                poSel.addEventListener('change', refreshCategories);
+                poSel.addEventListener('change', refreshDepartments);
                 // Initialize once in case a PO is preselected
-                refreshCategories();
+                refreshDepartments();
             }
             function onReady(){
                 attachHandlersForModal(document.getElementById('modifyModal'));

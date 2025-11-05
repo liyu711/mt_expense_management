@@ -15,6 +15,8 @@ from app_local.project_category_routes import project_category_routes
 from app_local.project_routes import project_routes
 from app_local.io_routes import io_routes
 from app_local.data_vis import data_vis
+from app_local.capex_forecast_routes import capex_forecast_routes
+from app_local.staff_cost_routes import staff_cost_routes
 from app_local.data_summary import data_summary_bp
 from backend.connect_local import \
     connect_local, initialize_database, close_connection, select_all_from_table
@@ -35,6 +37,8 @@ app.register_blueprint(project_routes)
 app.register_blueprint(io_routes)
 app.register_blueprint(data_vis)
 app.register_blueprint(data_summary_bp)
+app.register_blueprint(capex_forecast_routes)
+app.register_blueprint(staff_cost_routes)
 
 
 # Jinja filter to render numbers with 1 decimal when possible

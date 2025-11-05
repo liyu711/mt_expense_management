@@ -68,18 +68,18 @@ CREATE TABLE IO_CE_connection(
 
 CREATE TABLE human_resource_categories(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    name TEXT NOT NULL,
-    po_id INTEGER,
-    department_id INTEGER,
-    FOREIGN KEY (po_id) REFERENCES POs(id),
-    FOREIGN KEY (department_id) REFERENCES departments(id)
+    name TEXT NOT NULL
 );
 
 CREATE TABLE human_resource_cost(
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     category_id INTEGER,
-    cost REAL,
     year INTEGER,
+    po_id INTEGER,
+    department_id INTEGER,
+    cost REAL,
+    FOREIGN KEY (po_id) REFERENCES POs(id),
+    FOREIGN KEY (department_id) REFERENCES departments(id),
     FOREIGN KEY (category_id) REFERENCES human_resource_categories(id)
 );
 

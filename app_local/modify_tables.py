@@ -126,24 +126,24 @@ modify_table_config = {
         'title': 'Modify Staff Categories',
         'table_name': 'human_resource_categories',
         'fields': [
-            {'name': 'category', 'type': 'text', 'label': 'Staff Category'},
-            {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
-            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'category', 'type': 'text', 'label': 'Staff Category'}
         ],
         'merge_on': ['name'],
-        'columns': ['name', 'po_id', 'department_id']
+        'columns': ['name']
     },
     'modify_staff_cost': {
         'title': 'Modify Staff Cost',
         'table_name': 'human_resource_cost',
         'fields': [
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'BU', 'options': []},
             {'name': 'staff_category', 'type': 'select', 'label': 'Staff Category', 'options': []},
             {'name': 'year', 'type': 'select', 'label': 'Year', 'options': []},
             {'name': 'cost', 'type': 'number', 'label': 'Cost'}
         ],
-        'merge_on': 'category_id',
-        'columns': ['category_id', 'year', 'cost']
+        # Merge and identify rows by (po_id, department_id, category_id, year)
+        'merge_on': ['po_id', 'department_id', 'category_id', 'year'],
+        'columns': ['po_id', 'department_id', 'category_id', 'year', 'cost']
     },
     'add_user': {
         'title': 'Add User',
@@ -296,6 +296,7 @@ def modify_table_router(action):
             },
             'modify_staff_cost': {
                 'po': ('table', 'pos', 'name'),
+                'department': ('table', 'departments', 'name'),
                 'staff_category': ('table', 'human_resource_categories', 'name'),
                 'year': ('years', 2020, 2031),
             },
@@ -512,25 +513,49 @@ def modify_table_router(action):
                 try:
                     db = connect_local()
                     cursor, cnxn = db.connect_to_db()
+
+                    # Map PO name -> po_id
+                    try:
+                        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+                        po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+                        if 'po' in df_upload.columns:
+                            df_upload['po_id'] = df_upload['po'].map(po_map)
+                    except Exception:
+                        df_upload['po_id'] = None
+
+                    # Map Department name -> department_id
+                    try:
+                        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+                        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+                        if 'department' in df_upload.columns:
+                            df_upload['department_id'] = df_upload['department'].map(dept_map)
+                    except Exception:
+                        df_upload['department_id'] = None
+
+                    # Map Staff Category name -> category_id
                     hr_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
                     hr_map = dict(zip(hr_df['name'], hr_df['id'])) if 'name' in hr_df.columns and 'id' in hr_df.columns else {}
-                    # create category_id column by mapping the provided staff_category name
                     df_upload['category_id'] = df_upload.get('staff_category').map(hr_map) if 'staff_category' in df_upload.columns else None
-                    # ensure year is int when possible
+
+                    # Types
                     if 'year' in df_upload.columns:
                         try:
                             df_upload['year'] = df_upload['year'].astype(int)
                         except Exception:
                             pass
-                    # reorder/keep only the expected columns for the human_resource_cost table
+                    if 'cost' in df_upload.columns:
+                        try:
+                            df_upload['cost'] = df_upload['cost'].astype(float)
+                        except Exception:
+                            pass
+
+                    # Keep only expected columns for upload
                     expected_cols = modify_table_config.get(action).get('columns', [])
                     keep_cols = [c for c in expected_cols if c in df_upload.columns]
                     if keep_cols:
                         df_upload = df_upload[keep_cols]
-                    df_upload['cost'] = df_upload['cost'].astype(float)
-                    
                 except Exception:
-                    # Fallback: try a simple rename if mapping failed
+                    # Fallback minimal mapping
                     try:
                         df_upload.rename(columns={'staff_category': 'category_id'}, inplace=True)
                         if 'year' in df_upload.columns:
@@ -975,125 +1000,10 @@ def modify_table_router(action):
         )
 
 
-@modify_tables.route('/change_staff_cost', methods=['POST'])
-def change_staff_cost():
-    """Handle modify action to change an existing staff cost entry.
-
-    Expects form fields: staff_category, year, cost
-    Updates human_resource_cost.cost WHERE category_id = mapped id AND year = provided year.
-    """
-    form = dict(request.form)
-    staff_category = form.get('staff_category')
-    year = form.get('year')
-    cost = form.get('cost')
-
-    try:
-        db = connect_local()
-        cursor, cnxn = db.connect_to_db()
-        # map staff category name to id
-        hr_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
-        hr_map = dict(zip(hr_df['name'], hr_df['id'])) if 'name' in hr_df.columns and 'id' in hr_df.columns else {}
-        cat_id = hr_map.get(staff_category)
-        # coerce types
-        try:
-            year_val = int(year) if year not in (None, '') else None
-        except Exception:
-            year_val = None
-        try:
-            cost_val = float(cost) if cost not in (None, '') else None
-        except Exception:
-            cost_val = None
-
-        if cat_id is None or year_val is None or cost_val is None:
-            # invalid request; redirect back with no change
-            return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
-
-        # perform update
-        cursor.execute("UPDATE human_resource_cost SET cost = ? WHERE category_id = ? AND year = ?", (cost_val, int(cat_id), int(year_val)))
-        cnxn.commit()
-    except Exception:
-        # ignore errors and redirect back
-        pass
-
-    return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
+# moved to app_local/staff_cost_routes.py: /change_staff_cost
 
 
-@modify_tables.route('/capex_forecast/change_capex_forecast', methods=['POST'])
-def change_capex_forecast():
-    """Handle modify action to change an existing capex forecast entry.
-
-    Expects form fields: po, department, cap_year, project_name, capex_description, capex_forecast, cost_center
-    Updates capex_forecasts.capex_forecast and cost_center WHERE po_id, department_id, project_id, cap_year and capex_description match.
-    """
-    form = dict(request.form)
-    po = form.get('po')
-    department = form.get('department')
-    cap_year = form.get('cap_year')
-    project_name = form.get('project_name')
-    capex_description = form.get('capex_description')
-    capex_forecast = form.get('capex_forecast')
-    cost_center = form.get('cost_center')
-
-    try:
-        # Map names to IDs
-        db = connect_local()
-        cursor, cnxn = db.connect_to_db()
-
-        pos_df = select_all_from_table(cursor, cnxn, 'pos')
-        dept_df = select_all_from_table(cursor, cnxn, 'departments')
-        proj_df = select_all_from_table(cursor, cnxn, 'projects')
-
-        po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
-        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
-        proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
-
-        po_id = po_map.get(po)
-        department_id = dept_map.get(department)
-        project_id = proj_map.get(project_name)
-
-        # Coerce numeric types
-        try:
-            cap_year_val = int(cap_year) if cap_year not in (None, '') else None
-        except Exception:
-            cap_year_val = None
-        try:
-            forecast_val = float(capex_forecast) if capex_forecast not in (None, '') else None
-        except Exception:
-            forecast_val = None
-
-        # Basic validation: required mapping fields must exist
-        if po_id is None or department_id is None or project_id is None or cap_year_val is None:
-            return redirect(url_for('modify_tables.modify_table_router', action='capex_forecast'))
-
-        # Perform update. Per requirement, identify rows by PO/Department/Project/Cap Year
-        # and update capex_description, capex_forecast and cost_center.
-        cursor.execute(
-            """
-            UPDATE capex_forecasts
-               SET capex_description = ?,
-                   capex_forecast = ?,
-                   cost_center = ?
-             WHERE po_id = ?
-               AND department_id = ?
-               AND project_id = ?
-               AND cap_year = ?
-            """,
-            (
-                capex_description,
-                forecast_val,
-                cost_center,
-                int(po_id),
-                int(department_id),
-                int(project_id),
-                int(cap_year_val),
-            ),
-        )
-        cnxn.commit()
-    except Exception:
-        # Swallow errors and redirect back for now
-        pass
-
-    return redirect(url_for('modify_tables.modify_table_router', action='capex_forecast'))
+# moved to app_local/capex_forecast_routes.py: /capex_forecast/change_capex_forecast
 
 
 @modify_tables.route('/upload_budget/change_budget', methods=['POST'])
@@ -1182,181 +1092,28 @@ def change_budget():
 
 # moved to app_local/project_routes.py: /modify_project/project_ios
 
-@modify_tables.route('/capex_forecast/po_selection', methods=['POST'])
-def modify_po_selection():
-    """Receive PO selection from client for modify forms and update module-level selected_po."""
-    global selected_po
-    try:
-        if request.is_json:
-            payload = request.get_json()
-            val = payload.get('po')
-        else:
-            val = request.form.get('po')
-        selected_po = val
-        return {'status': 'ok', 'selected_po': selected_po}, 200
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}, 500
+# moved to app_local/capex_forecast_routes.py: /capex_forecast/po_selection
 
 
-@modify_tables.route('/capex_forecast/department_selection', methods=['POST'])
-def modify_department_selection():
-    """Receive Department selection from client for modify forms and update module-level selected_department."""
-    global selected_department
-    try:
-        if request.is_json:
-            payload = request.get_json()
-            val = payload.get('department')
-        else:
-            val = request.form.get('department')
-        selected_department = val
-        return {'status': 'ok', 'selected_department': selected_department}, 200
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}, 500
+# moved to app_local/capex_forecast_routes.py: /capex_forecast/department_selection
 
 
-@modify_tables.route('/capex_forecast/cap_year_selection', methods=['POST'])
-def modify_cap_year_selection():
-    """Receive Capex year selection from client for modify forms and update module-level selected_cap_year."""
-    global selected_cap_year
-    try:
-        if request.is_json:
-            payload = request.get_json()
-            val = payload.get('cap_year')
-        else:
-            val = request.form.get('cap_year')
-        selected_cap_year = val
-        return {'status': 'ok', 'selected_cap_year': selected_cap_year}, 200
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}, 500
+# moved to app_local/capex_forecast_routes.py: /capex_forecast/cap_year_selection
 
 
-@modify_tables.route('/capex_forecast/project_selection', methods=['POST'])
-def modify_project_selection():
-    """Receive Project selection from client for modify forms and update module-level selected_project."""
-    global selected_project
-    try:
-        if request.is_json:
-            payload = request.get_json()
-            val = payload.get('project') or payload.get('project_name')
-        else:
-            val = request.form.get('project') or request.form.get('project_name')
-        selected_project = val
-        return {'status': 'ok', 'selected_project': selected_project}, 200
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}, 500
+# moved to app_local/capex_forecast_routes.py: /capex_forecast/project_selection
 
 
-@modify_tables.route('/capex_forecast/department_update', methods=['GET'])
-def capex_department_update():
-    """Return a JSON list of departments filtered by PO.
-
-    Query params:
-    - po: optional PO name to filter by. If not provided, falls back to module-level selected_po.
-    Response: { 'departments': [ ... ] }
-    """
-        # prefer explicit query parameter, fall back to module-level selected_po
-    po = request.args.get('po') or selected_po
-    df = get_departments_display()
-    if df is None or df.empty:
-        return {'departments': []}, 200
-    df_dept = df[df['name_po'] == po]
-    depts = df_dept['name_departments'].to_list()
-                
-    return {'departments': depts}, 200
+# moved to app_local/capex_forecast_routes.py: /capex_forecast/department_update
 
 
-@modify_tables.route('/capex_forecast/project_update', methods=['GET'])
-def capex_project_update():
-    """Return a JSON list of projects filtered by PO, Department and Fiscal Year.
-
-    Query params:
-    - po: optional PO name to filter by. Falls back to module-level selected_po.
-    - department: optional department name to filter by. Falls back to selected_department.
-    - fiscal_year or cap_year: optional fiscal year to filter by. Falls back to selected_cap_year.
-    Response: { 'projects': [ ... ] }
-    """
-    try:
-        po = request.args.get('po') or selected_po
-        department = request.args.get('department') or selected_department
-        fiscal_year = request.args.get('fiscal_year') or request.args.get('cap_year') or selected_cap_year
-
-        df = get_projects_display()
-        if df is None or df.empty:
-            return {'projects': []}, 200
-
-        proj_col = 'project_name' if 'project_name' in df.columns else ( 'name' if 'name' in df.columns else (df.columns[0] if len(df.columns)>0 else None))
-        dept_col = next((c for c in ('department_name','department','name') if c in df.columns), None)
-        po_col = next((c for c in ('po_name','po','name_po') if c in df.columns), None)
-        fy_col = next((c for c in ('fiscal_year','Fiscal Year') if c in df.columns), None)
-
-        filt = df
-        if po and po_col in filt.columns:
-            filt = filt[filt[po_col].astype(str) == str(po)]
-        if department and dept_col in filt.columns:
-            filt = filt[filt[dept_col].astype(str) == str(department)]
-        if fiscal_year and fy_col in filt.columns:
-            filt = filt[filt[fy_col].astype(str) == str(fiscal_year)]
-
-        try:
-            projects = list(dict.fromkeys([p for p in filt[proj_col].dropna().astype(str).tolist()])) if proj_col in filt.columns else []
-        except Exception:
-            projects = []
-
-        return {'projects': projects}, 200
-    except Exception as e:
-        return {'projects': [], 'error': str(e)}, 500
+# moved to app_local/capex_forecast_routes.py: /capex_forecast/project_update
 
 
 # moved to app_local/project_routes.py: /modify_project/departments
 
 
-@modify_tables.route('/modify_staff_cost/categories', methods=['GET'])
-def staff_cost_categories_update():
-    """Return a JSON list of staff categories filtered by PO.
-
-    Query params:
-    - po: optional PO name to filter by; if omitted, returns all categories
-    Response: { 'categories': [ ... ] }
-    """
-    try:
-        po_name = request.args.get('po')
-        db = connect_local()
-        cursor, cnxn = db.connect_to_db()
-
-        # Map PO name -> id
-        po_id = None
-        if po_name:
-            try:
-                pos_df = select_all_from_table(cursor, cnxn, 'pos')
-                if pos_df is not None and not pos_df.empty and 'name' in pos_df.columns and 'id' in pos_df.columns:
-                    pmap = dict(zip(pos_df['name'], pos_df['id']))
-                    pid = pmap.get(po_name)
-                    po_id = int(pid) if pid is not None else None
-            except Exception:
-                po_id = None
-
-        # Load human_resource_categories and filter by po_id if provided
-        cats_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
-        if cats_df is None or cats_df.empty:
-            return {'categories': []}, 200
-        filt = cats_df
-        if po_id is not None and 'po_id' in filt.columns:
-            try:
-                filt = filt[filt['po_id'].astype('Int64') == po_id]
-            except Exception:
-                filt = filt[filt['po_id'] == po_id]
-
-        names = []
-        if 'name' in filt.columns:
-            try:
-                names = filt['name'].dropna().astype(str).tolist()
-            except Exception:
-                names = filt['name'].tolist()
-        # de-duplicate while preserving order
-        names = list(dict.fromkeys(names))
-        return {'categories': names}, 200
-    except Exception as e:
-        return {'categories': [], 'error': str(e)}, 500
+# moved to app_local/staff_cost_routes.py: /modify_staff_cost/categories
 
 
 # moved to app_local/project_routes.py: /modify_project/list
