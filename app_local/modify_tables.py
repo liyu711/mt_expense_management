@@ -877,6 +877,8 @@ def modify_table_router(action):
                 'project_id': ('projects', 'id', 'name', 'Project'),
                 'io_id': ('IOs', 'id', 'IO_num', 'IO'),
                 'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
+                # Map HR category id to friendly name for staff cost table
+                'category_id': ('human_resource_categories', 'id', 'name', 'Staff Category'),
             }
             for id_col, (ref_table, ref_id, ref_name, new_col_name) in id_name_map.items():
                 if id_col in getattr(df_tbl, 'columns', []):

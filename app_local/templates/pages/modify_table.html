@@ -228,6 +228,55 @@
                                                 if(input) input.value = catName;
                                             }catch(e){}
                                         };
+                                    } else if (tableName === 'human_resource_cost'){
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                // Determine values from row with robust key detection
+                                                function pick(row, keys){
+                                                    for(var i=0;i<keys.length;i++){ var k = keys[i]; if(row.hasOwnProperty(k) && row[k] != null && row[k] !== '') return String(row[k]); }
+                                                    return '';
+                                                }
+                                                var poVal = pick(row, ['PO','po','PO Name','name_po']);
+                                                var deptVal = pick(row, ['BU','Department','department','department_name','name_departments']);
+                                                var catVal = pick(row, ['Staff Category','staff_category','Category','category','name']);
+                                                var yearVal = pick(row, ['Year','year','Fiscal Year','fiscal_year']);
+                                                var costVal = pick(row, ['Cost','cost','human_resource_expense']);
+
+                                                var poSel = modal.querySelector('select[name="po"]');
+                                                var deptSel = modal.querySelector('select[name="department"]');
+                                                var catSel = modal.querySelector('select[name="staff_category"]');
+                                                var yearSel = modal.querySelector('select[name="year"]');
+                                                var costIn = modal.querySelector('input[name="cost"]');
+
+                                                if (poSel && poVal){ poSel.value = poVal; }
+                                                if (yearSel && yearVal){ yearSel.value = String(yearVal); }
+                                                if (catSel && catVal){ catSel.value = catVal; }
+                                                if (costIn && costVal){ costIn.value = costVal; }
+
+                                                // For Department, rebuild options based on selected PO, then set value
+                                                if (poSel && deptSel && poSel.value){
+                                                    var po = poSel.value;
+                                                    fetch('/capex_forecast/department_update?po=' + encodeURIComponent(po))
+                                                        .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
+                                                        .then(function(json){
+                                                            try{
+                                                                // Rebuild department options
+                                                                while (deptSel.firstChild) deptSel.removeChild(deptSel.firstChild);
+                                                                var placeholder = document.createElement('option');
+                                                                placeholder.value = ''; placeholder.disabled = true; placeholder.selected = true; placeholder.textContent = 'Select an option';
+                                                                deptSel.appendChild(placeholder);
+                                                                (json && json.departments ? json.departments : []).forEach(function(name){
+                                                                    var opt = document.createElement('option'); opt.value = name; opt.textContent = name; deptSel.appendChild(opt);
+                                                                });
+                                                                if (deptVal){ deptSel.value = deptVal; }
+                                                            }catch(e){}
+                                                        })
+                                                        .catch(function(){});
+                                                } else if (deptSel && deptVal){
+                                                    deptSel.value = deptVal;
+                                                }
+                                            }catch(e){}
+                                        };
                                     }
                                 }
                                 GenericTable.create(el, opts);
