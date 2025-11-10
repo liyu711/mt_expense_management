@@ -206,11 +206,11 @@
                     </div>
                     <div class="form-group">
                         <label for="Project_Category_modify">Project Category</label>
-                        <input type="text" name="Project_Category" id="project_category_modify" required value="">
+                        <input type="text" name="Project_Category" id="project_category_modify" required value="" readonly style="background:#f9f9f9; cursor:not-allowed;">
                     </div>
                     <div class="form-group">
                         <label for="IO_modify">IO</label>
-                        <input type="text" name="IO" id="io_modify" required value="">
+                        <input type="text" name="IO" id="io_modify" required value="" readonly style="background:#f9f9f9; cursor:not-allowed;">
                     </div>
                     <div class="form-group">
                         <label>Human Resource FTEs</label>
@@ -220,7 +220,7 @@
                     </div>
                     <div class="form-group">
                         <label for="Non_personnel_cost_modify">Non-personnel Expense</label>
-                        <input type="text" name="Non_personnel_cost" id="Non_personnel_cost_modify">
+                        <input type="number" name="Non_personnel_cost" id="Non_personnel_cost_modify" step="0.01" inputmode="decimal" pattern="^-?\\d+(?:\\.\\d{1,4})?$" style="width:100%;">
                     </div>
                     <div style="margin-top:12px;">
                         <button type="submit">Submit</button>
@@ -470,8 +470,128 @@
                         var cols = JSON.parse(el.getAttribute('data-cols') || '[]');
                         var data = JSON.parse(el.getAttribute('data-rows') || '[]');
                         var rows = (data||[]).map(function(arr){ var o={}; (cols||[]).forEach(function(c,i){ o[c] = (arr||[])[i]; }); return o; });
-                        GenericTable.create(el, { columns: cols, rows: rows, defaultPageSize: 25 });
-                    }catch(e){}
+                        // Helper slugify (scoped)
+                        function slugify(str){ return String(str||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
+                        // Prefill logic for modify modal when a table row is clicked
+                        function prefillModifyModal(modal, row){
+                            if(!modal || !row) return;
+                            // Reset first to ensure clean state
+                            if (typeof window.resetModifyForecastForm === 'function') window.resetModifyForecastForm();
+                            // Core elements
+                            var poSel = document.getElementById('po_select_modify');
+                            var deptSel = document.getElementById('department_select_modify');
+                            var fySel = document.getElementById('fiscal_year_modify');
+                            var projSel = document.getElementById('project_name_modify');
+                            var pcInp = document.getElementById('project_category_modify');
+                            var ioInp = document.getElementById('io_modify');
+                            var nonpcInp = document.getElementById('Non_personnel_cost_modify');
+                            var fiscalYear = row['Fiscal Year'] || row['fiscal_year'];
+                            // Set PO immediately
+                            if (poSel && row['PO']) { poSel.value = row['PO']; }
+                            // Fetch departments for PO then set Department
+                            function fetchDepartments(){
+                                return new Promise(function(resolve){
+                                    if (!row['PO']) return resolve();
+                                    fetch('/manual_input/departments?po=' + encodeURIComponent(row['PO']))
+                                      .then(r=>r.json()).then(function(j){
+                                        if (j && Array.isArray(j.departments) && deptSel){
+                                            // rebuild options
+                                            while (deptSel.firstChild) deptSel.removeChild(deptSel.firstChild);
+                                            var ph = document.createElement('option'); ph.value=''; ph.textContent='Select BU'; deptSel.appendChild(ph);
+                                            j.departments.forEach(function(d){
+                                                var opt = document.createElement('option');
+                                                opt.value = d.name; opt.textContent = d.name; deptSel.appendChild(opt);
+                                            });
+                                            if (row['Department']) deptSel.value = row['Department'];
+                                        }
+                                        resolve();
+                                      }).catch(function(){ resolve(); });
+                                });
+                            }
+                            function fetchProjects(){
+                                return new Promise(function(resolve){
+                                    var qs = [];
+                                    if (row['PO']) qs.push('po=' + encodeURIComponent(row['PO']));
+                                    if (row['Department']) qs.push('department=' + encodeURIComponent(row['Department']));
+                                    if (fiscalYear) qs.push('fiscal_year=' + encodeURIComponent(fiscalYear));
+                                    var url = '/manual_input/projects' + (qs.length?('?' + qs.join('&')):'');
+                                    fetch(url).then(r=>r.json()).then(function(j){
+                                        if (j && Array.isArray(j.projects) && projSel){
+                                            while (projSel.firstChild) projSel.removeChild(projSel.firstChild);
+                                            var ph = document.createElement('option'); ph.value=''; ph.textContent='Select Project'; projSel.appendChild(ph);
+                                            j.projects.forEach(function(p){
+                                                var opt = document.createElement('option');
+                                                opt.value = p.name; opt.textContent = p.name; projSel.appendChild(opt);
+                                            });
+                                            if (row['Project'] || row['Project Name']) {
+                                                var pname = row['Project'] || row['Project Name'];
+                                                projSel.value = pname;
+                                            }
+                                        }
+                                        resolve();
+                                    }).catch(function(){ resolve(); });
+                                });
+                            }
+                            // Set fiscal year select
+                            if (fySel && fiscalYear){ fySel.value = fiscalYear; }
+                            // Sequential async population
+                            fetchDepartments().then(fetchProjects).then(function(){
+                                if (pcInp && row['Project Category']) pcInp.value = row['Project Category'];
+                                if (ioInp && row['IO']) ioInp.value = row['IO'];
+                                var nonpc = (row['Non-personnel Forecast']!=null && row['Non-personnel Forecast']!=='') ? row['Non-personnel Forecast'] : row['Non-personnel Expense'];
+                                if (nonpcInp && nonpc!=null && nonpc!=='') nonpcInp.value = nonpc;
+                                // Prefill per-category FTEs by converting cost -> FTE using /api/hr_cost
+                                var year = fiscalYear;
+                                var promises = [];
+                                Object.keys(row).forEach(function(key){
+                                    if (['id','PO','Department','Fiscal Year','Project Category','Project','Project Name','IO','Forecast Sum','Non-personnel Forecast'].indexOf(key) >= 0) return;
+                                    // Remaining keys are HR categories (cost values)
+                                    var costVal = row[key];
+                                    if (costVal == null || costVal === '') return;
+                                    var catName = key;
+                                    var slug = slugify(catName);
+                                    var fteInput = document.querySelector('#modify_forecast input[name="fte__' + slug + '"]');
+                                    if (!fteInput) return;
+                                    // fetch base cost
+                                    promises.push(
+                                        fetch('/api/hr_cost?category=' + encodeURIComponent(catName) + '&year=' + encodeURIComponent(year))
+                                          .then(r=>r.json())
+                                          .then(function(j){
+                                            var base = j && j.cost != null ? parseFloat(j.cost) : null;
+                                            var c = parseFloat(costVal);
+                                            if (base && base > 0){
+                                                var fte = c / base;
+                                                fteInput.value = (isFinite(fte)? fte.toFixed(1): '0');
+                                            } else {
+                                                // fallback can't derive FTE, set 0
+                                                fteInput.value = '0';
+                                            }
+                                          }).catch(function(){ fteInput.value = '0'; })
+                                    );
+                                });
+                                Promise.all(promises).then(function(){
+                                    // Recalculate cost spans based on filled FTEs
+                                    if (typeof window.updateAllHrCosts === 'function') window.updateAllHrCosts();
+                                });
+                            });
+                        }
+                        GenericTable.create(el, {
+                            columns: cols,
+                            rows: rows,
+                            defaultPageSize: 25,
+                            rowClickEditModal: {
+                                selector: '#modifyForecastModal',
+                                prefill: prefillModifyModal,
+                                onOpen: function(modal,row){
+                                    // Ensure HR cost listeners bound (modify scope)
+                                    if (typeof window.bindHrFteListenersModify === 'function') window.bindHrFteListenersModify();
+                                    // Focus first field for usability
+                                    var first = modal.querySelector('select, input');
+                                    if (first) first.focus();
+                                }
+                            }
+                        });
+                    }catch(e){ console.warn('Failed to mount forecasts table', e); }
                 }
                 if (document.readyState === 'complete' || document.readyState === 'interactive'){
                     mount('gt-forecasts');

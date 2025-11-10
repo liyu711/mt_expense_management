@@ -460,6 +460,30 @@ def render_mannual_input():
         # Use source names for value lookup; only headers are renamed for display
         combined_data.append([d.get(c, None) for c in combined_columns])
 
+    # Remove IO from display table entirely (do not send IO as a visible column).
+    # This strips the IO column from both the displayed headers and from the data rows.
+    try:
+        # possible IO column names (prefer 'IO')
+        io_names = ['IO', 'IO Number', 'IO_num']
+        io_idx = None
+        for name in io_names:
+            if name in combined_columns:
+                io_idx = combined_columns.index(name)
+                break
+        if io_idx is not None:
+            # remove from combined_columns and display headers
+            combined_columns.pop(io_idx)
+            combined_columns_display.pop(io_idx)
+            # remove the corresponding value from each data row
+            for row in combined_data:
+                try:
+                    if len(row) > io_idx:
+                        row.pop(io_idx)
+                except Exception:
+                    pass
+    except Exception:
+        pass
+
     return render_template("pages/manual_input.html", 
                            input_types = input_types, 
                            titles = titles, 
