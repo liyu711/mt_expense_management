@@ -1,0 +1,5 @@
+PO,Department,fiscal_year,Project Name,capex_description,Project number,Expense,expense_date
+PO_1,DEPT_05,2025,Project 24,Capex 7,719819,6258.85,2025-1-1
+PO_1,DEPT_05,2025,Project 67,Capex 83,661831,6700.12,2025-1-2
+PO_1,DEPT_05,2025,Project 47,Capex 99,220940,5846.29,2025-1-3
+PO_1,DEPT_03,2025,Project 9,Capex 36,966778,5854.52,2025-1-4

@@ -90,20 +90,23 @@ def check_missing_attribute(df_upload, table_name, type):
         engine, cursor, cnxn = conn.connect_to_db(engine=True)
     if table_name in tables_allow_empty:
         return False, None
-    columns_check = []
-    for column in df_upload.columns:
-        if column in columns_to_check:
-            columns_check.append(column)
+    # Only check columns we recognize and that are present in the upload
+    columns_check = [c for c in df_upload.columns if c in columns_to_check]
     for column in columns_check:
         table = column_name_to_table[column]
         df = select_all_from_table(cursor, cnxn, table)
-        db_values = df['name'].values
-        df_values = df_upload[column].values
-        for value in df_values:
-            value = str(value)
-            if value not in db_values:
-                print('test2')
+        if df is None or df.empty or 'name' not in df.columns:
+            # If reference table is empty, treat as missing to prevent silent bad uploads
+            return True, column
+        # Normalize DB names to trimmed strings for robust comparison
+        try:
+            db_values_norm = set([str(v).strip() for v in df['name'].values if v is not None])
+        except Exception:
+            db_values_norm = set()
+        # Compare upload column values normalized to string
+        for value in df_upload[column].values:
+            val_norm = str(value).strip()
+            if val_norm not in db_values_norm:
                 return True, column
-        print('test3')
     return False, None
 

@@ -17,10 +17,9 @@ conn = connect_local()
 @upload_requests.route("/file_upload", methods=['GET', 'POST'])
 def workstation_page():
     engine, cursor, cnxn = conn.connect_to_db(engine=True)
+    # Limit upload options to operational expense uploads only as requested
     options = [
-        'budgets', 'expenses', 'fundings',
-        'project_forecasts_nonpc', 'project_forecasts_pc',
-        'capex_forecasts', 'capex_budgets', 'capex_expenses'
+        'expenses', 'capex_expenses'
     ]
     options_map = {
         'project_forecasts_nonpc': upload_nonpc_forecasts_local,
@@ -51,6 +50,41 @@ def workstation_page():
             
             filename = secure_filename(file.filename) # Secure the filename
             df = pd.read_csv(file)
+            # Normalize column names (trim whitespace) before any validations
+            try:
+                df.columns = [str(c).strip() for c in df.columns]
+            except Exception:
+                pass
+            # Special handling for CapEx Expenses uploads: clean and coerce types before validation/upload
+            if selected_option == 'capex_expenses':
+                # Drop optional Date column if present; uploader derives expense_date from fiscal_year
+                if 'Date' in df.columns:
+                    try:
+                        df = df.drop(columns=['Date'])
+                    except Exception:
+                        pass
+                # Ensure required columns exist
+                required_cols = ['PO', 'Department', 'fiscal_year', 'Project Name', 'capex_description', 'Project number', 'Expense']
+                missing = [c for c in required_cols if c not in df.columns]
+                if missing:
+                    flash(f"Missing required column(s) for CapEx Expenses: {', '.join(missing)}", 'error')
+                    return redirect(url_for('upload_requests.workstation_page'))
+                # Coerce to expected dtypes (best-effort)
+                try:
+                    df['PO'] = df['PO'].astype(str)
+                except Exception:
+                    pass
+                for c in ['fiscal_year', 'Project number']:
+                    if c in df.columns:
+                        try:
+                            df[c] = pd.to_numeric(df[c], errors='coerce').astype('Int64')
+                        except Exception:
+                            pass
+                if 'Expense' in df.columns:
+                    try:
+                        df['Expense'] = pd.to_numeric(df['Expense'], errors='coerce')
+                    except Exception:
+                        pass
             # status = check_input_integrity(df, selected_option)
             # if status:
             #     return f"Data mismatch "
@@ -74,15 +108,22 @@ def workstation_page():
                 except Exception:
                     # Non-fatal: proceed without dedup if anything goes wrong
                     pass
+            
 
-            if options_map[selected_option]:
-                try:       
-                    options_map[selected_option](df)
-                    flash(f'File {filename} uploaded successfully!', 'success')
-                except Exception as e:
-                    flash(f'Cannot upload {selected_option}. Please check input type.', 'error')
-            else:
-                flash(f'File type {selected_option} invalid.', 'error')
+            # Perform upload
+            try:
+                if selected_option == 'capex_expenses':
+                    # Use local CapEx expense uploader; append without clearing existing data
+                    upload_capex_expense_local(df, clear=False)
+                else:
+                    if options_map.get(selected_option):
+                        options_map[selected_option](df)
+                    else:
+                        flash(f'File type {selected_option} invalid.', 'error')
+                        return redirect(url_for('upload_requests.workstation_page'))
+                flash(f'File {filename} uploaded successfully!', 'success')
+            except Exception as e:
+                flash(f'Cannot upload {selected_option}. Please check input type.', 'error')
             return redirect(url_for('upload_requests.workstation_page'))
             
     return render_template("pages/file_upload.html", options=options, selected_option=selected_option, display_names=DISPLAY_NAMES)

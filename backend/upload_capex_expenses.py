@@ -61,8 +61,8 @@ def upload_capex_expense_df(df_upload, engine, cursor, cnxn, type, clear=True):
         projects,
         'Project Name',
         'name',
-        ['Project Name', 'name', 'category_id', 'Department'],
-        {'id': 'project_id', 'fiscal_year': 'cap_year', 'Expense': 'expense', 'Project number': 'project_number'}
+        ['Project Name', 'name', 'category_id', 'Department','fiscal_year_y'],
+        {'id': 'project_id', 'fiscal_year_x': 'cap_year', 'Expense': 'expense', 'Project number': 'project_number'}
     )
 
     df_upload.to_sql('capex_expenses', con=engine, if_exists='append', index=False)
