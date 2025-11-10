@@ -56,7 +56,7 @@
             display: block;
         }
 
-        /* Page flex layout: top (rest) 10%, each table 45% */
+        /* Page flex layout: header 10%, table takes remaining height */
         .page-wrapper {
             display: flex;
             flex-direction: column;
@@ -73,8 +73,9 @@
         }
 
         .table-container {
-            flex: 0 0 45vh;
-            /* each table takes 45% of viewport height */
+            /* Let table take all remaining vertical space under the header */
+            flex: 1 1 auto;
+            min-height: 0; /* allows child to size and scroll properly in flex container */
             padding-left: 24px;
             box-sizing: border-box;
             overflow: auto;
@@ -234,7 +235,7 @@
         {% if combined_forecast_columns %}
         <div class="table-container">
             <h3>Project Forecasts</h3>
-            <div id="gt-forecasts" style="height:45vh;" data-cols='{{ combined_forecast_columns|tojson|safe }}' data-rows='{{ (combined_forecast_data or [])|tojson|safe }}'></div>
+            <div id="gt-forecasts" style="height:100%;" data-cols='{{ combined_forecast_columns|tojson|safe }}' data-rows='{{ (combined_forecast_data or [])|tojson|safe }}' data-group-start='{{ (personnel_group_columns or [])|first }}' data-group-end='{{ (personnel_group_columns or [])|last }}'></div>
         </div>
         {% endif %}
 
@@ -469,6 +470,18 @@
                     try{
                         var cols = JSON.parse(el.getAttribute('data-cols') || '[]');
                         var data = JSON.parse(el.getAttribute('data-rows') || '[]');
+                        // Determine personnel cost group boundaries (all HR category columns). We infer by finding contiguous block after known base columns.
+                        // Since backend sends HR category columns toward the end, we can use provided first/last marker plus heuristics.
+                        var firstCat = el.getAttribute('data-group-start');
+                        var lastCat = el.getAttribute('data-group-end');
+                        var groupCols = [];
+                        if (firstCat && lastCat) {
+                            var firstIdx = cols.indexOf(firstCat);
+                            var lastIdx = cols.indexOf(lastCat);
+                            if (firstIdx >= 0 && lastIdx >= firstIdx) {
+                                for (var i = firstIdx; i <= lastIdx; i++) groupCols.push(cols[i]);
+                            }
+                        }
                         var rows = (data||[]).map(function(arr){ var o={}; (cols||[]).forEach(function(c,i){ o[c] = (arr||[])[i]; }); return o; });
                         // Helper slugify (scoped)
                         function slugify(str){ return String(str||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
@@ -579,6 +592,7 @@
                             columns: cols,
                             rows: rows,
                             defaultPageSize: 25,
+                            groups: groupCols.length ? { 'Personnel Cost': groupCols } : null,
                             rowClickEditModal: {
                                 selector: '#modifyForecastModal',
                                 prefill: prefillModifyModal,

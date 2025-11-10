@@ -600,6 +600,7 @@ def render_mannual_input():
                            projects = [],
                            project_categories=[],
                            human_resource_categories= human_resource_categories,
+                           personnel_group_columns= hr_category_list,  # for grouped header 'Personnel Cost'
                            combined_forecast_columns=combined_columns_display,
                            combined_forecast_data=combined_data
                            )

@@ -53,9 +53,10 @@
     const table = document.createElement('table');
     table.className = 'gt-table';
 
-  const thead = document.createElement('thead');
-  const headerRow = document.createElement('tr');
-  const filterRow = document.createElement('tr');
+    const thead = document.createElement('thead');
+    const groupRow = document.createElement('tr'); // optional top grouping row
+    const headerRow = document.createElement('tr');
+    const filterRow = document.createElement('tr');
 
     // Helpers to update sort button icons based on state
     function updateSortIcon(th){
@@ -121,8 +122,50 @@
         refresh();
       });
     });
-  thead.appendChild(headerRow);
-  thead.appendChild(filterRow);
+    // If grouping requested, add a grouping row spanning the grouped columns.
+    // cfg.groups structure: { GroupLabel: [col1,col2,...] }
+    if (cfg.groups && typeof cfg.groups === 'object') {
+      // For now support single group (Personnel Cost). Additional groups can be added similarly.
+      Object.keys(cfg.groups).forEach(function(gLabel){
+        const colsInGroup = cfg.groups[gLabel] || [];
+        if(!Array.isArray(colsInGroup) || !colsInGroup.length) return;
+        // Determine contiguous span indices
+        const indices = colsInGroup.map(function(c){ return cfg.columns.indexOf(c); }).filter(function(i){ return i >= 0; }).sort(function(a,b){return a-b;});
+        if(!indices.length) return;
+        const first = indices[0];
+        const last = indices[indices.length - 1];
+        // Build cells before group (empty placeholders)
+        for (let i = 0; i < first; i++) {
+          const emptyTh = document.createElement('th');
+          emptyTh.className = 'gt-group-spacer';
+          emptyTh.style.background = '#f5f5f5';
+          emptyTh.style.borderBottom = 'none';
+          groupRow.appendChild(emptyTh);
+        }
+        // Group header cell
+        const gth = document.createElement('th');
+        gth.className = 'gt-group-header';
+        gth.textContent = gLabel;
+        gth.colSpan = (last - first + 1);
+        gth.style.textAlign = 'center';
+        gth.style.background = '#e9ecef';
+        gth.style.fontWeight = '600';
+        groupRow.appendChild(gth);
+        // Remaining columns after group
+        for (let i = last + 1; i < cfg.columns.length; i++) {
+          const emptyTh = document.createElement('th');
+          emptyTh.className = 'gt-group-spacer';
+          emptyTh.style.background = '#f5f5f5';
+          emptyTh.style.borderBottom = 'none';
+          groupRow.appendChild(emptyTh);
+        }
+      });
+      // Append grouping row only if it has children
+      if(groupRow.children.length){ thead.appendChild(groupRow); }
+    }
+
+    thead.appendChild(headerRow);
+    thead.appendChild(filterRow);
 
     const tbody = document.createElement('tbody');
 
@@ -370,10 +413,12 @@
       .gt-page-size{padding:6px 8px;}
       .gt-table-wrap{overflow:auto;flex:1 1 auto;}
       .gt-table{border-collapse:collapse;width:100%;}
-      .gt-table th,.gt-table td{border:1px solid #ddd;padding:6px 8px;}
+  .gt-table th,.gt-table td{border:1px solid #ddd;padding:6px 8px;}
   .gt-table th{position:sticky;top:0;background:#f5f5f5;white-space:nowrap;}
   .gt-col-label{margin-right:6px;display:inline-block;vertical-align:middle;}
   .gt-sort{margin:0 6px 0 0;padding:2px 6px;width:1.5em;display:inline-flex;justify-content:center;align-items:center;line-height:1;box-sizing:content-box;white-space:nowrap;overflow:hidden;}
+  .gt-group-header{position:static !important;}
+  .gt-group-spacer{position:static !important;}
       .gt-filter{padding:2px 6px;}
       .gt-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;}
       .gt-pager button{margin:0 4px;}
