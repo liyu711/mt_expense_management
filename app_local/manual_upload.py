@@ -350,9 +350,113 @@ def render_mannual_input():
     # 5. Build combined rows: start from nonpc rows, then add pc-only keys.
     combined_rows_dicts = []
 
-    def extract_cost(pr):
-        # Personnel cost may exist under several column names after transform_table
-        return pr.get('Personnel Expense') or pr.get('Personnel Cost') or pr.get('personnel_expense')
+    # Build base cost lookup with priority keys:
+    # (po_name_lower|None, dept_name_lower|None, category_name_lower, fiscal_year) -> base_cost
+    # We'll fall back progressively: (PO,Dept,Cat,Year) -> (PO,None,Cat,Year) -> (None,Dept,Cat,Year) -> (None,None,Cat,Year)
+    base_cost_lookup = {}
+    try:
+        hr_cost_df = select_all_from_table(cursor, cnxn, 'human_resource_cost')
+        hr_cat_df_full = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+        if hr_cost_df is not None and hr_cat_df_full is not None and 'category_id' in hr_cost_df.columns and 'year' in hr_cost_df.columns:
+            # Map ids -> names for category/PO/Department
+            cat_id_to_name = {}
+            try:
+                if 'id' in hr_cat_df_full.columns and 'name' in hr_cat_df_full.columns:
+                    cat_id_to_name = dict(zip(hr_cat_df_full['id'], hr_cat_df_full['name']))
+            except Exception:
+                cat_id_to_name = {}
+            # POs and Departments for name resolution
+            pos_df2 = select_all_from_table(cursor, cnxn, 'pos')
+            depts_df2 = select_all_from_table(cursor, cnxn, 'departments')
+            po_id_to_name = {}
+            dept_id_to_name = {}
+            try:
+                if pos_df2 is not None and 'id' in pos_df2.columns and 'name' in pos_df2.columns:
+                    po_id_to_name = dict(zip(pos_df2['id'], pos_df2['name']))
+            except Exception:
+                po_id_to_name = {}
+            try:
+                if depts_df2 is not None and 'id' in depts_df2.columns and 'name' in depts_df2.columns:
+                    dept_id_to_name = dict(zip(depts_df2['id'], depts_df2['name']))
+            except Exception:
+                dept_id_to_name = {}
+
+            for _, r in hr_cost_df.iterrows():
+                try:
+                    cid = r.get('category_id')
+                    year_val = r.get('year')
+                    cost_val = r.get('cost')
+                    po_id_row = r.get('po_id') if 'po_id' in hr_cost_df.columns else None
+                    dept_id_row = r.get('department_id') if 'department_id' in hr_cost_df.columns else None
+                    cat_name = cat_id_to_name.get(cid) or (cid if isinstance(cid, str) else None)
+                    if cat_name is None or year_val is None:
+                        continue
+                    po_name = po_id_to_name.get(po_id_row) if po_id_row is not None else None
+                    dept_name = dept_id_to_name.get(dept_id_row) if dept_id_row is not None else None
+                    key = (
+                        (str(po_name).strip().lower() if po_name not in (None, '') else None),
+                        (str(dept_name).strip().lower() if dept_name not in (None, '') else None),
+                        str(cat_name).strip().lower(),
+                        int(year_val)
+                    )
+                    if cost_val is not None:
+                        base_cost_lookup[key] = cost_val
+                    # Also store fallbacks without PO/Dept to ease lookup
+                    key_po_only = (key[0], None, key[2], key[3])
+                    key_dept_only = (None, key[1], key[2], key[3])
+                    key_none = (None, None, key[2], key[3])
+                    if cost_val is not None:
+                        # only set if not already present to preserve more specific entries
+                        base_cost_lookup.setdefault(key_po_only, cost_val)
+                        base_cost_lookup.setdefault(key_dept_only, cost_val)
+                        base_cost_lookup.setdefault(key_none, cost_val)
+                except Exception:
+                    continue
+    except Exception:
+        base_cost_lookup = {}
+
+    def compute_personnel_cost(pr):
+        """Derive personnel cost = FTE * base_cost(category, fiscal_year). Falls back to stored Personnel Expense if present."""
+        # Attempt to read previously stored cost columns (legacy) first
+        legacy_cost = pr.get('Personnel Expense') or pr.get('Personnel Cost') or pr.get('personnel_expense')
+        # Determine FTE and category
+        cat = pr.get('Human resource category') or pr.get('Staff Category')
+        fte_raw = pr.get('Human resource FTE') or pr.get('Work Hours(FTE)') or pr.get('human_resource_fte')
+        fy = pr.get('Fiscal Year') or pr.get('fiscal_year')
+        po_name = pr.get('PO') or pr.get('PO_id')
+        dept_name = pr.get('Department') or pr.get('Department Name')
+        try:
+            fte_val = float(fte_raw)
+        except Exception:
+            fte_val = None
+        try:
+            fy_val = int(fy)
+        except Exception:
+            fy_val = None
+        if cat and fte_val is not None and fy_val is not None:
+            # try most specific -> least specific
+            cat_key = str(cat).strip().lower()
+            po_key = str(po_name).strip().lower() if po_name not in (None, '') else None
+            dept_key = str(dept_name).strip().lower() if dept_name not in (None, '') else None
+            base_cost = None
+            for k in [
+                (po_key, dept_key, cat_key, fy_val),
+                (po_key, None, cat_key, fy_val),
+                (None, dept_key, cat_key, fy_val),
+                (None, None, cat_key, fy_val)
+            ]:
+                if k in base_cost_lookup:
+                    base_cost = base_cost_lookup.get(k)
+                    if base_cost is not None:
+                        break
+            try:
+                base_num = float(base_cost) if base_cost is not None else None
+            except Exception:
+                base_num = None
+            if base_num is not None:
+                return base_num * fte_val
+        # fallback to legacy stored cost value if available
+        return legacy_cost
 
     def build_row_base(source_dict):
         return {c: source_dict.get(c) for c in base_cols_order}
@@ -364,13 +468,13 @@ def render_mannual_input():
         # Initialize all hr category columns as None
         for cat in hr_category_list:
             row[cat] = None
-        # Fill with cost values from matching personnel rows
+        # Fill with derived personnel cost values from matching personnel rows
         for pr in pc_group.get(key, []):
             cat = pr.get('Human resource category') or pr.get('Staff Category')
             if cat:
                 cat_norm = str(cat).strip()
                 if cat_norm in row:
-                    cost_val = extract_cost(pr)
+                    cost_val = compute_personnel_cost(pr)
                     # If multiple rows for same category, sum them
                     try:
                         if row[cat_norm] is None:
@@ -403,7 +507,7 @@ def render_mannual_input():
                 continue
             cat_norm = str(cat).strip()
             if cat_norm in row:
-                cost_val = extract_cost(pr)
+                cost_val = compute_personnel_cost(pr)
                 try:
                     if row[cat_norm] is None:
                         row[cat_norm] = cost_val
@@ -1135,10 +1239,44 @@ def manual_change_forecast():
                 if not dfi.empty:
                     io_id = dfi.iloc[0]['id']
 
+        # Helper to infer IO when it's not provided in the form (IO removed from UI)
+        def infer_io_id_for_category(cat_id_local):
+            try:
+                if None in (po_id, dept_id, proj_id, pc_id, fy_val) or cat_id_local is None:
+                    return None
+                # Find distinct io_id values for the matching key in project_forecasts_pc
+                cursor.execute(
+                    """
+                    SELECT DISTINCT io_id
+                      FROM project_forecasts_pc
+                     WHERE PO_id = ? AND department_id = ? AND project_id = ?
+                       AND project_category_id = ? AND fiscal_year = ? AND human_resource_category_id = ?
+                    """,
+                    (int(po_id), int(dept_id), int(proj_id), int(pc_id), int(fy_val), int(cat_id_local))
+                )
+                rows = cursor.fetchall()
+                if not rows:
+                    return None
+                # If exactly one IO matches, use it; otherwise ambiguous
+                distinct_ios = list({r[0] for r in rows if r and r[0] is not None})
+                if len(distinct_ios) == 1:
+                    return distinct_ios[0]
+                return None
+            except Exception:
+                return None
+
         # HR category id
         hr_cat_id = None
         if hrc_df is not None and 'name' in hrc_df.columns and 'id' in hrc_df.columns:
-            hr_cat_id = dict(zip(hrc_df['name'], hrc_df['id'])).get(hr_category)
+            try:
+                # exact match
+                hr_cat_id = dict(zip(hrc_df['name'], hrc_df['id'])).get(hr_category)
+                if hr_cat_id is None and hr_category:
+                    # case-insensitive fallback
+                    name_lower_map = {str(n).strip().lower(): i for n, i in zip(hrc_df['name'], hrc_df['id'])}
+                    hr_cat_id = name_lower_map.get(str(hr_category).strip().lower())
+            except Exception:
+                hr_cat_id = None
 
         # Coerce numbers
         fy_val = None
@@ -1186,15 +1324,17 @@ def manual_change_forecast():
                 hr_cat_id_local = None
                 if hrc_df is not None and 'name' in hrc_df.columns and 'id' in hrc_df.columns:
                     try:
+                        # exact, then case-insensitive fallback
                         hr_cat_id_local = dict(zip(hrc_df['name'], hrc_df['id'])).get(cat_name)
+                        if hr_cat_id_local is None and cat_name:
+                            name_lower_map = {str(n).strip().lower(): i for n, i in zip(hrc_df['name'], hrc_df['id'])}
+                            hr_cat_id_local = name_lower_map.get(str(cat_name).strip().lower())
                     except Exception:
                         hr_cat_id_local = None
                 try:
                     fte_local = float(fte_raw)
                 except Exception:
                     fte_local = 0.0
-                if fte_local == 0.0:
-                    continue
                 # Compute cost = base_cost(category, year) * fte
                 base_cost = None
                 try:
@@ -1225,7 +1365,9 @@ def manual_change_forecast():
                 except Exception:
                     cnum = 0.0
                 total_personnel_cost += (cnum * fte_local)
-                if all(v is not None for v in (po_id, dept_id, proj_id, io_id, pc_id, fy_val, hr_cat_id_local)):
+                # Determine IO for update: use provided io_id or infer from existing rows
+                candidate_io_id = io_id if io_id is not None else infer_io_id_for_category(hr_cat_id_local)
+                if all(v is not None for v in (po_id, dept_id, proj_id, candidate_io_id, pc_id, fy_val, hr_cat_id_local)):
                     try:
                         cursor.execute(
                             """
@@ -1234,7 +1376,7 @@ def manual_change_forecast():
                              WHERE PO_id = ? AND department_id = ? AND project_id = ? AND io_id = ?
                                AND project_category_id = ? AND fiscal_year = ? AND human_resource_category_id = ?
                             """,
-                            (fte_local, int(po_id), int(dept_id), int(proj_id), int(io_id), int(pc_id), int(fy_val), int(hr_cat_id_local))
+                            (fte_local, int(po_id), int(dept_id), int(proj_id), int(candidate_io_id), int(pc_id), int(fy_val), int(hr_cat_id_local))
                         )
                     except Exception:
                         pass
