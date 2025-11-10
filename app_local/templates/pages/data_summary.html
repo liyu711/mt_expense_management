@@ -48,39 +48,7 @@
                     {% endif %}
                 </select>
             </div>
-            <div id="project_wrapper" class="{% if not selected_fiscal_year %}hidden{% endif %}" style="margin-top:10px;">
-                <label for="project">Choose Project</label>
-                <select name="project" id="project">
-                    <option value="">-- select Project --</option>
-                    <option value="All" {% if selected_project == 'All' %}selected{% endif %}>All</option>
-                    {% if projects %}
-                        {% for p in projects %}
-                            {% set pname = p.get('name') or p.get('Project') or p.get('project') %}
-                            <option value="{{ pname }}" data-project="{{ pname }}" {% if selected_project and selected_project == pname %}selected{% endif %}>{{ pname }}</option>
-                        {% endfor %}
-                    {% endif %}
-                </select>
-            </div>
-            <script>
-                (function(){
-                    var project = document.getElementById('project');
-                    if(!project) return;
-                    project.addEventListener('change', function(){
-                        var val = project.value;
-                        fetch('/data_summary/project_selection', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ project: val })
-                        }).then(function(resp){
-                            if(resp.ok){
-                                window.location.reload();
-                            } else {
-                                console.error('Failed to set Project');
-                            }
-                        }).catch(function(err){ console.error(err); });
-                    });
-                })();
-            </script>
+            
             <script>
                 // Ensure the handler is attached after the DOM is ready so the button exists
                 document.addEventListener('DOMContentLoaded', function(){
@@ -168,19 +136,16 @@
                                 if(po.value && po.value !== '') deptWrap.style.display = '';
                                 else deptWrap.style.display = 'none';
                             }
-                            // reset UI selects for department, fiscal year and project
+                            // reset UI selects for department and fiscal year (project filter removed)
                             var dept = document.getElementById('department');
                             var fy = document.getElementById('fiscal_year');
-                            var project = document.getElementById('project');
                             if(dept) { dept.selectedIndex = 0; }
                             if(fy) { fy.selectedIndex = 0; }
-                            if(project) { project.selectedIndex = 0; }
 
-                            // clear server-side selections for department/fiscal_year/project before applying new PO
+                            // clear server-side selections for department/fiscal_year before applying new PO
                             var clearPromises = [];
                             clearPromises.push(fetch('/data_summary/department_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department: '' }) }).catch(function(){}) );
                             clearPromises.push(fetch('/data_summary/fiscal_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ fiscal_year: '' }) }).catch(function(){}) );
-                            clearPromises.push(fetch('/data_summary/project_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ project: '' }) }).catch(function(){}) );
 
                             Promise.all(clearPromises).then(function(){
                                 // now send PO selection to server

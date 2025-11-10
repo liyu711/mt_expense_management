@@ -2,8 +2,8 @@ from flask import render_template, request, Blueprint
 from backend.connect_local import connect_local, select_all_from_table
 from backend.display_names import DISPLAY_NAMES
 from backend import \
-    get_departments_display, get_forecasts_display, get_pc_display, get_projects_display,\
-    get_nonpc_display, get_budget_display_table, create_funding_display
+    get_departments_display, get_forecasts_display, get_pc_display, \
+    get_nonpc_display, get_budget_display_table, create_funding_display, get_capex_expenses_display, get_expenses_display
 import pandas as pd
 
 data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates')
@@ -12,7 +12,7 @@ data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates
 selected_po = None
 selected_department = None
 selected_fiscal_year = None
-selected_project = None
+selected_project = None  # deprecated: project filter removed
 
 
 @data_summary_bp.route('/data_summary', methods=['GET', 'POST'])
@@ -23,14 +23,14 @@ def data_summary():
     # Prepare DataFrame variables from database tables for use in summary and filtering
     po_df = select_all_from_table(cursor, cnxn, 'pos')
     departments_df = get_departments_display()
-    project_df = get_projects_display()
-    IO_df = select_all_from_table(cursor, cnxn, 'ios')
+    # project filter removed; no need to load projects or IOs
     pc_forecast_df = get_pc_display()
     non_pc_forecast_df = get_forecasts_display()
-    expense_df = select_all_from_table(cursor, cnxn, 'expenses')
+    expense_df = get_expenses_display()
     budget_df = get_budget_display_table()
     funding_df = select_all_from_table(cursor, cnxn, 'fundings')
     fiscal_years = [str(y) for y in range(2020, 2036)]
+    capex_expenses = get_capex_expenses_display()
 
     # build simple list of PO dicts (id, name) from po_df for template iteration
     pos = []
@@ -79,47 +79,8 @@ def data_summary():
         except Exception:
             departments = []
 
-    # return template with current module-level selections
-    # Build projects list filtered by server-side selections
-    projects = []
-    if project_df is not None:
-        try:
-            raw_projects = project_df.to_dict(orient='records')
-        except Exception:
-            raw_projects = []
-
-        try:
-            print('test')
-            for p in raw_projects:
-                print(raw_projects)
-                # normalize project name candidates (include project_name)
-                proj_name = p.get('project_name')
-                # normalize PO name candidates
-                po_name = p.get('po_name') or p.get('PO Name') or p.get('PO') or p.get('po')
-                # normalize department name candidates
-                dept_name = p.get('department_name') or p.get('Department Name') or p.get('Department') or p.get('department')
-                # normalize fiscal year candidates
-                fy = p.get('fiscal_year') or p.get('Fiscal Year') or p.get('fy') or p.get('fiscal')
-
-                rec = {'name': proj_name, 'po_name': po_name, 'department_name': dept_name, 'fiscal_year': fy}
-
-                # apply server-side filters if selections exist (treat 'All' as wildcard)
-                ok = True
-                if selected_po and selected_po != '' and selected_po != 'All':
-                    # if project record lacks po_name, treat as non-matching
-                    ok = ok and (po_name == selected_po)
-                if selected_department and selected_department != '' and selected_department != 'All':
-                    ok = ok and (dept_name == selected_department)
-                if selected_fiscal_year and selected_fiscal_year != '' and selected_fiscal_year != 'All':
-                    ok = ok and (str(fy) == str(selected_fiscal_year))
-                if ok:
-                    projects.append(rec)
-                
-        except Exception:
-            print('test2')
-            projects = []
-
-    return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department, fiscal_years=fiscal_years, selected_fiscal_year=selected_fiscal_year, projects=projects, selected_project=selected_project)
+    # return template with current module-level selections (project filter removed)
+    return render_template('pages/data_summary.html', summary_row=None, pos=pos, selected_po=selected_po, departments=departments, selected_department=selected_department, fiscal_years=fiscal_years, selected_fiscal_year=selected_fiscal_year)
 
 
 @data_summary_bp.route('/data_summary/po_selection', methods=['POST'])
@@ -173,20 +134,7 @@ def fiscal_year_selection():
 
 
 
-@data_summary_bp.route('/data_summary/project_selection', methods=['POST'])
-def project_selection():
-    """Endpoint to receive Project selection and update server-side selected_project."""
-    global selected_project
-    try:
-        if request.is_json:
-            payload = request.get_json()
-            val = payload.get('project')
-        else:
-            val = request.form.get('project')
-        selected_project = val
-        return {'status': 'ok', 'selected_project': selected_project}, 200
-    except Exception as e:
-        return {'status': 'error', 'message': str(e)}, 500
+# Project filter endpoint removed
 
 
 @data_summary_bp.route('/data_summary/get_statistics', methods=['GET'])
@@ -216,7 +164,9 @@ def get_statistics():
         # fundings
         fundings = create_funding_display()
         # expenses
-        expenses = select_all_from_table(cursor, cnxn, 'expenses')
+        expenses = get_expenses_display()
+
+        
 
         def apply_filters(df):
             if df is None or df.empty:
@@ -259,13 +209,7 @@ def get_statistics():
                 else:
                     mask &= False
 
-            # Project
-            if selected_project and selected_project != '' and selected_project != 'All':
-                proj_col = find_col(['project_name', 'project', 'project name', 'name'])
-                if proj_col is not None:
-                    mask &= out[proj_col].astype(str) == str(selected_project)
-                else:
-                    mask &= False
+            # Project filter removed
 
             return out.loc[mask]
 
