@@ -281,7 +281,7 @@ def get_statistics():
             'budget': round(budget_sum, 2),
             'funding': round(funding_sum, 2),
             'total_budget and funding': round(total_budget, 2),
-            'actual_expense': round(actual_expense, 2),
+            'Total Expense': round(actual_expense, 2),
             'Personnel Expense': round(personnel_expense_actual, 2),
             'Non-personnel Expense': round(non_personnel_expense_actual, 2)
         }
