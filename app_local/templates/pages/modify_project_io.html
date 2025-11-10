@@ -91,15 +91,11 @@
 
     
         
-            <!-- Interactive generic tables (Projects & IOs) -->
+            <!-- Combined Projects table (includes grouped IOs column) -->
             <div class="tables-row">
-                <div class="table-half">
-                    <h3>Projects</h3>
-                    <div id="gt-projects" style="height:300px;"></div>
-                </div>
-                <div class="table-half">
-                    <h3>IOs</h3>
-                    <div id="gt-ios" style="height:300px;"></div>
+                <div class="table-half" style="flex:1 1 100%;">
+                    <h3>Projects (with IOs)</h3>
+                    <div id="gt-projects" style="height:600px;"></div>
                 </div>
             </div>
     </div>
@@ -107,39 +103,7 @@
         <!-- Generic table module -->
         <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
 
-    <!-- IO Modify Modal (reintroduced for IO row click edits) -->
-    <div id="ioModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="ioModalTitle">
-        <div class="modal-overlay" id="ioOverlay"></div>
-        <div class="modal-content" role="document">
-            <button class="modal-close" id="ioClose" aria-label="Close">&times;</button>
-            <h2 id="ioModalTitle">Modify IO</h2>
-            <form method="POST" name="Modify_ios" id="ioForm" action="/modify_io/change_io">
-                <input type="hidden" name="form_kind" value="io">
-                <input type="hidden" name="table_name" value="ios">
-                <input type="hidden" name="io_edit_mode" id="io_edit_mode" value="1">
-                <input type="hidden" name="io_id" id="io_id" value="">
-                {% for field in io_fields %}
-                    <div class="form-group">
-                        <label for="io_{{ field.name }}">{{ field.label }}</label>
-                        {% if field.type == 'select' %}
-                            <select name="{{ field.name }}" id="io_{{ field.name }}" required>
-                                <option value="" disabled selected>Select an option</option>
-                                {% for option in field.options %}
-                                    <option value="{{ option }}">{{ option }}</option>
-                                {% endfor %}
-                            </select>
-                        {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
-                            <input type="{{ field.type }}" name="{{ field.name }}" id="io_{{ field.name }}"{% if not (field.name|lower in ['io','io_num','io number','io_number']) %} required{% endif %}>
-                        {% endif %}
-                    </div>
-                {% endfor %}
-                <div style="margin-top:12px;">
-                    <button type="submit">Submit</button>
-                    <button type="button" id="ioCancel">Cancel</button>
-                </div>
-            </form>
-        </div>
-    </div>
+    <!-- IO Modify Modal removed: IOs managed within Project modal -->
 
     <script>
         // Basic modal open/close wiring
@@ -228,52 +192,8 @@
                 }catch(e){}
             }
 
-            function openIoEdit(row){
-                try{
-                    var modal = document.getElementById('ioModal');
-                    var overlay = document.getElementById('ioOverlay');
-                    var closeBtn = document.getElementById('ioClose');
-                    var cancelBtn = document.getElementById('ioCancel');
-                    function open(){
-                        modal.style.display='block';
-                        modal.setAttribute('aria-hidden','false');
-                        document.body.style.overflow='hidden';
-                        var first = modal.querySelector('input,select,button'); if(first) first.focus();
-                    }
-                    function close(){
-                        modal.style.display='none';
-                        modal.setAttribute('aria-hidden','true');
-                        document.body.style.overflow='';
-                    }
-                    [overlay, closeBtn, cancelBtn].forEach(function(el){ if(el) el.onclick = close; });
-
-                    // Prefill fields using the IO value from the row
-                    var ioInput = document.getElementById('io_IO');
-                    var projSel = document.getElementById('io_project_name');
-                    var hid = document.getElementById('io_id');
-                    var editMode = document.getElementById('io_edit_mode');
-                    if (editMode) editMode.value = '1';
-                    if (ioInput && row && row.IO != null) ioInput.value = String(row.IO);
-                    // Fetch additional details by IO number to set hidden id and project
-                    if (row && row.IO != null){
-                        fetch('/modify_io/details?io=' + encodeURIComponent(row.IO))
-                            .then(function(res){ return res.ok ? res.json() : null; })
-                            .then(function(info){
-                                if(!info) return;
-                                try{
-                                    if (hid && info.id != null) hid.value = String(info.id);
-                                    if (projSel && info.project_name != null) projSel.value = String(info.project_name);
-                                }catch(e){}
-                            })
-                            .catch(function(){});
-                    }
-                    open();
-                }catch(e){}
-            }
-
-            // Mount both tables
+            // Mount single combined table
             mountTable('gt-projects', 'Projects', "{{ url_for('project_routes.list_projects') }}", openProjectEdit);
-            mountTable('gt-ios', 'IOs', "{{ url_for('io_routes.list_ios') }}", openIoEdit);
         })();
     </script>
 
@@ -438,35 +358,6 @@
         })();
     </script>
 
-    <script>
-        // Prefill IO modal fields when selecting an existing IO in edit mode
-        (function(){
-            var ioModal = document.getElementById('ioModal');
-            if (!ioModal) return;
-            function attachHandlers(){
-                var existSel = document.getElementById('io_existing_select');
-                var ioInput = document.getElementById('io_IO');
-                var projSel = document.getElementById('io_project_name');
-                if (!existSel || !projSel) return;
-                existSel.addEventListener('change', function(){
-                    var id = existSel.value || '';
-                    if (!id) return;
-                    fetch('/modify_io/details?id=' + encodeURIComponent(id))
-                        .then(function(res){ return res.ok ? res.json() : null; })
-                        .then(function(info){
-                            if (!info) return;
-                            try {
-                                var hid = document.getElementById('io_id');
-                                if (hid) hid.value = info.id || '';
-                                if (ioInput && info.io != null) ioInput.value = info.io;
-                                if (projSel && info.project_name != null) projSel.value = info.project_name;
-                            } catch(e){}
-                        })
-                        .catch(function(){});
-                });
-            }
-            if (document.readyState === 'complete' || document.readyState === 'interactive') attachHandlers(); else document.addEventListener('DOMContentLoaded', attachHandlers);
-        })();
-    </script>
+    <!-- IO modal scripts removed -->
 </body>
 </html>

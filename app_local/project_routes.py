@@ -305,7 +305,7 @@ def list_projects():
         # Base display (friendly names)
         df = get_projects_display()
         if df is None or df.empty:
-            empty_cols = standardize_columns_order(['id', 'Project', 'PO', 'BU', 'Fiscal Year'], table_name='projects')
+            empty_cols = standardize_columns_order(['id', 'Project', 'PO', 'BU', 'Fiscal Year', 'IOs'], table_name='projects')
             return {'columns': empty_cols, 'rows': []}, 200
 
         # Normalize for frontend (friendly column headers)
@@ -325,6 +325,7 @@ def list_projects():
             db = connect_local()
             cursor, cnxn = db.connect_to_db()
             proj_tbl = select_all_from_table(cursor, cnxn, 'projects')
+            ios_tbl = select_all_from_table(cursor, cnxn, 'ios')
             dept_tbl = select_all_from_table(cursor, cnxn, 'departments')
 
             # Build department id -> name map
@@ -364,13 +365,71 @@ def list_projects():
                 return f"{n}|||{d}|||{fy}"
 
             out['id'] = out.apply(lambda r: id_by_key.get(mkkey_out(r)), axis=1)
+
+            # Attach grouped IOs per project (comma-separated string)
+            io_by_pid = {}
+            try:
+                if ios_tbl is not None and not ios_tbl.empty and 'project_id' in ios_tbl.columns and 'IO_num' in ios_tbl.columns:
+                    # Normalize IO numbers to int-like strings and group
+                    tmp = ios_tbl[['project_id', 'IO_num']].dropna()
+                    vals = {}
+                    for _, rr in tmp.iterrows():
+                        try:
+                            pid = int(rr['project_id'])
+                        except Exception:
+                            continue
+                        val = rr['IO_num']
+                        s = None
+                        try:
+                            f = float(val)
+                            s = str(int(f)) if float(f).is_integer() else str(val)
+                        except Exception:
+                            s = str(val)
+                        vals.setdefault(pid, []).append(s)
+                    # de-duplicate and sort numerically when possible
+                    for pid, arr in vals.items():
+                        # unique preserving order
+                        seen = set(); uniq = []
+                        for v in arr:
+                            if v not in seen:
+                                seen.add(v); uniq.append(v)
+                        def sort_key(x):
+                            try:
+                                return (0, int(x))
+                            except Exception:
+                                return (1, x)
+                        uniq_sorted = sorted(uniq, key=sort_key)
+                        io_by_pid[pid] = ', '.join(uniq_sorted)
+            except Exception:
+                io_by_pid = {}
+
+            if 'id' in out.columns:
+                try:
+                    out['IOs'] = out['id'].apply(lambda pid: io_by_pid.get(int(pid), '') if pid is not None else '')
+                except Exception:
+                    out['IOs'] = ''
         except Exception:
             out['id'] = None
+            out['IOs'] = ''
 
-        # Reorder columns by standardized order
-        ordered = standardize_columns_order(list(out.columns), table_name='projects')
-        out = out[[c for c in ordered if c in out.columns]]
+        # Ensure single IOs column (avoid duplication if already present)
+        if 'IOs' not in out.columns:
+            out['IOs'] = out.get('IOs', '')
+        # Build ordered column set including IOs once
+        current_cols = list(out.columns)
+        # Remove duplicate occurrences of IOs if any
+        seen = set(); unique_order = []
+        for c in current_cols:
+            if c not in seen:
+                seen.add(c); unique_order.append(c)
+        ordered = standardize_columns_order(unique_order + (['IOs'] if 'IOs' not in unique_order else []), table_name='projects')
+        # Guarantee IOs is at the end if not already in standardized position
+        if 'IOs' not in ordered:
+            ordered.append('IOs')
+        # Filter to existing columns only
+        final_cols = [c for c in ordered if c in out.columns]
+        out = out[final_cols]
         rows = out.fillna('').to_dict(orient='records')
-        return {'columns': list(out.columns), 'rows': rows}, 200
+        return {'columns': final_cols, 'rows': rows}, 200
     except Exception as e:
         return {'columns': [], 'rows': [], 'error': str(e)}, 200

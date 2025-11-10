@@ -36,14 +36,17 @@ def workstation_page():
     if request.method == 'POST':
         selected_option = request.form.get('my_dropdown')
         if 'file' not in request.files:
-            return 'No file selected'
+            flash('No file part in request', 'error')
+            return redirect(url_for('upload_requests.workstation_page'))
         file = request.files['file']
         if file.filename == '':
-            return 'No selected file', 400
+            flash('No selected file', 'error')
+            return redirect(url_for('upload_requests.workstation_page'))
         if file:
             db_is_empty = check_if_all_tables_empty("local")
             if db_is_empty and selected_option != "project_forecasts_nonpc":
-                return "Database is currently empty, please upload non-personnel forecasts first"
+                flash('Database is empty. Upload non-personnel forecasts first.', 'warning')
+                return redirect(url_for('upload_requests.workstation_page'))
            
             
             filename = secure_filename(file.filename) # Secure the filename
@@ -53,25 +56,47 @@ def workstation_page():
             #     return f"Data mismatch "
             status, column = check_missing_attribute(df, selected_option, 'local')
             if status:
-                return f"Missing value in {column}, please upload related forcasts first."
+                flash(f"Missing value in {column}. Please upload related forecasts first.", 'warning')
+                return redirect(url_for('upload_requests.workstation_page'))
+            # Remove duplicate rows for expenses uploads before handing to uploader
+            if selected_option == 'expenses':
+                try:
+                    preferred_keys = ['Department', 'fiscal_year', 'from_period', 'Order', 'Cost element']
+                    subset_keys = [c for c in preferred_keys if c in df.columns]
+                    before = len(df)
+                    if subset_keys:
+                        df = df.drop_duplicates(subset=subset_keys, keep='first')
+                    else:
+                        df = df.drop_duplicates(keep='first')
+                    removed = before - len(df)
+                    if removed > 0:
+                        flash(f'Removed {removed} duplicate expense rows before upload.', 'warning')
+                except Exception:
+                    # Non-fatal: proceed without dedup if anything goes wrong
+                    pass
+
             if options_map[selected_option]:
                 try:       
                     options_map[selected_option](df)
-                    return f'File {filename} uploaded successfully!'
-                except:
-                    return f'Cannot upload {selected_option}. Please check input type'
+                    flash(f'File {filename} uploaded successfully!', 'success')
+                except Exception as e:
+                    flash(f'Cannot upload {selected_option}. Please check input type.', 'error')
             else:
-                return f'File {selected_option} invalid'
+                flash(f'File type {selected_option} invalid.', 'error')
+            return redirect(url_for('upload_requests.workstation_page'))
             
     return render_template("pages/file_upload.html", options=options, selected_option=selected_option, display_names=DISPLAY_NAMES)
 
 @upload_requests.route('/upload', methods=['POST'])
 def upload_file():
     if 'file' not in request.files:
-        return 'No file part'
+        flash('No file part', 'error')
+        return redirect(url_for('upload_requests.workstation_page'))
     file = request.files['file']
     if file.filename == '':
-        return 'No selected file'
+        flash('No selected file', 'error')
+        return redirect(url_for('upload_requests.workstation_page'))
     if file:
         filename = secure_filename(file.filename)
-        return f'File {filename} uploaded successfully!'
+        flash(f'File {filename} uploaded successfully!', 'success')
+    return redirect(url_for('upload_requests.workstation_page'))

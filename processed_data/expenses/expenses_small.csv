@@ -1,0 +1,5 @@
+Department,fiscal_year,from_period,Order,CO object name,Cost element,Cost element name,Val.in rep.cur,Name
+DEPT_05,2025,3,2000009587,Project 24,9210010,Settlement Material,5247.98,Expense 332
+DEPT_05,2025,1,2000009582,Project 67,7299900,Other Misc Expense,6606.53,Expense 974
+DEPT_03,2025,6,2000009585,Project 9,9430210,Engineering Labor,6686.09,Expense 590
+DEPT_05,2025,10,2000009585,Project 47,9430210,Engineering Labor,5618.88,Expense 717
