@@ -69,8 +69,14 @@
                             document.getElementById('stat_non_personnel_budget').textContent = data['non personnel budget'] != null ? data['non personnel budget'] : '-';
                             document.getElementById('stat_budget').textContent = data.budget != null ? data.budget : '-';
                             document.getElementById('stat_funding').textContent = data.funding != null ? data.funding : '-';
-                            document.getElementById('stat_total_budget').textContent = data.total_budget != null ? data.total_budget : '-';
-                            document.getElementById('stat_actual').textContent = data.actual_expense != null ? data.actual_expense : '-';
+                            document.getElementById('stat_total_budget').textContent = data['total_budget and funding'] != null ? data['total_budget and funding'] : '-';
+                            // new expense breakdowns
+                            var pe = document.getElementById('stat_personnel_expense');
+                            var npe = document.getElementById('stat_non_personnel_expense');
+                            var te = document.getElementById('stat_total_expense');
+                            if (pe) pe.textContent = (data['Personnel Expense'] != null ? data['Personnel Expense'] : '-');
+                            if (npe) npe.textContent = (data['Non-personnel Expense'] != null ? data['Non-personnel Expense'] : '-');
+                            if (te) te.textContent = (data['Total Expense'] != null ? data['Total Expense'] : '-');
                         }).catch(function(err){ console.error('Failed to fetch stats', err); });
                     });
                 });
@@ -205,8 +211,16 @@
                 <span id="stat_total_budget">-</span>
             </div>
             <div>
-                <label>Actual Expense: </label>
-                <span id="stat_actual">-</span>
+                <label>Personnel Expense: </label>
+                <span id="stat_personnel_expense">-</span>
+            </div>
+            <div>
+                <label>Non-personnel Expense: </label>
+                <span id="stat_non_personnel_expense">-</span>
+            </div>
+            <div>
+                <label>Total Expense: </label>
+                <span id="stat_total_expense">-</span>
             </div>
             <div style="margin-top:8px;">
                 <button id="calculate_stats">Calculate statistics</button>

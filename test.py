@@ -6,6 +6,6 @@ from backend import \
     
 
 if __name__ == '__main__':
-    res = get_capex_expenses_display()
+    res = get_expenses_display()
     print(res)
 

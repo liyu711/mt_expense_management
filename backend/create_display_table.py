@@ -1156,12 +1156,14 @@ def get_expenses_display():
 
 	Joins:
 	- expenses.department_id -> departments.id
+	- expenses.cost_element_id -> cost_elements.id
 
 	Keeps columns (exact names):
 	- id
 	- BU Name (from departments.name)
 	- expense (from expenses.expense_value)
 	- Name (from expenses.name)
+	- cost_element (from cost_elements.co_id)
 
 	Gracefully handles missing columns by filling with None.
 	"""
@@ -1170,6 +1172,7 @@ def get_expenses_display():
 
 	exp = select_all_from_table(cursor, cnxn, 'expenses')
 	dept = select_all_from_table(cursor, cnxn, 'departments')
+	cost_elements = select_all_from_table(cursor, cnxn, 'cost_elements')
 
 	# Empty fallback
 	if exp is None or exp.empty:
@@ -1212,7 +1215,34 @@ def get_expenses_display():
 	else:
 		work['Name'] = None
 
-	return work.loc[:, ['id', 'BU Name', 'expense', 'Name']].reset_index(drop=True)
+	# cost element: map expenses.cost_element_id -> cost_elements.co_id
+	# Preferred join key on expenses
+	exp_ce_col = None
+	for cand in ('cost_element_id',):
+		if cand in work.columns:
+			exp_ce_col = cand
+			break
+
+	if cost_elements is not None and not cost_elements.empty and 'id' in cost_elements.columns:
+		try:
+			# Determine co_id column on cost_elements
+			ce_co_col = 'co_id' if 'co_id' in cost_elements.columns else None
+			if ce_co_col is not None and exp_ce_col is not None:
+				ce_map = dict(zip(cost_elements['id'], cost_elements[ce_co_col]))
+				work['cost_element'] = work[exp_ce_col].map(ce_map)
+			elif 'co_id' in work.columns:
+				# direct passthrough if expenses already carries co_id
+				work['cost_element'] = work['co_id']
+			else:
+				work['cost_element'] = None
+		except Exception:
+			# fallback to passthrough if expenses has co_id
+			work['cost_element'] = work['co_id'] if 'co_id' in work.columns else None
+	else:
+		# If cost_elements table not available, use co_id in expenses if present
+		work['cost_element'] = work['co_id'] if 'co_id' in work.columns else (work[exp_ce_col] if exp_ce_col in work.columns else None)
+
+	return work.loc[:, ['id', 'BU Name', 'expense', 'Name', 'cost_element']].reset_index(drop=True)
 
 
 def get_capex_expenses_display():

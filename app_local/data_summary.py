@@ -243,7 +243,34 @@ def get_statistics():
         funding_sum = sum_column(fundings_f, ['funding', 'Funding'])
         total_budget = budget_sum + funding_sum
 
+        # Total actual expense across all cost elements (after filters)
         actual_expense = sum_column(expenses_f, ['expenses', 'expense', 'amount', 'Actual Expenditure'])
+
+        # Derive Personnel Expense and Non-personnel Expense from expenses based on cost_element prefix '94'
+        def sum_expenses_by_cost_element_prefix(df, prefix, value_candidates):
+            if df is None or df.empty:
+                return 0.0
+            # locate value column
+            val_col = next((c for c in value_candidates if c in df.columns), None)
+            if val_col is None:
+                return 0.0
+            # locate cost element column
+            cost_col = None
+            for cand in ('cost_element', 'co_id', 'cost element'):
+                if cand in df.columns:
+                    cost_col = cand
+                    break
+            if cost_col is None:
+                return 0.0
+            try:
+                mask = df[cost_col].astype(str).str.startswith(str(prefix))
+                values = pd.to_numeric(df.loc[mask, val_col], errors='coerce').fillna(0.0)
+                return float(values.sum())
+            except Exception:
+                return 0.0
+
+        personnel_expense_actual = sum_expenses_by_cost_element_prefix(expenses_f, '94', ['expenses', 'expense', 'amount', 'Actual Expenditure'])
+        non_personnel_expense_actual = max(0.0, float(actual_expense) - float(personnel_expense_actual))
 
         result = {
             'non_personnel_forecast': round(non_personnel_forecast, 2),
@@ -254,7 +281,9 @@ def get_statistics():
             'budget': round(budget_sum, 2),
             'funding': round(funding_sum, 2),
             'total_budget and funding': round(total_budget, 2),
-            'actual_expense': round(actual_expense, 2)
+            'actual_expense': round(actual_expense, 2),
+            'Personnel Expense': round(personnel_expense_actual, 2),
+            'Non-personnel Expense': round(non_personnel_expense_actual, 2)
         }
         print(result)
         return result, 200
