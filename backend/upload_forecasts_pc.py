@@ -108,23 +108,26 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
 
     df_upload_fin = pd.merge(df_upload, hr_categories_merged, left_on = 'Human resource category', right_on='name', how='left')
     df_upload_fin.rename(columns={'id': 'human_resource_category_id'}, inplace=True)
-    df_upload_fin.drop(['Human resource category', 'name', 'Department', 'po_id', 'department_id'], axis=1, inplace=True)
+    # Drop columns that shouldn't go forward; ignore if not present
+    df_upload_fin.drop(['Human resource category', 'name', 'Department', 'po_id', 'department_id'], axis=1, inplace=True, errors='ignore')
     df_upload_fin = pd.merge(df_upload_fin, projects_merged, left_on='Project Name', right_on='name', how='left')
     df_upload_fin.drop(['Project Category', 'Project Name', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'project_id', 'category_id': 'project_category_id'}, inplace=True)
     df_upload_fin = pd.merge(df_upload_fin, io_merged, left_on='IO', right_on='IO_num', how='left')
-    df_upload_fin.drop(['IO', 'IO_num', 'project_id_y'], axis=1, inplace=True)
+    df_upload_fin.drop(['IO', 'IO_num', 'project_id_y'], axis=1, inplace=True, errors='ignore')
     df_upload_fin.rename(columns={'id': 'io_id', 'project_id_x': 'project_id'}, inplace=True)
     df_upload_fin = pd.merge(df_upload_fin, pos_merged, left_on='PO', right_on='name', how='left')
     # df_upload_fin.drop(['PO', 'name', 'value'], axis=1, inplace=True)
-    df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True)
-    df_upload_fin.rename(columns={'id': 'po_id', 'Fiscal Year': 'fiscal_year'}, inplace=True)
+    df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True, errors='ignore')
+    # Ensure correct column casing to match schema (PO_id)
+    df_upload_fin.rename(columns={'id': 'PO_id', 'Fiscal Year': 'fiscal_year'}, inplace=True)
     
     df_upload_fin.rename(columns={'Human resource FTE': 'human_resource_fte', 'Personnel cost': 'personnel_expense'}, inplace=True)
     # df_upload_fin['fiscal_year'] =pd.to_datetime(df_upload_fin['fiscal_year'], format='%Y')
     # Deduplicate final merged DataFrame on id columns where possible to avoid duplicate inserts
     try:
-        dedupe_ids = [c for c in ['po_id', 'project_id', 'department_id', 'io_id', 'fiscal_year', 'human_resource_category_id'] if c in df_upload_fin.columns]
+        # Prefer schema-correct PO_id; fallback to po_id if present
+        dedupe_ids = [c for c in ['PO_id', 'po_id', 'project_id', 'department_id', 'io_id', 'fiscal_year', 'human_resource_category_id'] if c in df_upload_fin.columns]
         if dedupe_ids:
             df_upload_fin = df_upload_fin.drop_duplicates(subset=dedupe_ids, keep='first')
         else:
@@ -134,8 +137,15 @@ def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):
                 df_upload_fin = df_upload_fin.drop_duplicates(subset=fallback, keep='first')
     except Exception:
         pass
-    df_upload_fin.drop(['fiscal_year_x'], axis=1, inplace=True)
-    df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year'}, inplace=True)
+    # Handle possible duplicate fiscal_year columns from merges
+    try:
+        df_upload_fin.drop(['fiscal_year_x'], axis=1, inplace=True)
+    except Exception:
+        pass
+    try:
+        df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year'}, inplace=True)
+    except Exception:
+        pass
 
     # close_connection(cursor, cnxn)
     return df_upload_fin

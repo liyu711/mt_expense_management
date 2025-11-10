@@ -256,6 +256,7 @@ def render_mannual_input():
         'project_id': ('projects', 'id', 'name', 'Project'),
         'io_id': ('IOs', 'id', 'IO_num', 'IO'),
         'project_category_id': ('project_categories', 'id', 'category', 'Project Category'),
+        'human_resource_category_id': ('human_resource_categories', 'id', 'name', 'Human resource category'),
     }
     def map_and_prepare(df, table_name=None):
         if df is None:
@@ -280,6 +281,185 @@ def render_mannual_input():
     pf_nonpc_columns, pf_nonpc_data = map_and_prepare(df_nonpc, 'project_forecasts_nonpc')
     pf_pc_columns, pf_pc_data = map_and_prepare(df_pc, 'project_forecasts_pc')
 
+    # Build combined forecast table pivoting each Human Resource Category into its own column with its cost value.
+    # 1. Determine base columns (union without personnel-specific columns). These remain unchanged across pivot.
+    base_cols_order = []
+    seen = set()
+    personnel_specific = {'Human resource category', 'Staff Category', 'Work Hours(FTE)', 'Personnel Expense', 'Personnel Cost', 'Personnel cost'}
+    for c in pf_nonpc_columns + pf_pc_columns:
+        if c not in seen and c not in personnel_specific:
+            seen.add(c)
+            base_cols_order.append(c)
+
+    # 2. Helper to convert list rows to dicts.
+    def to_dicts(cols, rows):
+        out = []
+        for r in rows:
+            d = {}
+            for i, col in enumerate(cols):
+                d[col] = r[i] if i < len(r) else None
+            out.append(d)
+        return out
+
+    nonpc_dicts = to_dicts(pf_nonpc_columns, pf_nonpc_data)
+    pc_dicts = to_dicts(pf_pc_columns, pf_pc_data)
+
+    # 3. Get full list of HR categories (column names for pivot)
+    try:
+        hr_cat_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+        if hr_cat_df is not None and 'name' in hr_cat_df.columns:
+            hr_category_list = [str(v).strip() for v in hr_cat_df['name'].dropna().tolist() if str(v).strip()]
+        else:
+            # fallback: scan pc_dicts
+            hr_category_list = []
+    except Exception:
+        hr_category_list = []
+    # fallback from pc rows if DB call failed or empty
+    if not hr_category_list:
+        seen_cat = set()
+        for d in pc_dicts:
+            cval = d.get('Human resource category') or d.get('Staff Category')
+            if cval:
+                sc = str(cval).strip()
+                if sc and sc not in seen_cat:
+                    seen_cat.add(sc)
+                    hr_category_list.append(sc)
+
+    # Ensure deterministic ordering
+    hr_category_list = sorted(hr_category_list, key=lambda x: x.lower())
+
+    # 4. Index personnel rows by composite key for grouping and build per-key category->cost mapping.
+    def norm(v):
+        return '' if v is None else str(v).strip()
+
+    def make_key(d):
+        return (
+            norm(d.get('PO') or d.get('PO_id')),
+            norm(d.get('Department') or d.get('Department Name')),
+            norm(d.get('Project Category')),
+            norm(d.get('Project Name') or d.get('Project')),
+            norm(d.get('IO')),
+            norm(d.get('Fiscal Year'))
+        )
+
+    pc_group = {}
+    for d in pc_dicts:
+        key = make_key(d)
+        pc_group.setdefault(key, []).append(d)
+
+    # 5. Build combined rows: start from nonpc rows, then add pc-only keys.
+    combined_rows_dicts = []
+
+    def extract_cost(pr):
+        # Personnel cost may exist under several column names after transform_table
+        return pr.get('Personnel Expense') or pr.get('Personnel Cost') or pr.get('personnel_expense')
+
+    def build_row_base(source_dict):
+        return {c: source_dict.get(c) for c in base_cols_order}
+
+    # For each non-personnel row, add HR category columns.
+    for d in nonpc_dicts:
+        key = make_key(d)
+        row = build_row_base(d)
+        # Initialize all hr category columns as None
+        for cat in hr_category_list:
+            row[cat] = None
+        # Fill with cost values from matching personnel rows
+        for pr in pc_group.get(key, []):
+            cat = pr.get('Human resource category') or pr.get('Staff Category')
+            if cat:
+                cat_norm = str(cat).strip()
+                if cat_norm in row:
+                    cost_val = extract_cost(pr)
+                    # If multiple rows for same category, sum them
+                    try:
+                        if row[cat_norm] is None:
+                            row[cat_norm] = cost_val
+                        else:
+                            # convert to float if possible and sum
+                            current = row[cat_norm]
+                            cv = float(current) if current not in (None, '') else 0.0
+                            nv = float(cost_val) if cost_val not in (None, '') else 0.0
+                            row[cat_norm] = cv + nv
+                    except Exception:
+                        # fallback: keep first value
+                        if row[cat_norm] is None:
+                            row[cat_norm] = cost_val
+        combined_rows_dicts.append(row)
+
+    # Add personnel-only keys (those without a nonpc counterpart)
+    existing_keys = {make_key(d) for d in nonpc_dicts}
+    for key, pc_list in pc_group.items():
+        if key in existing_keys:
+            continue
+        # use first pc row for base info
+        rep = pc_list[0]
+        row = build_row_base(rep)
+        for cat in hr_category_list:
+            row[cat] = None
+        for pr in pc_list:
+            cat = pr.get('Human resource category') or pr.get('Staff Category')
+            if not cat:
+                continue
+            cat_norm = str(cat).strip()
+            if cat_norm in row:
+                cost_val = extract_cost(pr)
+                try:
+                    if row[cat_norm] is None:
+                        row[cat_norm] = cost_val
+                    else:
+                        current = row[cat_norm]
+                        cv = float(current) if current not in (None, '') else 0.0
+                        nv = float(cost_val) if cost_val not in (None, '') else 0.0
+                        row[cat_norm] = cv + nv
+                except Exception:
+                    if row[cat_norm] is None:
+                        row[cat_norm] = cost_val
+        combined_rows_dicts.append(row)
+
+    # 6. Compute Forecast Sum per row (sum of Non-personnel Expense + all HR category costs).
+    def to_float(x):
+        try:
+            return float(x)
+        except Exception:
+            return 0.0
+
+    for idx, d in enumerate(combined_rows_dicts, start=1):
+        d['id'] = idx
+        # Sum Non-personnel Expense (if present) + all hr category columns
+        total = 0.0
+        npexp = d.get('Non-personnel Expense')
+        total += to_float(npexp)
+        for cat in hr_category_list:
+            total += to_float(d.get(cat))
+        d['Forecast Sum'] = total
+
+    # 7. Final columns in required order:
+    #    Project, PO, Department, Fiscal Year, IO, Project Category, Non-personnel Expense,
+    #    [HR category columns...], Forecast Sum
+    project_label = 'Project' if 'Project' in base_cols_order else ('Project Name' if 'Project Name' in base_cols_order else None)
+    po_label = 'PO' if 'PO' in base_cols_order else None
+    department_label = 'Department' if 'Department' in base_cols_order else ('Department Name' if 'Department Name' in base_cols_order else None)
+    fy_label = 'Fiscal Year' if 'Fiscal Year' in base_cols_order else ('fiscal_year' if 'fiscal_year' in base_cols_order else None)
+    io_label = 'IO' if 'IO' in base_cols_order else None
+    pc_label = 'Project Category' if 'Project Category' in base_cols_order else None
+    npexp_label = 'Non-personnel Expense' if 'Non-personnel Expense' in base_cols_order else None
+
+    ordered_prefix = [lbl for lbl in ['id', project_label, po_label, department_label, fy_label, io_label, pc_label, npexp_label] if lbl]
+
+    # Any other base columns not explicitly listed should follow after the prefix
+    remaining_base = [c for c in base_cols_order if c not in set(ordered_prefix)]
+
+    combined_columns = ordered_prefix + remaining_base + hr_category_list + ['Forecast Sum']
+    # For display, rename 'Non-personnel Expense' to 'Non-personnel Forecast' without changing values
+    combined_columns_display = [
+        ('Non-personnel Forecast' if c == 'Non-personnel Expense' else c) for c in combined_columns
+    ]
+    combined_data = []
+    for d in combined_rows_dicts:
+        # Use source names for value lookup; only headers are renamed for display
+        combined_data.append([d.get(c, None) for c in combined_columns])
+
     return render_template("pages/manual_input.html", 
                            input_types = input_types, 
                            titles = titles, 
@@ -292,10 +472,8 @@ def render_mannual_input():
                            projects = [],
                            project_categories=[],
                            human_resource_categories= human_resource_categories,
-                           pf_nonpc_columns=pf_nonpc_columns,
-                           pf_nonpc_data=pf_nonpc_data,
-                           pf_pc_columns=pf_pc_columns,
-                           pf_pc_data=pf_pc_data
+                           combined_forecast_columns=combined_columns_display,
+                           combined_forecast_data=combined_data
                            )
 
 
@@ -550,113 +728,58 @@ def manual_projects():
 
 @manual_upload.route('/manual_input/hr_categories', methods=['GET'])
 def manual_hr_categories():
-    """Return human resource categories filtered by the provided PO name (query param 'po')
-    or by the current module-level selected_po if no query param is provided.
+    """Return ALL human resource categories without filtering by PO.
     Response JSON: {"human_resource_categories": [<str>, ...]}
     """
-    po_name = request.args.get('po') or selected_po
-    # If no PO selected, return empty list to enforce hierarchy
-    if not po_name or str(po_name).strip() == '' or str(po_name) == 'All':
-        return jsonify({'human_resource_categories': []}), 200
-
     try:
         df = get_hr_category_display()
     except Exception as e:
-        # If display table cannot be built, surface an empty list with error
         return jsonify({'human_resource_categories': [], 'error': str(e)}), 500
 
     if df is None or getattr(df, 'empty', True):
         return jsonify({'human_resource_categories': []}), 200
 
-    # Find expected column names with defensive fallbacks
-    def find_col(cols, target):
-        if target in cols:
-            return target
-        # case-insensitive match
-        for c in cols:
-            if c.lower() == target.lower():
-                return c
-        # alternate names
-        if target.lower() == 'po name':
-            alts = ['PO Name', 'PO', 'po', 'po_name']
-        elif target.lower() == 'human resource category':
-            alts = ['Human resource category', 'Staff Category', 'Staff category', 'name', 'Category']
-        else:
-            alts = []
-        for alt in alts:
+    # Try to find the HR category column with several fallbacks
+    def find_hr_col(cols):
+        candidates = ['Human Resource Category', 'Human resource category', 'Staff Category', 'Staff category', 'name', 'Category']
+        for cand in candidates:
             for c in cols:
-                if c.lower() == alt.lower():
+                if c.lower() == cand.lower():
                     return c
         return None
 
-    cols = list(df.columns)
-    po_col = find_col(cols, 'PO name')
-    hr_col = find_col(cols, 'Human Resource Category')
+    hr_col = find_hr_col(list(df.columns))
 
-    # If expected columns are not found, fallback to record-wise processing
-    if not po_col or not hr_col:
-        try:
-            records = df.to_dict(orient='records')
-        except Exception:
-            records = []
-        cats = []
-        seen = set()
-        for r in records:
-            p = r.get('PO name') or r.get('PO Name') or r.get('PO') or r.get('po') or r.get('po_name')
-            h = r.get('Human Resource Category') or r.get('Human resource category') or r.get('Staff Category') or r.get('Staff category') or r.get('name') or r.get('Category')
-            if not p or not h:
-                continue
-            try:
-                if str(p).strip() == str(po_name).strip():
-                    hv = str(h).strip()
-                    if hv and hv not in seen:
-                        seen.add(hv)
-                        cats.append(hv)
-            except Exception:
-                continue
-        return jsonify({'human_resource_categories': cats}), 200
-
-    # Column-based filtering
-    try:
-        mask = df[po_col].astype(str).str.strip().str.lower() == str(po_name).strip().lower()
-    except Exception:
-        # Fallback to record-wise if masking fails
-        try:
-            records = df.to_dict(orient='records')
-        except Exception:
-            records = []
-        cats = []
-        seen = set()
-        for r in records:
-            p = r.get(po_col)
-            h = r.get(hr_col)
-            if p is None or h is None:
-                continue
-            try:
-                if str(p).strip() == str(po_name).strip():
-                    hv = str(h).strip()
-                    if hv and hv not in seen:
-                        seen.add(hv)
-                        cats.append(hv)
-            except Exception:
-                continue
-        return jsonify({'human_resource_categories': cats}), 200
-
-    filtered = df[mask]
-    try:
-        values = filtered[hr_col].dropna().astype(str).str.strip().tolist()
-    except Exception:
-        try:
-            values = [str(v).strip() for v in list(filtered[hr_col]) if v is not None]
-        except Exception:
-            values = []
-    # Deduplicate preserving order
-    seen = set()
     cats = []
-    for v in values:
-        if v and v not in seen:
-            seen.add(v)
-            cats.append(v)
+    if hr_col:
+        try:
+            values = df[hr_col].dropna().astype(str).str.strip().tolist()
+        except Exception:
+            try:
+                values = [str(v).strip() for v in list(df[hr_col]) if v is not None]
+            except Exception:
+                values = []
+        seen = set()
+        for v in values:
+            if v and v not in seen:
+                seen.add(v)
+                cats.append(v)
+    else:
+        # Column not found; try record-wise fallbacks
+        try:
+            records = df.to_dict(orient='records')
+        except Exception:
+            records = []
+        seen = set()
+        for r in records:
+            h = r.get('Human Resource Category') or r.get('Human resource category') or r.get('Staff Category') or r.get('Staff category') or r.get('name') or r.get('Category')
+            if not h:
+                continue
+            hv = str(h).strip()
+            if hv and hv not in seen:
+                seen.add(hv)
+                cats.append(hv)
+
     return jsonify({'human_resource_categories': cats}), 200
 
 
@@ -1101,7 +1224,21 @@ def upload_forecast_merged():
         # except Exception as e:
         #     results.append(f"Non-personnel upload failed: {e}")
     # Personnel
+    # Trigger personnel upload if either FTE provided (non-zero) or category selected or a computed personnel cost exists.
+    personnel_trigger = False
+    try:
+        fte_val = form.get("Human_resource_FTE")
+        fte_num = float(fte_val) if fte_val not in (None, '',) else 0.0
+        if fte_num != 0:
+            personnel_trigger = True
+    except Exception:
+        pass
+    if form.get("Human_resource_category"):
+        personnel_trigger = True
     if form.get("Personnel_cost"):
+        personnel_trigger = True
+
+    if personnel_trigger:
         df_pc = pd.DataFrame([pc_row])
         try:
             df_pc["IO"] = df_pc["IO"].astype(int)
