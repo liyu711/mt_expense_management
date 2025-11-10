@@ -1150,3 +1150,160 @@ def get_hr_category_display():
 
 	return out.reset_index(drop=True)
 
+
+def get_expenses_display():
+	"""Return operating expenses with BU name.
+
+	Joins:
+	- expenses.department_id -> departments.id
+
+	Keeps columns (exact names):
+	- id
+	- BU Name (from departments.name)
+	- expense (from expenses.expense_value)
+	- Name (from expenses.name)
+
+	Gracefully handles missing columns by filling with None.
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	exp = select_all_from_table(cursor, cnxn, 'expenses')
+	dept = select_all_from_table(cursor, cnxn, 'departments')
+
+	# Empty fallback
+	if exp is None or exp.empty:
+		return pd.DataFrame(columns=['id', 'BU Name', 'expense', 'Name'])
+
+	work = exp.copy()
+
+	# Map department_id -> departments.name
+	if dept is not None and not dept.empty and 'id' in dept.columns:
+		dept_name_col = 'name' if 'name' in dept.columns else (dept.columns[0] if len(dept.columns) else None)
+		if 'department_id' in work.columns and dept_name_col is not None:
+			try:
+				ref = dict(zip(dept['id'], dept[dept_name_col]))
+				work['BU Name'] = work['department_id'].map(ref)
+			except Exception:
+				work['BU Name'] = None
+		elif dept_name_col is not None and 'Department' in work.columns:
+			# direct textual join alternative
+			work['BU Name'] = work['Department']
+	else:
+		work['BU Name'] = work['Department'] if 'Department' in work.columns else None
+
+	# id column
+	if 'id' not in work.columns:
+		work['id'] = None
+
+	# expense value: prefer 'expense_value'
+	if 'expense_value' in work.columns:
+		work['expense'] = work['expense_value']
+	else:
+		# fallbacks seen in generated data or alternative schemas
+		val_col = next((c for c in ['expense', 'Expense', 'Val.in rep.cur', 'val_in_rep_cur'] if c in work.columns), None)
+		work['expense'] = work[val_col] if val_col else None
+
+	# Name field
+	if 'name' in work.columns:
+		work['Name'] = work['name']
+	elif 'Name' in work.columns:
+		work['Name'] = work['Name']
+	else:
+		work['Name'] = None
+
+	return work.loc[:, ['id', 'BU Name', 'expense', 'Name']].reset_index(drop=True)
+
+
+def get_capex_expenses_display():
+	"""Return CapEx expenses joined to PO, BU, and Project.
+
+	Joins:
+	- capex_expenses.po_id -> pos.id
+	- capex_expenses.department_id -> departments.id
+	- capex_expenses.project_id -> projects.id
+
+	Keeps columns (exact names):
+	- id
+	- PO name (from pos.name)
+	- BU name (from departments.name)
+	- project name (from projects.name)
+	- expense (from capex_expenses.expense)
+	- expense date (from capex_expenses.expense_date)
+
+	Handles common column name variants gracefully.
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	cap = select_all_from_table(cursor, cnxn, 'capex_expenses')
+	pos = select_all_from_table(cursor, cnxn, 'pos')
+	dept = select_all_from_table(cursor, cnxn, 'departments')
+	proj = select_all_from_table(cursor, cnxn, 'projects')
+
+	if cap is None or cap.empty:
+		return pd.DataFrame(columns=['id', 'PO name', 'BU name', 'project name', 'expense', 'expense date'])
+
+	work = cap.copy()
+
+	# id
+	if 'id' not in work.columns:
+		work['id'] = None
+
+	# PO name mapping via po_id
+	po_name = None
+	if pos is not None and not pos.empty and 'id' in pos.columns:
+		po_name_col = 'name' if 'name' in pos.columns else (pos.columns[0] if len(pos.columns) else None)
+		po_map = dict(zip(pos['id'], pos[po_name_col])) if po_name_col is not None else {}
+		po_id_col = next((c for c in ['po_id', 'PO_id'] if c in work.columns), None)
+		if po_id_col is not None:
+			try:
+				work['PO name'] = work[po_id_col].map(po_map)
+			except Exception:
+				work['PO name'] = None
+		elif 'PO' in work.columns:
+			work['PO name'] = work['PO']
+	else:
+		work['PO name'] = work['PO'] if 'PO' in work.columns else None
+
+	# Department -> BU name
+	if dept is not None and not dept.empty and 'id' in dept.columns:
+		dept_name_col = 'name' if 'name' in dept.columns else (dept.columns[0] if len(dept.columns) else None)
+		dept_map = dict(zip(dept['id'], dept[dept_name_col])) if dept_name_col is not None else {}
+		dept_id_col = next((c for c in ['department_id', 'dept_id'] if c in work.columns), None)
+		if dept_id_col is not None:
+			try:
+				work['BU name'] = work[dept_id_col].map(dept_map)
+			except Exception:
+				work['BU name'] = None
+		elif 'Department' in work.columns:
+			work['BU name'] = work['Department']
+	else:
+		work['BU name'] = work['Department'] if 'Department' in work.columns else None
+
+	# Project -> project name
+	if proj is not None and not proj.empty and 'id' in proj.columns:
+		proj_name_col = 'name' if 'name' in proj.columns else (proj.columns[0] if len(proj.columns) else None)
+		proj_map = dict(zip(proj['id'], proj[proj_name_col])) if proj_name_col is not None else {}
+		proj_id_col = next((c for c in ['project_id', 'proj_id', 'project'] if c in work.columns), None)
+		if proj_id_col is not None:
+			try:
+				work['project name'] = work[proj_id_col].map(proj_map)
+			except Exception:
+				work['project name'] = None
+		elif 'Project Name' in work.columns:
+			work['project name'] = work['Project Name']
+	else:
+		work['project name'] = work['Project Name'] if 'Project Name' in work.columns else None
+
+	# expense amount
+	exp_col = next((c for c in ['expense', 'Expense', 'amount', 'Actual', 'Actual (k CNY)'] if c in work.columns), None)
+	work['expense'] = work[exp_col] if exp_col else None
+
+	# expense date
+	date_col = next((c for c in ['expense_date', 'Expense Date', 'date', 'Date'] if c in work.columns), None)
+	work['expense date'] = work[date_col] if date_col else None
+
+	return work.loc[:, ['id', 'PO name', 'BU name', 'project name', 'expense', 'expense date']].reset_index(drop=True)
+
+
