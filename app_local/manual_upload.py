@@ -1041,6 +1041,7 @@ def manual_change_forecast():
     project_name = form.get('Project_Name')
     project_category = form.get('Project_Category')
     io_value = form.get('IO')
+    # Legacy single-category fields removed from UI; still read for backward compatibility
     hr_category = form.get('Human_resource_category')
     fte = form.get('Human_resource_FTE')
     nonpc = form.get('Non_personnel_cost')
@@ -1147,23 +1148,80 @@ def manual_change_forecast():
             except Exception:
                 pass
 
-        # Update personnel FTE if all keys are available (also requires hr category id)
-        if all(v is not None for v in (po_id, dept_id, proj_id, io_id, pc_id, fy_val, hr_cat_id)) and fte_val is not None:
-            try:
-                cursor.execute(
-                    """
-                    UPDATE project_forecasts_pc
-                       SET human_resource_fte = ?
-                     WHERE PO_id = ? AND department_id = ? AND project_id = ? AND io_id = ?
-                       AND project_category_id = ? AND fiscal_year = ? AND human_resource_category_id = ?
-                    """,
-                    (fte_val, int(po_id), int(dept_id), int(proj_id), int(io_id), int(pc_id), int(fy_val), int(hr_cat_id))
-                )
-            except Exception:
-                pass
+        # Multi-category personnel updates: iterate fte__* inputs and compute personnel cost for summary
+        total_personnel_cost = 0.0
+        for key in form.keys():
+            if key.startswith('fte__'):
+                slug = key[len('fte__'):]
+                fte_raw = form.get(key)
+                cat_key = 'cat__' + slug
+                cat_name = form.get(cat_key)
+                if not cat_name:
+                    continue
+                # Resolve hr category id for each cat_name
+                hr_cat_id_local = None
+                if hrc_df is not None and 'name' in hrc_df.columns and 'id' in hrc_df.columns:
+                    try:
+                        hr_cat_id_local = dict(zip(hrc_df['name'], hrc_df['id'])).get(cat_name)
+                    except Exception:
+                        hr_cat_id_local = None
+                try:
+                    fte_local = float(fte_raw)
+                except Exception:
+                    fte_local = 0.0
+                if fte_local == 0.0:
+                    continue
+                # Compute cost = base_cost(category, year) * fte
+                base_cost = None
+                try:
+                    cursor.execute("SELECT id FROM human_resource_categories WHERE name = ?", (cat_name,))
+                    r = cursor.fetchone()
+                    if r:
+                        cid = r[0]
+                        try:
+                            cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (cid, int(fy_val) if fy_val is not None else None))
+                            cr = cursor.fetchone()
+                            if cr:
+                                base_cost = cr[0]
+                        except Exception:
+                            base_cost = None
+                    # Fallback where category_id stored as name
+                    if base_cost is None:
+                        try:
+                            cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (cat_name, int(fy_val) if fy_val is not None else None))
+                            cr2 = cursor.fetchone()
+                            if cr2:
+                                base_cost = cr2[0]
+                        except Exception:
+                            base_cost = None
+                except Exception:
+                    base_cost = None
+                try:
+                    cnum = float(base_cost) if base_cost is not None else 0.0
+                except Exception:
+                    cnum = 0.0
+                total_personnel_cost += (cnum * fte_local)
+                if all(v is not None for v in (po_id, dept_id, proj_id, io_id, pc_id, fy_val, hr_cat_id_local)):
+                    try:
+                        cursor.execute(
+                            """
+                            UPDATE project_forecasts_pc
+                               SET human_resource_fte = ?
+                             WHERE PO_id = ? AND department_id = ? AND project_id = ? AND io_id = ?
+                               AND project_category_id = ? AND fiscal_year = ? AND human_resource_category_id = ?
+                            """,
+                            (fte_local, int(po_id), int(dept_id), int(proj_id), int(io_id), int(pc_id), int(fy_val), int(hr_cat_id_local))
+                        )
+                    except Exception:
+                        pass
 
         try:
             cnxn.commit()
+        except Exception:
+            pass
+        # Flash a summary of personnel cost change for visibility (optional)
+        try:
+            flash(f"Personnel cost (calculated): {total_personnel_cost:.2f}", 'info')
         except Exception:
             pass
     except Exception:
@@ -1176,95 +1234,85 @@ def manual_change_forecast():
 
 @manual_upload.route("/upload_forecast", methods=['POST'])
 def upload_forecast_merged():
-    # Extract form data
     form = request.form
-    # Prepare for both forecast types
-    # Non-personnel
-    nonpc_fields = ["PO","IO","Department","Project_Category","Project_Name","fiscal_year","Non_personnel_cost"]
-    nonpc_row = {
-        "PO": form.get("PO"),
-        "IO": form.get("IO"),
-        "Department": form.get("Department"),
-        "Project Category": form.get("Project_Category"),
-        "Project Name": form.get("Project_Name"),
-        "fiscal_year": form.get("fiscal_year"),
-        "Non-personnel cost": form.get("Non_personnel_cost")
-    }
-    # Personnel
-    pc_fields = ["PO","IO","Department","Project_Category","Project_Name","fiscal_year","Human_resource_category","Human_resource_FTE","Personnel_cost"]
-    pc_row = {
-        "PO": form.get("PO"),
-        "IO": form.get("IO"),
-        "Department": form.get("Department"),
-        "Project Category": form.get("Project_Category"),
-        "Project Name": form.get("Project_Name"),
-        "fiscal_year": form.get("fiscal_year"),
-        "Human resource category": form.get("Human_resource_category"),
-        "Human resource FTE": form.get("Human_resource_FTE"),
-        "Personnel cost": form.get("Personnel_cost")
-    }
-    # Track results
     results = []
-    # Only upload if at least one relevant field is filled
-    # Non-personnel
-    if form.get("Non_personnel_cost"):
+
+    # Shared keys
+    base_context = {
+        "PO": form.get("PO"),
+        "IO": form.get("IO"),
+        "Department": form.get("Department"),
+        "Project Category": form.get("Project_Category"),
+        "Project Name": form.get("Project_Name"),
+        "fiscal_year": form.get("fiscal_year")
+    }
+
+    # Non-personnel upload (single value)
+    nonpc_val = form.get("Non_personnel_cost")
+    if nonpc_val not in (None, ''):
+        nonpc_row = dict(base_context)
+        nonpc_row["Non-personnel cost"] = nonpc_val
         df_nonpc = pd.DataFrame([nonpc_row])
-        print(df_nonpc)
         try:
             df_nonpc["IO"] = df_nonpc["IO"].astype(int)
-        except:
+        except Exception:
             pass
-        # try:
-            # from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_local_m
-        changed = upload_nonpc_forecasts_local_m(df_nonpc)
-        if changed > 0:
-            results.append("Non-personnel forecast uploaded successfully.")
-        else:
-            results.append("Non-personnel forecast already exists.")
-        # except Exception as e:
-        #     results.append(f"Non-personnel upload failed: {e}")
-    # Personnel
-    # Trigger personnel upload if either FTE provided (non-zero) or category selected or a computed personnel cost exists.
-    personnel_trigger = False
-    try:
-        fte_val = form.get("Human_resource_FTE")
-        fte_num = float(fte_val) if fte_val not in (None, '',) else 0.0
-        if fte_num != 0:
-            personnel_trigger = True
-    except Exception:
-        pass
-    if form.get("Human_resource_category"):
-        personnel_trigger = True
-    if form.get("Personnel_cost"):
-        personnel_trigger = True
-
-    if personnel_trigger:
-        df_pc = pd.DataFrame([pc_row])
         try:
-            df_pc["IO"] = df_pc["IO"].astype(int)
-        except:
+            changed = upload_nonpc_forecasts_local_m(df_nonpc)
+            if changed > 0:
+                results.append("Non-personnel forecast uploaded successfully.")
+            else:
+                results.append("Non-personnel forecast already exists.")
+        except Exception as e:
+            results.append(f"Non-personnel upload failed: {e}")
+
+    # Personnel uploads (multiple categories)
+    # Expect pairs: cat__<slug>=<Category Name>, fte__<slug>=<FTE>
+    pc_rows = []
+    for key in form.keys():
+        if key.startswith('fte__'):
+            slug = key[len('fte__'):]
+            fte_raw = form.get(key)
+            cat_key = 'cat__' + slug
+            category_name = form.get(cat_key)
+            if category_name is None:
+                continue
+            # Skip empty or zero FTE values
+            try:
+                fte_val = float(fte_raw)
+            except Exception:
+                fte_val = 0.0
+            if fte_val == 0.0:
+                continue
+            pc_row = dict(base_context)
+            pc_row['Human resource category'] = category_name
+            pc_row['Human resource FTE'] = fte_val
+            # Personnel cost not stored; omit
+            pc_rows.append(pc_row)
+
+    if pc_rows:
+        df_pc = pd.DataFrame(pc_rows)
+        try:
+            df_pc['IO'] = df_pc['IO'].astype(int)
+        except Exception:
             pass
-        # project_forecasts_pc table does not store personnel_expense - drop Personnel cost before upload
-        if 'Personnel cost' in df_pc.columns:
-            df_pc = df_pc.drop(columns=['Personnel cost'])
         try:
             from backend.upload_forecasts_pc import upload_pc_forecasts_local_m
             changed = upload_pc_forecasts_local_m(df_pc)
             if changed > 0:
-                results.append("Personnel forecast uploaded successfully.")
+                results.append(f"{len(pc_rows)} personnel forecast row(s) uploaded successfully.")
             else:
-                results.append("Personnel forecast already exists.")
+                results.append("Personnel forecast row(s) already exist.")
         except Exception as e:
             results.append(f"Personnel upload failed: {e}")
+
     if not results:
-        # No data provided: flash a message and redirect back to the manual input page
         try:
             flash('No forecast data provided. Please fill at least one forecast field.', 'warning')
         except Exception:
             pass
         return redirect(url_for('manual_upload.render_mannual_input'))
 
-    # On success, flash each result message and redirect back to the manual input page
     try:
         for msg in results:
             flash(msg, 'success')
