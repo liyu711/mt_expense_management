@@ -53,7 +53,7 @@
                 <h1>{{ title }}</h1>
                 <!-- Add and Modify buttons to trigger modal popups -->
                 <button id="add_button" type="button">Add</button>
-                {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' %}
+                {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'fundings' or table_name == 'capex_budgets' %}
                 <button id="modify_button" type="button">Modify</button>
                 {% endif %}
 
@@ -89,14 +89,14 @@
         </div>
 
                     <!-- Modify modal: single instance that submits to /change_staff_cost (render only for staff cost page) -->
-            {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'pos' or table_name == 'departments' or table_name == 'project_categories' %}
+            {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'fundings' or table_name == 'capex_budgets' or table_name == 'pos' or table_name == 'departments' or table_name == 'project_categories' %}
                     <div id="modifyModalChange" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modalTitleChange">
                         <div class="modal-overlay" id="modalOverlayChange"></div>
                         <div class="modal-content" role="document">
                             <button class="modal-close" id="modalCloseChange" aria-label="Close">&times;</button>
                             <h2 id="modalTitleChange">Modify {{ title }}</h2>
                     <form method="POST"
-                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('staff_cost_routes.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('capex_forecast_routes.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'pos' %}{{ url_for('po_routes.change_po') }}{% elif table_name == 'departments' %}{{ url_for('department_routes.change_department') }}{% elif table_name == 'project_categories' %}{{ url_for('project_category_routes.change_porject_category') }}{% endif %}"
+                        action="{% if table_name == 'human_resource_cost' %}{{ url_for('staff_cost_routes.change_staff_cost') }}{% elif table_name == 'capex_forecasts' %}{{ url_for('capex_forecast_routes.change_capex_forecast') }}{% elif table_name == 'budgets' %}{{ url_for('modify_tables.change_budget') }}{% elif table_name == 'fundings' %}{{ url_for('modify_tables.change_funding') }}{% elif table_name == 'capex_budgets' %}{{ url_for('capex_forecast_routes.change_capex_budget') }}{% elif table_name == 'pos' %}{{ url_for('po_routes.change_po') }}{% elif table_name == 'departments' %}{{ url_for('department_routes.change_department') }}{% elif table_name == 'project_categories' %}{{ url_for('project_category_routes.change_porject_category') }}{% endif %}"
                                   name="Change_{{ table_name }}" id="changeForm">
                                 {% if table_name == 'pos' %}
                                 <!-- Hidden field to carry the original PO name for update lookup -->
@@ -313,6 +313,120 @@
                                                 if(idIn && (row.id != null && row.id !== '')) idIn.value = row.id;
                                                 var input = modal.querySelector('#change_category') || modal.querySelector('input[name="category"]');
                                                 if(input) input.value = catName;
+                                            }catch(e){}
+                                        };
+                                    } else if (tableName === 'human_resource_cost'){
+                                        opts.rowClickEditModal.prefill = function(modal, row){ try{}catch(e){} };
+                                    } else if (tableName === 'budgets'){
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                function pick(o, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(o.hasOwnProperty(k) && o[k] != null && o[k] !== '') return String(o[k]); } return ''; }
+                                                var poVal = pick(row, ['PO','po','PO Name','name_po']);
+                                                var deptVal = pick(row, ['Department','department','Department Name','name_departments','BU']);
+                                                var fyVal = pick(row, ['Fiscal Year','fiscal_year','Year']);
+                                                var hrVal = pick(row, ['Personnel budget','human_resource_expense','Human Resource Expense','human_resource_expense']);
+                                                var npVal = pick(row, ['Non-personnel budget','non_personnel_expense','Non Personnel Expense','non_personnel_expense']);
+                                                var poSel = modal.querySelector('select[name="po"]');
+                                                var deptSel = modal.querySelector('select[name="department"]');
+                                                var fySel = modal.querySelector('select[name="fiscal_year"]');
+                                                var hrIn = modal.querySelector('input[name="human_resource_expense"]');
+                                                var npIn = modal.querySelector('input[name="non_personnel_expense"]');
+                                                if(poSel && poVal){ poSel.value = poVal; }
+                                                if(fySel && fyVal){ fySel.value = String(fyVal); }
+                                                if(hrIn && hrVal){ hrIn.value = hrVal; }
+                                                if(npIn && npVal){ npIn.value = npVal; }
+                                                if(deptSel && deptVal){ deptSel.value = deptVal; }
+                                            }catch(e){}
+                                        };
+                                    } else if (tableName === 'fundings'){
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                function pick(o, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(o.hasOwnProperty(k) && o[k] != null && o[k] !== '') return String(o[k]); } return ''; }
+                                                var poVal = pick(row, ['PO','po','PO Name','name_po']);
+                                                var deptVal = pick(row, ['Department','department','Department Name','name_departments','BU']);
+                                                var fyVal = pick(row, ['Fiscal Year','fiscal_year','Year']);
+                                                var fundingVal = pick(row, ['Funding','funding']);
+                                                var fromVal = pick(row, ['Funding From','funding_from']);
+                                                var forVal = pick(row, ['Funding For','funding_for']);
+                                                var poSel = modal.querySelector('select[name="po"]');
+                                                var deptSel = modal.querySelector('select[name="department"]');
+                                                var fySel = modal.querySelector('select[name="fiscal_year"]');
+                                                var fIn = modal.querySelector('input[name="funding"]');
+                                                var fromIn = modal.querySelector('input[name="funding_from"]');
+                                                var forIn = modal.querySelector('input[name="funding_for"]');
+                                                if(poSel && poVal){ poSel.value = poVal; }
+                                                if(fySel && fyVal){ fySel.value = String(fyVal); }
+                                                if(fIn && fundingVal){ fIn.value = fundingVal; }
+                                                if(fromIn){ fromIn.value = fromVal; }
+                                                if(forIn){ forIn.value = forVal; }
+                                                if(deptSel && deptVal){ deptSel.value = deptVal; }
+                                            }catch(e){}
+                                        };
+                                    } else if (tableName === 'capex_budgets'){
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj.hasOwnProperty(k) && obj[k] != null && obj[k] !== '') return String(obj[k]); } return ''; }
+                                                var poVal = pick(row, ['PO','PO Name','po','name_po']);
+                                                var deptVal = pick(row, ['Department','Department Name','department','department_name','name_departments','BU']);
+                                                var yearVal = pick(row, ['Capex Year','Capital Year','cap_year','Fiscal Year']);
+                                                var projVal = pick(row, ['Project','Project Name','project_name']);
+                                                var descVal = pick(row, ['Capex Description','Description','capex_description']);
+                                                var budgetVal = pick(row, ['Approved Budget (K CNY)','Budget','budget','approved_budget']);
+                                                var poSel = modal.querySelector('select[name="po"]');
+                                                var yearSel = modal.querySelector('select[name="cap_year"]');
+                                                var deptSel = modal.querySelector('select[name="department"]');
+                                                var projSel = modal.querySelector('select[name="project_name"]');
+                                                var descIn = modal.querySelector('input[name="capex_description"]');
+                                                var budIn = modal.querySelector('input[name="approved_budget"], input[name="budget"]');
+                                                if(poSel && poVal){ poSel.value = poVal; }
+                                                if(yearSel && yearVal){ yearSel.value = String(yearVal); }
+                                                if(descIn){ descIn.value = descVal; }
+                                                if(budIn && budgetVal){ budIn.value = budgetVal; }
+                                                function setDeptAndProjects(){
+                                                    if(deptSel && deptVal){ deptSel.value = deptVal; }
+                                                    var currentPO = poSel ? poSel.value : '';
+                                                    var currentDept = deptSel ? deptSel.value : '';
+                                                    var currentFY = yearSel ? yearSel.value : '';
+                                                    if(projSel && currentPO && currentDept && currentFY){
+                                                        var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                                                        fetch(url)
+                                                            .then(function(res){ return res.ok ? res.json() : { projects: [] }; })
+                                                            .then(function(json){
+                                                                try{
+                                                                    projSel.innerHTML = '';
+                                                                    var placeholder = document.createElement('option');
+                                                                    placeholder.value = ''; placeholder.disabled = true; placeholder.selected = true; placeholder.textContent = 'Select an option';
+                                                                    projSel.appendChild(placeholder);
+                                                                    (json && json.projects ? json.projects : []).forEach(function(name){
+                                                                        var opt = document.createElement('option'); opt.value = name; opt.textContent = name; projSel.appendChild(opt);
+                                                                    });
+                                                                    if(projVal){ projSel.value = projVal; }
+                                                                }catch(e){}
+                                                            })
+                                                            .catch(function(){});
+                                                    } else if (projSel && projVal){ projSel.value = projVal; }
+                                                }
+                                                if(poSel && poSel.value){
+                                                    fetch('/capex_forecast/department_update?po=' + encodeURIComponent(poSel.value))
+                                                        .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
+                                                        .then(function(json){
+                                                            try{
+                                                                if(deptSel){
+                                                                    deptSel.innerHTML = '';
+                                                                    var placeholder = document.createElement('option');
+                                                                    placeholder.value=''; placeholder.disabled=true; placeholder.selected=true; placeholder.textContent='Select an option';
+                                                                    deptSel.appendChild(placeholder);
+                                                                    (json && json.departments ? json.departments : []).forEach(function(name){
+                                                                        var opt = document.createElement('option'); opt.value = name; opt.textContent = name; deptSel.appendChild(opt);
+                                                                    });
+                                                                }
+                                                            }catch(e){}
+                                                        })
+                                                        .then(function(){ setDeptAndProjects(); })
+                                                        .catch(function(){ setDeptAndProjects(); });
+                                                } else {
+                                                    setDeptAndProjects();
+                                                }
                                             }catch(e){}
                                         };
                                     } else if (tableName === 'human_resource_cost'){

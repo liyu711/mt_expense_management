@@ -279,3 +279,71 @@ def delete_capex_forecast():
         return {'status': 'ok'}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
+
+
+@capex_forecast_routes.route('/capex_budget/change_capex_budget', methods=['POST'])
+def change_capex_budget():
+    """Handle modify action to change an existing capex budget entry.
+
+    Expects form fields: po, department, cap_year, project_name, capex_description, approved_budget
+    Updates capex_budgets.budget and capex_description WHERE po_id, department_id, project_id, cap_year match.
+    """
+    form = dict(request.form)
+    po = form.get('po')
+    department = form.get('department')
+    cap_year = form.get('cap_year') or form.get('fiscal_year')
+    project_name = form.get('project_name') or form.get('project')
+    capex_description = form.get('capex_description')
+    approved_budget = form.get('approved_budget') or form.get('budget')
+
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+        proj_map = dict(zip(proj_df['name'], proj_df['id'])) if 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+
+        po_id = po_map.get(po)
+        department_id = dept_map.get(department)
+        project_id = proj_map.get(project_name)
+
+        try:
+            cap_year_val = int(cap_year) if cap_year not in (None, '') else None
+        except Exception:
+            cap_year_val = None
+        try:
+            budget_val = float(approved_budget) if approved_budget not in (None, '') else None
+        except Exception:
+            budget_val = None
+
+        if po_id is None or department_id is None or project_id is None or cap_year_val is None or budget_val is None:
+            return {'status': 'error', 'message': 'Missing identifiers'}, 400
+
+        cursor.execute(
+            """
+            UPDATE capex_budgets
+               SET capex_description = ?,
+                   budget = ?
+             WHERE po_id = ?
+               AND department_id = ?
+               AND project_id = ?
+               AND cap_year = ?
+            """,
+            (
+                capex_description,
+                budget_val,
+                int(po_id),
+                int(department_id),
+                int(project_id),
+                int(cap_year_val),
+            ),
+        )
+        cnxn.commit()
+        return {'status': 'ok'}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500

@@ -1079,6 +1079,73 @@ def change_budget():
     return redirect(url_for('modify_tables.modify_table_router', action='upload_budget'))
 
 
+@modify_tables.route('/modify_funding/change_funding', methods=['POST'])
+def change_funding():
+    """Handle modify action to change an existing funding entry.
+
+    Expects form fields: po, department, fiscal_year, funding, funding_from, funding_for
+    Updates fundings row identified by (po_id, department_id, fiscal_year).
+    """
+    form = dict(request.form)
+    po = form.get('po')
+    department = form.get('department')
+    fiscal_year = form.get('fiscal_year')
+    funding = form.get('funding')
+    funding_from = form.get('funding_from')
+    funding_for = form.get('funding_for')
+
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Map names to IDs
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+
+        po_id = po_map.get(po)
+        department_id = dept_map.get(department)
+
+        # Coerce numeric types
+        fy_val = None
+        try:
+            fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
+        except Exception:
+            fy_val = fiscal_year
+
+        fund_val = None
+        try:
+            fund_val = float(funding) if funding not in (None, '') else None
+        except Exception:
+            fund_val = None
+
+        if po_id is None or department_id is None or fy_val is None or fund_val is None:
+            # Missing required identifiers or values; redirect back without change
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_funding'))
+
+        # Perform update
+        cursor.execute(
+            """
+            UPDATE fundings
+               SET funding = ?,
+                   funding_from = ?,
+                   funding_for = ?
+             WHERE po_id = ?
+               AND department_id = ?
+               AND fiscal_year = ?
+            """,
+            (fund_val, funding_from, funding_for, int(po_id), int(department_id), fy_val),
+        )
+        cnxn.commit()
+    except Exception:
+        # ignore errors and redirect back
+        pass
+
+    return redirect(url_for('modify_tables.modify_table_router', action='modify_funding'))
+
+
 
 
 # moved to app_local/project_routes.py: /modify_project/details
