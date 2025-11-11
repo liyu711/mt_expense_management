@@ -173,6 +173,93 @@
                                                 if(input) input.value = existing;
                                             }catch(e){}
                                         };
+                                    } else if (tableName === 'capex_forecasts'){
+                                        // Prefill Change form for CapEx Forecasts
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj.hasOwnProperty(k) && obj[k] != null && obj[k] !== '') return String(obj[k]); } return ''; }
+                                                // Extract display values from row with robust key detection
+                                                var poVal = pick(row, ['PO','PO Name','po_name','name_po']);
+                                                var deptVal = pick(row, ['Department','Department Name','department_name','BU','name_departments']);
+                                                var yearVal = pick(row, ['Capital Year','Fiscal Year','fiscal_year','cap_year']);
+                                                var projVal = pick(row, ['Project','Project Name','project_name']);
+                                                var descVal = pick(row, ['Description','capex_description']);
+                                                var forecastVal = pick(row, ['CapEx Forecast','capex_forecast','Forecast','forecast']);
+                                                var costCenterVal = pick(row, ['Cost Center','cost_center']);
+
+                                                // Set PO first
+                                                var poSel = modal.querySelector('select[name="po"]');
+                                                if(poSel && poVal){ poSel.value = poVal; }
+
+                                                // Cap Year
+                                                var yearSel = modal.querySelector('select[name="cap_year"]');
+                                                if(yearSel && yearVal){ yearSel.value = String(yearVal); }
+
+                                                // Description, Forecast, Cost Center
+                                                var descIn = modal.querySelector('input[name="capex_description"]');
+                                                if(descIn){ descIn.value = descVal; }
+                                                var fcIn = modal.querySelector('input[name="capex_forecast"]');
+                                                if(fcIn){ fcIn.value = forecastVal; }
+                                                var ccIn = modal.querySelector('input[name="cost_center"]');
+                                                if(ccIn){ ccIn.value = costCenterVal; }
+
+                                                // Department depends on selected PO -> fetch filtered departments then set
+                                                var deptSel = modal.querySelector('select[name="department"]');
+                                                function setDeptAndMaybeProjects(){
+                                                    if(deptSel && deptVal){ deptSel.value = deptVal; }
+                                                    // After Department and Year are present, fetch project options and set
+                                                    var projSel = modal.querySelector('select[name="project_name"]');
+                                                    var currentPO = poSel ? poSel.value : '';
+                                                    var currentDept = deptSel ? deptSel.value : '';
+                                                    var currentFY = yearSel ? yearSel.value : '';
+                                                    if(projSel && currentPO && currentDept && currentFY){
+                                                        var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                                                        fetch(url)
+                                                            .then(function(res){ return res.ok ? res.json() : { projects: [] }; })
+                                                            .then(function(json){
+                                                                try{
+                                                                    // Rebuild project options
+                                                                    projSel.innerHTML = '';
+                                                                    var placeholder = document.createElement('option');
+                                                                    placeholder.value = ''; placeholder.disabled = true; placeholder.selected = true; placeholder.textContent = 'Select an option';
+                                                                    projSel.appendChild(placeholder);
+                                                                    (json && json.projects ? json.projects : []).forEach(function(name){
+                                                                        var opt = document.createElement('option'); opt.value = name; opt.textContent = name; projSel.appendChild(opt);
+                                                                    });
+                                                                    if(projVal){ projSel.value = projVal; }
+                                                                }catch(e){}
+                                                            })
+                                                            .catch(function(){});
+                                                    } else if (projSel && projVal){
+                                                        projSel.value = projVal;
+                                                    }
+                                                }
+
+                                                // If we have a PO selected, fetch filtered departments; otherwise just set value
+                                                if(poSel && poSel.value){
+                                                    fetch('/capex_forecast/department_update?po=' + encodeURIComponent(poSel.value))
+                                                        .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
+                                                        .then(function(json){
+                                                            try{
+                                                                if(deptSel){
+                                                                    // Rebuild department options
+                                                                    deptSel.innerHTML = '';
+                                                                    var placeholder = document.createElement('option');
+                                                                    placeholder.value=''; placeholder.disabled=true; placeholder.selected=true; placeholder.textContent='Select an option';
+                                                                    deptSel.appendChild(placeholder);
+                                                                    (json && json.departments ? json.departments : []).forEach(function(name){
+                                                                        var opt = document.createElement('option'); opt.value = name; opt.textContent = name; deptSel.appendChild(opt);
+                                                                    });
+                                                                }
+                                                            }catch(e){}
+                                                        })
+                                                        .then(function(){ setDeptAndMaybeProjects(); })
+                                                        .catch(function(){ setDeptAndMaybeProjects(); });
+                                                } else {
+                                                    setDeptAndMaybeProjects();
+                                                }
+                                            }catch(e){}
+                                        };
                                     } else if (tableName === 'departments'){
                                         opts.rowClickEditModal.prefill = function(modal, row){
                                             try{
