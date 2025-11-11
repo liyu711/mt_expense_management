@@ -367,6 +367,100 @@
                                     }
                                 }
                                 GenericTable.create(el, opts);
+                                // Inject per-row Delete actions strictly for CapEx Forecasts table
+                                if (tableName === 'capex_forecasts') {
+                                    function injectDeleteButtons(){
+                                        try{
+                                            var table = el.querySelector('table');
+                                            if(!table) return;
+                                            var theadTr = table.querySelector('thead tr');
+                                            if(theadTr && !theadTr.querySelector('th.gt-delete-col')){
+                                                var th = document.createElement('th');
+                                                th.className = 'gt-delete-col';
+                                                th.textContent = 'Delete';
+                                                theadTr.appendChild(th);
+                                            }
+                                            var headerTexts = Array.prototype.map.call(table.querySelectorAll('thead th'), function(th){ return (th.textContent||'').trim(); });
+                                            table.querySelectorAll('tbody tr').forEach(function(tr){
+                                                if(tr.querySelector('td.gt-delete-cell')) return; // already injected
+                                                var td = document.createElement('td');
+                                                td.className = 'gt-delete-cell';
+                                                var btn = document.createElement('button');
+                                                btn.type = 'button';
+                                                btn.textContent = 'Delete';
+                                                btn.style.cssText = 'padding:2px 6px;font-size:12px;background:#c0392b;color:#fff;border:none;border-radius:4px;cursor:pointer;';
+                                                btn.addEventListener('click', function(ev){
+                                                    ev.stopPropagation();
+                                                    try{
+                                                        var cells = Array.prototype.slice.call(tr.querySelectorAll('td, th'));
+                                                        // Build a case-insensitive, normalized header->cell map
+                                                        function norm(s){
+                                                            return (s||'').toLowerCase().replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
+                                                        }
+                                                        var lowerMap = {};
+                                                        for (var i = 0; i < headerTexts.length && i < cells.length; i++) {
+                                                            var key = norm(headerTexts[i] || '');
+                                                            lowerMap[key] = (cells[i].textContent || '').trim();
+                                                        }
+                                                        function pickLower(map, keys){
+                                                            for (var j=0;j<keys.length;j++){
+                                                                var k = keys[j];
+                                                                if (map.hasOwnProperty(k) && map[k] !== '') return map[k];
+                                                            }
+                                                            return '';
+                                                        }
+                                                        var poVal = pickLower(lowerMap, ['po','po name','po_name','name_po']);
+                                                        var deptVal = pickLower(lowerMap, ['department','department name','department_name','bu','dept','bu name','name_departments']);
+                                                        var projVal = pickLower(lowerMap, ['project','project name','project_name']);
+                                                        var yearVal = pickLower(lowerMap, ['capex year','capital year','fiscal year','cap year','year','cap_year']);
+                                                        var descVal = pickLower(lowerMap, ['capex description','capex_description','capex desc','description','desc']);
+                                                        // Substring-based fallbacks if exact header match failed
+                                                        function pickByIncludes(map, includeAny){
+                                                            var keys = Object.keys(map);
+                                                            for (var i=0;i<keys.length;i++){
+                                                                var k = keys[i];
+                                                                for (var j=0;j<includeAny.length;j++){
+                                                                    if (k.indexOf(includeAny[j]) !== -1) return map[k];
+                                                                }
+                                                            }
+                                                            return '';
+                                                        }
+                                                        if (!poVal) poVal = pickByIncludes(lowerMap, ['po']);
+                                                        if (!deptVal) deptVal = pickByIncludes(lowerMap, ['department','dept','bu']);
+                                                        if (!projVal) projVal = pickByIncludes(lowerMap, ['project']);
+                                                        if (!yearVal) yearVal = pickByIncludes(lowerMap, ['capex','capital','fiscal','cap','year']);
+                                                        if (!descVal) descVal = pickByIncludes(lowerMap, ['description','desc']);
+
+                                                        if(!(poVal && deptVal && projVal && yearVal)){
+                                                            alert('Missing key fields for deletion.');
+                                                            return;
+                                                        }
+                                                        if(!confirm('Delete forecast for '+ (projVal||'') +' / '+ (deptVal||'') +' / '+ (poVal||'') +' ('+ (yearVal||'') +')?')) return;
+
+                                                        fetch('/capex_forecast/delete_capex_forecast', {
+                                                            method: 'POST',
+                                                            headers: { 'Content-Type': 'application/json' },
+                                                            body: JSON.stringify({ po: poVal, department: deptVal, project_name: projVal, cap_year: yearVal, capex_description: descVal })
+                                                        }).then(function(r){ return r.json(); }).then(function(resp){
+                                                            if(resp && resp.status === 'ok'){
+                                                                tr.remove();
+                                                            } else {
+                                                                alert('Delete failed: ' + ((resp && resp.message) ? resp.message : 'unknown error'));
+                                                            }
+                                                        }).catch(function(err){ alert('Delete error: ' + err); });
+                                                    }catch(e){ }
+                                                });
+                                                td.appendChild(btn);
+                                                tr.appendChild(td);
+                                            });
+                                        }catch(e){}
+                                    }
+                                    // initial injection after a short delay to allow render
+                                    setTimeout(injectDeleteButtons, 60);
+                                    // observe changes under the container to re-inject on pagination/redraw
+                                    var obs = new MutationObserver(function(){ injectDeleteButtons(); });
+                                    obs.observe(el, { childList: true, subtree: true });
+                                }
                             }catch(e){}
                         })();
                     </script>
