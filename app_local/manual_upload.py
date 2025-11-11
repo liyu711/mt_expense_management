@@ -1296,18 +1296,30 @@ def manual_change_forecast():
         except Exception:
             nonpc_val = None
 
-        # Update non-personnel expense if all keys are available
-        if all(v is not None for v in (po_id, dept_id, proj_id, io_id, pc_id, fy_val)) and nonpc_val is not None:
+        # Update non-personnel expense if base keys are available
+        if all(v is not None for v in (po_id, dept_id, proj_id, pc_id, fy_val)) and nonpc_val is not None:
             try:
-                cursor.execute(
-                    """
-                    UPDATE project_forecasts_nonpc
-                       SET non_personnel_expense = ?
-                     WHERE PO_id = ? AND department_id = ? AND project_id = ?
-                       AND io_id = ? AND project_category_id = ? AND fiscal_year = ?
-                    """,
-                    (nonpc_val, int(po_id), int(dept_id), int(proj_id), int(io_id), int(pc_id), int(fy_val))
-                )
+                if io_id is not None:
+                    cursor.execute(
+                        """
+                        UPDATE project_forecasts_nonpc
+                           SET non_personnel_expense = ?
+                         WHERE PO_id = ? AND department_id = ? AND project_id = ?
+                           AND io_id = ? AND project_category_id = ? AND fiscal_year = ?
+                        """,
+                        (nonpc_val, int(po_id), int(dept_id), int(proj_id), int(io_id), int(pc_id), int(fy_val))
+                    )
+                else:
+                    # IO not specified/known: update all matching rows across IOs for this key
+                    cursor.execute(
+                        """
+                        UPDATE project_forecasts_nonpc
+                           SET non_personnel_expense = ?
+                         WHERE PO_id = ? AND department_id = ? AND project_id = ?
+                           AND project_category_id = ? AND fiscal_year = ?
+                        """,
+                        (nonpc_val, int(po_id), int(dept_id), int(proj_id), int(pc_id), int(fy_val))
+                    )
             except Exception:
                 pass
 
