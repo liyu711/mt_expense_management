@@ -166,8 +166,6 @@ def get_statistics():
         # expenses
         expenses = get_expenses_display()
 
-        
-
         def apply_filters(df):
             if df is None or df.empty:
                 return pd.DataFrame()
@@ -187,7 +185,7 @@ def get_statistics():
 
             # PO
             if selected_po and selected_po != '' and selected_po != 'All':
-                po_col = find_col(['po', 'po_name', 'po name', 'po_id', 'poid'])
+                po_col = find_col(['po', 'po_name', 'po name', 'po_id', 'poid', 'PO Name'])
                 if po_col is not None:
                     mask &= out[po_col].astype(str) == str(selected_po)
                 else:
@@ -195,7 +193,7 @@ def get_statistics():
 
             # Department
             if selected_department and selected_department != '' and selected_department != 'All':
-                dept_col = find_col(['department', 'department_name', 'department name', 'dept', 'dept_name'])
+                dept_col = find_col(['department', 'department_name', 'department name', 'dept', 'dept_name', 'BU Name'])
                 if dept_col is not None:
                     mask &= out[dept_col].astype(str) == str(selected_department)
                 else:

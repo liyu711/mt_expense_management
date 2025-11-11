@@ -1176,7 +1176,7 @@ def get_expenses_display():
 
 	# Empty fallback
 	if exp is None or exp.empty:
-		return pd.DataFrame(columns=['id', 'BU Name', 'expense', 'Name'])
+		return pd.DataFrame(columns=['id', 'BU Name', 'expense', 'Name', 'cost_element', 'fiscal_year'])
 
 	work = exp.copy()
 
@@ -1241,8 +1241,15 @@ def get_expenses_display():
 	else:
 		# If cost_elements table not available, use co_id in expenses if present
 		work['cost_element'] = work['co_id'] if 'co_id' in work.columns else (work[exp_ce_col] if exp_ce_col in work.columns else None)
+    
+	# fiscal year passthrough: detect common variants and expose as 'fiscal_year'
+	fy_src = next((c for c in ('fiscal_year', 'Fiscal Year', 'fy', 'year', 'cap_year') if c in work.columns), None)
+	if fy_src is not None:
+		work['fiscal_year'] = work[fy_src]
+	else:
+		work['fiscal_year'] = None
 
-	return work.loc[:, ['id', 'BU Name', 'expense', 'Name', 'cost_element']].reset_index(drop=True)
+	return work.loc[:, ['id', 'BU Name', 'expense', 'Name', 'cost_element', 'fiscal_year']].reset_index(drop=True)
 
 
 def get_capex_expenses_display():
@@ -1272,7 +1279,7 @@ def get_capex_expenses_display():
 	proj = select_all_from_table(cursor, cnxn, 'projects')
 
 	if cap is None or cap.empty:
-		return pd.DataFrame(columns=['id', 'PO name', 'BU name', 'project name', 'expense', 'expense date'])
+		return pd.DataFrame(columns=['id', 'PO name', 'BU name', 'project name', 'expense', 'expense date', 'fiscal_year'])
 
 	work = cap.copy()
 
@@ -1333,7 +1340,14 @@ def get_capex_expenses_display():
 	# expense date
 	date_col = next((c for c in ['expense_date', 'Expense Date', 'date', 'Date'] if c in work.columns), None)
 	work['expense date'] = work[date_col] if date_col else None
+    
+	# fiscal year passthrough: detect common variants and expose as 'fiscal_year'
+	fy_src = next((c for c in ('fiscal_year', 'Fiscal Year', 'fy', 'year', 'cap_year') if c in work.columns), None)
+	if fy_src is not None:
+		work['fiscal_year'] = work[fy_src]
+	else:
+		work['fiscal_year'] = None
 
-	return work.loc[:, ['id', 'PO name', 'BU name', 'project name', 'expense', 'expense date']].reset_index(drop=True)
+	return work.loc[:, ['id', 'PO name', 'BU name', 'project name', 'expense', 'expense date', 'fiscal_year']].reset_index(drop=True)
 
 
