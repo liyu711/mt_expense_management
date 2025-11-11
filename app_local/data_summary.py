@@ -3,7 +3,8 @@ from backend.connect_local import connect_local, select_all_from_table
 from backend.display_names import DISPLAY_NAMES
 from backend import \
     get_departments_display, get_forecasts_display, get_pc_display, \
-    get_nonpc_display, get_budget_display_table, create_funding_display, get_capex_expenses_display, get_expenses_display, get_projects_display
+    get_nonpc_display, get_budget_display_table, create_funding_display, get_capex_expenses_display, get_expenses_display, get_projects_display, \
+    create_capex_forecast_display, create_capex_budgets_dispaly
 import pandas as pd
 
 data_summary_bp = Blueprint('data_summary', __name__, template_folder='templates')
@@ -166,6 +167,10 @@ def get_statistics():
         fundings = create_funding_display()
         # expenses
         expenses = get_expenses_display()
+        # capex-related displays
+        capex_forecast_df = create_capex_forecast_display()
+        capex_budget_df = create_capex_budgets_dispaly()
+        capex_expense_df = get_capex_expenses_display()
 
         def apply_filters(df):
             if df is None or df.empty:
@@ -218,6 +223,9 @@ def get_statistics():
         budgets_f = apply_filters(budgets)
         fundings_f = apply_filters(fundings)
         expenses_f = apply_filters(expenses)
+        capex_forecast_f = apply_filters(capex_forecast_df)
+        capex_budget_f = apply_filters(capex_budget_df)
+        capex_expense_f = apply_filters(capex_expense_df)
 
 
         def sum_column(df, candidates):
@@ -244,6 +252,11 @@ def get_statistics():
 
         # Total actual expense across all cost elements (after filters)
         actual_expense = sum_column(expenses_f, ['expenses', 'expense', 'amount', 'Actual Expenditure'])
+
+        # Capex sums
+        capex_forecast_sum = sum_column(capex_forecast_f, ['capex_forecast'])
+        capex_budget_sum = sum_column(capex_budget_f, ['budget'])
+        capex_expense_sum = sum_column(capex_expense_f, ['expense'])
 
         # Derive Personnel Expense and Non-personnel Expense from expenses based on cost_element prefix '94'
         def sum_expenses_by_cost_element_prefix(df, prefix, value_candidates):
@@ -284,6 +297,12 @@ def get_statistics():
             'Personnel Expense': round(personnel_expense_actual, 2),
             'Non-personnel Expense': round(non_personnel_expense_actual, 2)
         }
+        # include Capex Statistics
+        result.update({
+            'capex_forecast': round(capex_forecast_sum, 2),
+            'capex_budget': round(capex_budget_sum, 2),
+            'capex_expense': round(capex_expense_sum, 2),
+        })
         print(result)
         return result, 200
     except Exception as e:

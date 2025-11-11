@@ -183,6 +183,10 @@
                 <button id="calculate_stats">Refresh statistics</button>
             </div>
         </div>
+        <div id="capex-stats" style="margin-top:18px;">
+            <h3 style="margin:0 0 8px;">Capex Statistics</h3>
+            <div id="capex-stats-content"><em>Loading…</em></div>
+        </div>
         <script>
             (function(){
                 function fmt(n){
@@ -193,12 +197,19 @@
                     { label: 'Personnel Forecast', key: 'personnel_forecast' },
                     { label: 'Non-personnel Forecast', key: 'non_personnel_forecast' },
                     { label: 'Total Forecast', key: 'total_forecast' },
+                    { label: 'Personnel Budget', key: 'personnel budget' },
+                    { label: 'Non-personnel Budget', key: 'non personnel budget' },
                     { label: 'Budget', key: 'budget' },
                     { label: 'Funding', key: 'funding' },
                     { label: 'Total Budget and Funding', key: 'total_budget and funding' },
                     { label: 'Personnel Expense', key: 'Personnel Expense' },
                     { label: 'Non-personnel Expense', key: 'Non-personnel Expense' },
                     { label: 'Total Expense', key: 'Total Expense' }
+                ];
+                var capexRows = [
+                    { label: 'Capex Forecast', key: 'capex_forecast' },
+                    { label: 'Capex Budget', key: 'capex_budget' },
+                    { label: 'Capex Expense', key: 'capex_expense' }
                 ];
                 function render(data){
                     var el = document.getElementById('stats-content');
@@ -214,11 +225,25 @@
                     html += '</tbody></table>';
                     el.innerHTML = html;
                 }
+                function renderCapex(data){
+                    var el = document.getElementById('capex-stats-content');
+                    if(!el) return;
+                    if(!data || data.error){ el.innerHTML = '<span style="color:#a00;">Failed to load capex statistics</span>'; return; }
+                    var html = '<table style="border-collapse:collapse;min-width:420px;">\n<tbody>';
+                    capexRows.forEach(function(r){
+                        html += '<tr>' +
+                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap;">' + r.label + '</td>' +
+                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data[r.key]) + '</td>' +
+                        '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    el.innerHTML = html;
+                }
                 function load(){
                     fetch('/data_summary/get_statistics',{method:'GET'})
                         .then(function(r){ return r.ok ? r.json() : {error:'bad status'}; })
-                        .then(render)
-                        .catch(function(){ render({error:'network'}); });
+                        .then(function(data){ render(data); renderCapex(data); })
+                        .catch(function(){ render({error:'network'}); renderCapex({error:'network'}); });
                 }
                 document.addEventListener('DOMContentLoaded', function(){
                     var btn = document.getElementById('calculate_stats');

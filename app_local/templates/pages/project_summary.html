@@ -135,6 +135,10 @@
             <div id="stats-content" style="margin-top:10px;">
                 <em>Loading…</em>
             </div>
+            <div id="capex-stats-content" style="margin-top:18px;">
+                <h3 style="margin:0 0 8px;">Capex Statistics</h3>
+                <em>Loading…</em>
+            </div>
         </div>
 
         <script>
@@ -179,11 +183,35 @@
                     el.innerHTML = html;
                 }
 
+                function renderCapex(data){
+                    var el = document.getElementById('capex-stats-content');
+                    if(!el) return;
+                    if(!data || data.error){
+                        el.innerHTML = '<h3 style="margin:0 0 8px;">Capex Statistics</h3><span style="color:#a00;">Failed to load capex statistics</span>';
+                        return;
+                    }
+                    var rows = [
+                        { label: 'Capex Forecast', key: 'capex_forecast' },
+                        { label: 'Capex Expense', key: 'capex_expense' }
+                    ];
+                    var html = '<h3 style="margin:0 0 8px;">Capex Statistics</h3>';
+                    html += '<table style="border-collapse:collapse;min-width:420px;">';
+                    html += '<tbody>';
+                    rows.forEach(function(r){
+                        html += '<tr>' +
+                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap;">' + r.label + '</td>' +
+                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data[r.key]) + '</td>' +
+                        '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    el.innerHTML = html;
+                }
+
                 // Fetch stats on load
                 fetch('/project_summary/get_statistics', { method: 'GET' })
                     .then(function(resp){ return resp.ok ? resp.json() : {error:'bad status'}; })
-                    .then(renderStats)
-                    .catch(function(){ renderStats({error:'network'}); });
+                    .then(function(data){ renderStats(data); renderCapex(data); })
+                    .catch(function(){ renderStats({error:'network'}); renderCapex({error:'network'}); });
             })();
         </script>
     </div>

@@ -1381,3 +1381,186 @@ def get_capex_expenses_display():
 	return work.loc[:, ['id', 'PO name', 'BU name', 'project name', 'expense', 'expense date', 'fiscal_year']].reset_index(drop=True)
 
 
+def create_capex_forecast_display():
+	"""Return CapEx forecasts joined to PO, BU, and Project.
+
+	Joins:
+	- capex_forecasts.po_id -> pos.id
+	- capex_forecasts.department_id -> departments.id
+	- capex_forecasts.project_id -> projects.id
+
+	Keeps columns:
+	- id
+	- po_name (from pos.name)
+	- department_name (from departments.name)
+	- project_name (from projects.name)
+	- fiscal_year (from cap_year)
+	- capex_forecast (value column)
+
+	Handles common column name variants gracefully.
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	capf = select_all_from_table(cursor, cnxn, 'capex_forecasts')
+	pos = select_all_from_table(cursor, cnxn, 'pos')
+	dept = select_all_from_table(cursor, cnxn, 'departments')
+	proj = select_all_from_table(cursor, cnxn, 'projects')
+
+	# If missing return empty with expected columns
+	if capf is None or capf.empty:
+		return pd.DataFrame(columns=['id', 'po_name', 'department_name', 'project_name', 'fiscal_year', 'capex_forecast'])
+
+	work = capf.copy()
+
+	# id
+	if 'id' not in work.columns:
+		work['id'] = None
+
+	# PO mapping
+	if pos is not None and not pos.empty and 'id' in pos.columns:
+		pos_name_col = 'name' if 'name' in pos.columns else pos.columns[0]
+		po_map = dict(zip(pos['id'], pos[pos_name_col])) if pos_name_col is not None else {}
+		po_id_col = next((c for c in ['po_id', 'PO_id'] if c in work.columns), None)
+		if po_id_col is not None:
+			try:
+				work['po_name'] = work[po_id_col].map(po_map)
+			except Exception:
+				work['po_name'] = None
+		elif 'PO' in work.columns:
+			work['po_name'] = work['PO']
+	else:
+		work['po_name'] = work['PO'] if 'PO' in work.columns else None
+
+	# Department mapping -> BU name
+	if dept is not None and not dept.empty and 'id' in dept.columns:
+		dept_name_col = 'name' if 'name' in dept.columns else dept.columns[0]
+		dept_map = dict(zip(dept['id'], dept[dept_name_col])) if dept_name_col is not None else {}
+		dept_id_col = next((c for c in ['department_id', 'dept_id'] if c in work.columns), None)
+		if dept_id_col is not None:
+			try:
+				work['department_name'] = work[dept_id_col].map(dept_map)
+			except Exception:
+				work['department_name'] = None
+		elif 'Department' in work.columns:
+			work['department_name'] = work['Department']
+	else:
+		work['department_name'] = work['Department'] if 'Department' in work.columns else None
+
+	# Project mapping -> project name
+	if proj is not None and not proj.empty and 'id' in proj.columns:
+		proj_name_col = 'name' if 'name' in proj.columns else proj.columns[0]
+		proj_map = dict(zip(proj['id'], proj[proj_name_col])) if proj_name_col is not None else {}
+		proj_id_col = next((c for c in ['project_id', 'proj_id', 'project'] if c in work.columns), None)
+		if proj_id_col is not None:
+			try:
+				work['project_name'] = work[proj_id_col].map(proj_map)
+			except Exception:
+				work['project_name'] = None
+		elif 'Project Name' in work.columns:
+			work['project_name'] = work['Project Name']
+	else:
+		work['project_name'] = work['Project Name'] if 'Project Name' in work.columns else None
+
+	# fiscal year from cap_year (common variants)
+	cap_year_col = next((c for c in ('cap_year', 'capex_year', 'fiscal_year', 'Fiscal Year', 'fy', 'year') if c in work.columns), None)
+	if cap_year_col is not None:
+		work['fiscal_year'] = work[cap_year_col]
+	else:
+		work['fiscal_year'] = None
+
+	# capex forecast amount column candidates
+	val_col = next((c for c in ('capex_forecast', 'capex', 'forecast', 'amount', 'value') if c in work.columns), None)
+	work['capex_forecast'] = work[val_col] if val_col else None
+
+	# Final selection
+	return work.loc[:, ['id', 'po_name', 'department_name', 'project_name', 'fiscal_year', 'capex_forecast']].reset_index(drop=True)
+
+
+def create_capex_budgets_dispaly():
+	"""Return CapEx budgets joined to PO, BU, and Project.
+
+	Joins:
+	- capex_budgets.po_id -> pos.id
+	- capex_budgets.department_id -> departments.id
+	- capex_budgets.project_id -> projects.id
+
+	Keeps columns:
+	- po_name
+	- department_name
+	- project_name
+	- fiscal_year (from cap_year)
+	- budget (value column)
+	"""
+	conn = connect_local()
+	cursor, cnxn = conn.connect_to_db()
+
+	caps = select_all_from_table(cursor, cnxn, 'capex_budgets')
+	pos = select_all_from_table(cursor, cnxn, 'pos')
+	dept = select_all_from_table(cursor, cnxn, 'departments')
+	proj = select_all_from_table(cursor, cnxn, 'projects')
+
+	if caps is None or caps.empty:
+		return pd.DataFrame(columns=['po_name', 'department_name', 'project_name', 'fiscal_year', 'budget'])
+
+	work = caps.copy()
+
+	# PO
+	if pos is not None and not pos.empty and 'id' in pos.columns:
+		pos_name_col = 'name' if 'name' in pos.columns else pos.columns[0]
+		po_map = dict(zip(pos['id'], pos[pos_name_col])) if pos_name_col is not None else {}
+		po_id_col = next((c for c in ['po_id', 'PO_id'] if c in work.columns), None)
+		if po_id_col is not None:
+			try:
+				work['po_name'] = work[po_id_col].map(po_map)
+			except Exception:
+				work['po_name'] = None
+		elif 'PO' in work.columns:
+			work['po_name'] = work['PO']
+	else:
+		work['po_name'] = work['PO'] if 'PO' in work.columns else None
+
+	# Department
+	if dept is not None and not dept.empty and 'id' in dept.columns:
+		dept_name_col = 'name' if 'name' in dept.columns else dept.columns[0]
+		dept_map = dict(zip(dept['id'], dept[dept_name_col])) if dept_name_col is not None else {}
+		dept_id_col = next((c for c in ['department_id', 'dept_id'] if c in work.columns), None)
+		if dept_id_col is not None:
+			try:
+				work['department_name'] = work[dept_id_col].map(dept_map)
+			except Exception:
+				work['department_name'] = None
+		elif 'Department' in work.columns:
+			work['department_name'] = work['Department']
+	else:
+		work['department_name'] = work['Department'] if 'Department' in work.columns else None
+
+	# Project
+	if proj is not None and not proj.empty and 'id' in proj.columns:
+		proj_name_col = 'name' if 'name' in proj.columns else proj.columns[0]
+		proj_map = dict(zip(proj['id'], proj[proj_name_col])) if proj_name_col is not None else {}
+		proj_id_col = next((c for c in ['project_id', 'proj_id', 'project'] if c in work.columns), None)
+		if proj_id_col is not None:
+			try:
+				work['project_name'] = work[proj_id_col].map(proj_map)
+			except Exception:
+				work['project_name'] = None
+		elif 'Project Name' in work.columns:
+			work['project_name'] = work['Project Name']
+	else:
+		work['project_name'] = work['Project Name'] if 'Project Name' in work.columns else None
+
+	# fiscal year
+	cap_year_col = next((c for c in ('cap_year', 'capex_year', 'fiscal_year', 'Fiscal Year', 'fy', 'year') if c in work.columns), None)
+	if cap_year_col is not None:
+		work['fiscal_year'] = work[cap_year_col]
+	else:
+		work['fiscal_year'] = None
+
+	# budget column candidates
+	val_col = next((c for c in ('budget', 'Budget', 'amount', 'value') if c in work.columns), None)
+	work['budget'] = work[val_col] if val_col else None
+
+	return work.loc[:, ['po_name', 'department_name', 'project_name', 'fiscal_year', 'budget']].reset_index(drop=True)
+
+

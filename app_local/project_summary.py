@@ -7,7 +7,8 @@ from backend.connect_local import connect_local, select_all_from_table
 from backend import (
     get_departments_display, get_projects_display, get_nonpc_display,
     get_pc_display, get_budget_display_table, create_funding_display,
-    get_expenses_display
+    get_expenses_display,
+    create_capex_forecast_display, get_capex_expenses_display
 )
 
 # Dedicated blueprint for Project Summary page and related endpoints
@@ -161,6 +162,9 @@ def get_project_statistics():
         budgets = get_budget_display_table()
         fundings = create_funding_display()
         expenses = get_expenses_display()
+        # CapEx displays (no CapEx budget per requirement)
+        capex_forecast_df = create_capex_forecast_display()
+        capex_expense_df = get_capex_expenses_display()
 
         def apply_filters(df):
             if df is None or df.empty:
@@ -215,6 +219,8 @@ def get_project_statistics():
         budgets_f = apply_filters(budgets)
         fundings_f = apply_filters(fundings)
         expenses_f = apply_filters(expenses)
+        capex_forecast_f = apply_filters(capex_forecast_df)
+        capex_expense_f = apply_filters(capex_expense_df)
 
         def sum_column(df, candidates):
             if df is None or df.empty:
@@ -238,6 +244,10 @@ def get_project_statistics():
         total_budget = budget_sum + funding_sum
 
         actual_expense = sum_column(expenses_f, ['expenses', 'expense', 'amount', 'Actual Expenditure'])
+
+        # CapEx metrics (no budget)
+        capex_forecast_sum = sum_column(capex_forecast_f, ['capex_forecast'])
+        capex_expense_sum = sum_column(capex_expense_f, ['expense'])
 
         def sum_expenses_by_cost_element_prefix(df, prefix, value_candidates):
             if df is None or df.empty:
@@ -274,6 +284,9 @@ def get_project_statistics():
             'Total Expense': round(actual_expense, 2),
             'Personnel Expense': round(personnel_expense_actual, 2),
             'Non-personnel Expense': round(non_personnel_expense_actual, 2),
+            # CapEx-only additions
+            'capex_forecast': round(capex_forecast_sum, 2),
+            'capex_expense': round(capex_expense_sum, 2),
             'selected_project': data_summary_module.selected_project or ''
         }
         return result, 200
