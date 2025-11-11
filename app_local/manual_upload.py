@@ -1486,3 +1486,155 @@ def upload_forecast_merged():
     except Exception:
         pass
     return redirect(url_for('manual_upload.render_mannual_input'))
+
+
+@manual_upload.route('/manual_input/delete_forecast', methods=['POST'])
+def manual_delete_forecast():
+    """Delete forecast rows (both non-personnel and personnel) matching the visible composite key.
+    Expected JSON body with the following visible keys from the display table:
+      {
+        "PO": str,
+        "Department": str,
+        "Project": str | null,          # either Project or Project Name will be provided
+        "Project Name": str | null,
+        "Project Category": str,
+        "Fiscal Year": int | str
+      }
+    Notes:
+    - IO is intentionally NOT required (and removed from display). This endpoint deletes all matching rows across IOs.
+    - Personnel deletion removes all HR categories for the matching key.
+    Returns JSON: { status, deleted_nonpc, deleted_pc }
+    """
+    try:
+        payload = request.get_json(silent=True) or {}
+        po_name = payload.get('PO')
+        dept_name = payload.get('Department')
+        # project name could be under 'Project' or 'Project Name'
+        project_name = payload.get('Project') or payload.get('Project Name')
+        project_category = payload.get('Project Category')
+        fiscal_year = payload.get('Fiscal Year') or payload.get('fiscal_year')
+
+        if not all([po_name, dept_name, project_name, project_category, fiscal_year]):
+            return jsonify({
+                'status': 'error',
+                'message': 'Missing required fields (PO, Department, Project, Project Category, Fiscal Year)'
+            }), 400
+
+        # Coerce FY to int when possible
+        try:
+            fy_val = int(fiscal_year)
+        except Exception:
+            return jsonify({'status': 'error', 'message': 'Invalid Fiscal Year'}), 400
+
+        conn = connect_local()
+        cursor, cnxn = conn.connect_to_db()
+
+        # Resolve IDs robustly
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        depts_df = select_all_from_table(cursor, cnxn, 'departments')
+        projs_df = select_all_from_table(cursor, cnxn, 'projects')
+        pcats_df = select_all_from_table(cursor, cnxn, 'project_categories')
+
+        po_id = None
+        if pos_df is not None:
+            name_col = 'name' if 'name' in pos_df.columns else ('Name' if 'Name' in pos_df.columns else None)
+            if name_col and 'id' in pos_df.columns:
+                try:
+                    match = pos_df[pos_df[name_col].astype(str).str.strip().str.lower() == str(po_name).strip().lower()]
+                    if not match.empty:
+                        po_id = int(match.iloc[0]['id'])
+                except Exception:
+                    po_id = None
+
+        dept_id = None
+        if depts_df is not None and 'name' in depts_df.columns and 'id' in depts_df.columns:
+            try:
+                match = depts_df[depts_df['name'].astype(str).str.strip().str.lower() == str(dept_name).strip().lower()]
+                if not match.empty:
+                    dept_id = int(match.iloc[0]['id'])
+            except Exception:
+                dept_id = None
+
+        proj_id = None
+        if projs_df is not None:
+            try:
+                dfp = projs_df
+                if 'name' in dfp.columns:
+                    mask = dfp['name'].astype(str).str.strip().str.lower() == str(project_name).strip().lower()
+                    # If duplicates exist, prefer those matching department and/or fiscal year if such columns exist
+                    if dept_id is not None and 'department_id' in dfp.columns:
+                        mask &= (dfp['department_id'] == int(dept_id))
+                    if 'fiscal_year' in dfp.columns:
+                        try:
+                            mask &= (dfp['fiscal_year'].astype(int) == int(fy_val))
+                        except Exception:
+                            mask &= (dfp['fiscal_year'].astype(str) == str(fy_val))
+                    rows = dfp[mask]
+                    if not rows.empty and 'id' in rows.columns:
+                        proj_id = int(rows.iloc[0]['id'])
+            except Exception:
+                proj_id = None
+
+        pc_id = None
+        if pcats_df is not None and 'category' in pcats_df.columns and 'id' in pcats_df.columns:
+            try:
+                match = pcats_df[pcats_df['category'].astype(str).str.strip().str.lower() == str(project_category).strip().lower()]
+                if not match.empty:
+                    pc_id = int(match.iloc[0]['id'])
+            except Exception:
+                pc_id = None
+
+        if None in (po_id, dept_id, proj_id, pc_id):
+            return jsonify({'status': 'error', 'message': 'Unable to resolve identifiers for deletion'}), 400
+
+        deleted_nonpc = 0
+        deleted_pc = 0
+        # Delete Non-Personnel forecasts (all IOs for the key)
+        try:
+            cursor.execute(
+                """
+                DELETE FROM project_forecasts_nonpc
+                 WHERE PO_id = ? AND department_id = ? AND project_id = ?
+                   AND project_category_id = ? AND fiscal_year = ?
+                """,
+                (int(po_id), int(dept_id), int(proj_id), int(pc_id), int(fy_val))
+            )
+            try:
+                deleted_nonpc = cursor.rowcount if cursor.rowcount is not None else 0
+            except Exception:
+                deleted_nonpc = 0
+        except Exception:
+            deleted_nonpc = 0
+
+        # Delete Personnel forecasts (all categories and IOs for the key)
+        try:
+            cursor.execute(
+                """
+                DELETE FROM project_forecasts_pc
+                 WHERE PO_id = ? AND department_id = ? AND project_id = ?
+                   AND project_category_id = ? AND fiscal_year = ?
+                """,
+                (int(po_id), int(dept_id), int(proj_id), int(pc_id), int(fy_val))
+            )
+            try:
+                deleted_pc = cursor.rowcount if cursor.rowcount is not None else 0
+            except Exception:
+                deleted_pc = 0
+        except Exception:
+            deleted_pc = 0
+
+        try:
+            cnxn.commit()
+        except Exception:
+            pass
+        try:
+            cursor.close(); cnxn.close()
+        except Exception:
+            pass
+
+        return jsonify({'status': 'ok', 'deleted_nonpc': int(deleted_nonpc), 'deleted_pc': int(deleted_pc)}), 200
+    except Exception as e:
+        try:
+            return jsonify({'status': 'error', 'message': str(e)}), 500
+        except Exception:
+            return ('', 500)

@@ -588,7 +588,7 @@
                                 });
                             });
                         }
-                        GenericTable.create(el, {
+                        var api = GenericTable.create(el, {
                             columns: cols,
                             rows: rows,
                             defaultPageSize: 25,
@@ -605,6 +605,108 @@
                                 }
                             }
                         });
+
+                        // Inject Delete column & buttons after each render/refresh
+                        function ensureDeleteHeader(table){
+                            var theadRows = table.querySelectorAll('thead tr');
+                            var headerRow = null; // second row is actual labels (group row may be first)
+                            if (theadRows.length === 1) headerRow = theadRows[0];
+                            else if (theadRows.length >= 2) headerRow = theadRows[1];
+                            if(!headerRow) return null;
+                            // If last header already 'Delete', skip adding
+                            var lastHeaderText = headerRow.lastElementChild ? (headerRow.lastElementChild.textContent || '').trim() : '';
+                            if (lastHeaderText !== 'Delete'){
+                                var th = document.createElement('th');
+                                th.textContent = 'Delete';
+                                th.style.background = '#f5e5e5';
+                                th.style.color = '#a00';
+                                th.style.fontWeight = '600';
+                                headerRow.appendChild(th);
+                                // Add matching filter-row spacer
+                                var filterRow = table.querySelector('thead tr:last-child');
+                                if(filterRow){
+                                    var thf = document.createElement('th');
+                                    thf.textContent = '';
+                                    filterRow.appendChild(thf);
+                                }
+                            }
+                            return headerRow;
+                        }
+
+                        function addDeleteButtons(){
+                            try {
+                                var table = el.querySelector('table.gt-table');
+                                if(!table) return;
+                                var headerRow = ensureDeleteHeader(table);
+                                if(!headerRow) return;
+
+                                // For each body row append a delete button
+                                Array.from(table.querySelectorAll('tbody tr')).forEach(function(tr){
+                                    var td = document.createElement('td');
+                                    td.style.textAlign = 'center';
+                                    var btn = document.createElement('button');
+                                    btn.type = 'button';
+                                    btn.textContent = 'Delete';
+                                    btn.style.background = '#c62828';
+                                    btn.style.color = '#fff';
+                                    btn.style.border = 'none';
+                                    btn.style.padding = '4px 8px';
+                                    btn.style.cursor = 'pointer';
+                                    btn.style.borderRadius = '4px';
+                                    btn.addEventListener('click', function(ev){
+                                        ev.stopPropagation();
+                                        // Gather key values from the row cells by header names
+                                        try {
+                                            var cells = Array.from(tr.children);
+                                            var headers = Array.from(headerRow.children).map(function(th){ return th.querySelector('.gt-col-label') ? th.querySelector('.gt-col-label').textContent : (th.textContent || ''); });
+                                            // Remove trailing 'Delete' header from mapping
+                                            if(headers[headers.length-1] === 'Delete') headers.pop();
+                                            var rowObj = {};
+                                            cells.forEach(function(td,i){
+                                                if(i < headers.length){ rowObj[headers[i]] = td.textContent; }
+                                            });
+                                            // Build payload using expected backend keys
+                                            var payload = {
+                                                PO: rowObj['PO'],
+                                                Department: rowObj['Department'],
+                                                'Project': rowObj['Project'] || rowObj['Project Name'],
+                                                'Project Category': rowObj['Project Category'],
+                                                'Fiscal Year': rowObj['Fiscal Year'] || rowObj['fiscal_year']
+                                            };
+                                            // Basic guard
+                                            if(!payload.PO || !payload.Department || !payload['Project'] || !payload['Project Category'] || !payload['Fiscal Year']){
+                                                console.warn('Missing keys for deletion', payload); return;
+                                            }
+                                            // Optional confirmation
+                                            if(!window.confirm('Delete all forecasts for this key (including all IOs & HR categories)?')) return;
+                                            fetch('/manual_input/delete_forecast', {
+                                                method: 'POST',
+                                                headers: { 'Content-Type': 'application/json' },
+                                                body: JSON.stringify(payload)
+                                            }).then(function(r){ return r.json().catch(function(){ return {}; }); })
+                                            .then(function(resp){
+                                                if(resp && resp.status === 'ok'){
+                                                    // Remove row from DOM
+                                                    tr.parentNode.removeChild(tr);
+                                                } else {
+                                                    alert('Delete failed: ' + (resp && resp.message ? resp.message : 'Unknown error'));
+                                                }
+                                            }).catch(function(){ alert('Delete request failed.'); });
+                                        } catch(e){ console.warn('Deletion failed to build payload', e); }
+                                    });
+                                    td.appendChild(btn);
+                                    tr.appendChild(td);
+                                });
+                            } catch(e){ console.warn('Failed to append Delete column', e); }
+                        }
+
+                        // Hook into table refresh to re-append buttons after any filtering/paging
+                        if (api && typeof api.refresh === 'function'){
+                            var origRefresh = api.refresh;
+                            api.refresh = function(){ origRefresh(); addDeleteButtons(); };
+                        }
+                        // Initial add
+                        addDeleteButtons();
                     }catch(e){ console.warn('Failed to mount forecasts table', e); }
                 }
                 if (document.readyState === 'complete' || document.readyState === 'interactive'){
