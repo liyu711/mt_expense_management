@@ -175,57 +175,58 @@
                 })();
             </script>
         </div>
-        <hr>
-        <div style="margin-top:12px;">
-            <h3>Statistics</h3>
-            <div>
-                <label>Non personnel forecast: </label>
-                <span id="stat_non_personnel">-</span>
-            </div>
-            <div>
-                <label>Personnel forecast: </label>
-                <span id="stat_personnel">-</span>
-            </div>
-            <div>
-                <label>Personnel budget: </label>
-                <span id="stat_personnel_budget">-</span>
-            </div>
-            <div>
-                <label>Non personnel budget: </label>
-                <span id="stat_non_personnel_budget">-</span>
-            </div>
-            <div>
-                <label>Total forecast: </label>
-                <span id="stat_total_forecast">-</span>
-            </div>
-            <div>
-                <label>Budget: </label>
-                <span id="stat_budget">-</span>
-            </div>
-            <div>
-                <label>Funding: </label>
-                <span id="stat_funding">-</span>
-            </div>
-            <div>
-                <label>Total Budget: </label>
-                <span id="stat_total_budget">-</span>
-            </div>
-            <div>
-                <label>Personnel Expense: </label>
-                <span id="stat_personnel_expense">-</span>
-            </div>
-            <div>
-                <label>Non-personnel Expense: </label>
-                <span id="stat_non_personnel_expense">-</span>
-            </div>
-            <div>
-                <label>Total Expense: </label>
-                <span id="stat_total_expense">-</span>
-            </div>
-            <div style="margin-top:8px;">
-                <button id="calculate_stats">Calculate statistics</button>
+        <hr style="margin:20px 0;" />
+        <div id="stats" style="margin-top:12px;">
+            <h3 style="margin:0 0 8px;">Statistics</h3>
+            <div id="stats-content"><em>Loading…</em></div>
+            <div style="margin-top:10px;">
+                <button id="calculate_stats">Refresh statistics</button>
             </div>
         </div>
+        <script>
+            (function(){
+                function fmt(n){
+                    if(n === null || n === undefined || isNaN(Number(n))) return '-';
+                    try { return Number(n).toLocaleString(undefined,{minimumFractionDigits:1,maximumFractionDigits:1}); } catch(e){ return String(n); }
+                }
+                var rows = [
+                    { label: 'Personnel Forecast', key: 'personnel_forecast' },
+                    { label: 'Non-personnel Forecast', key: 'non_personnel_forecast' },
+                    { label: 'Total Forecast', key: 'total_forecast' },
+                    { label: 'Budget', key: 'budget' },
+                    { label: 'Funding', key: 'funding' },
+                    { label: 'Total Budget and Funding', key: 'total_budget and funding' },
+                    { label: 'Personnel Expense', key: 'Personnel Expense' },
+                    { label: 'Non-personnel Expense', key: 'Non-personnel Expense' },
+                    { label: 'Total Expense', key: 'Total Expense' }
+                ];
+                function render(data){
+                    var el = document.getElementById('stats-content');
+                    if(!el) return;
+                    if(!data || data.error){ el.innerHTML = '<span style="color:#a00;">Failed to load statistics</span>'; return; }
+                    var html = '<table style="border-collapse:collapse;min-width:420px;">\n<tbody>';
+                    rows.forEach(function(r){
+                        html += '<tr>' +
+                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap;">' + r.label + '</td>' +
+                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data[r.key]) + '</td>' +
+                        '</tr>';
+                    });
+                    html += '</tbody></table>';
+                    el.innerHTML = html;
+                }
+                function load(){
+                    fetch('/data_summary/get_statistics',{method:'GET'})
+                        .then(function(r){ return r.ok ? r.json() : {error:'bad status'}; })
+                        .then(render)
+                        .catch(function(){ render({error:'network'}); });
+                }
+                document.addEventListener('DOMContentLoaded', function(){
+                    var btn = document.getElementById('calculate_stats');
+                    if(btn){ btn.addEventListener('click', function(e){ e.preventDefault(); load(); }); }
+                    load();
+                });
+            })();
+        </script>
         {% if summary_row %}
             <h3>Aggregated Summary</h3>
             <table id="summary_table" class="display" style="width:60%" border="1">

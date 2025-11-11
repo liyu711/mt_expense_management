@@ -1157,6 +1157,8 @@ def get_expenses_display():
 	Joins:
 	- expenses.department_id -> departments.id
 	- expenses.cost_element_id -> cost_elements.id
+	- expenses.io_id -> IOs.id (to obtain IO and project linkage)
+	- IOs.project_id -> projects.id (to obtain project name)
 
 	Keeps columns (exact names):
 	- id
@@ -1164,6 +1166,7 @@ def get_expenses_display():
 	- expense (from expenses.expense_value)
 	- Name (from expenses.name)
 	- cost_element (from cost_elements.co_id)
+	- project_name (from projects.name via IOs.project_id)
 
 	Gracefully handles missing columns by filling with None.
 	"""
@@ -1173,10 +1176,12 @@ def get_expenses_display():
 	exp = select_all_from_table(cursor, cnxn, 'expenses')
 	dept = select_all_from_table(cursor, cnxn, 'departments')
 	cost_elements = select_all_from_table(cursor, cnxn, 'cost_elements')
+	ios = select_all_from_table(cursor, cnxn, 'IOs')
+	projects = select_all_from_table(cursor, cnxn, 'projects')
 
 	# Empty fallback
 	if exp is None or exp.empty:
-		return pd.DataFrame(columns=['id', 'BU Name', 'expense', 'Name', 'cost_element', 'fiscal_year'])
+		return pd.DataFrame(columns=['id', 'BU Name', 'expense', 'Name', 'cost_element', 'project_name', 'fiscal_year'])
 
 	work = exp.copy()
 
@@ -1242,6 +1247,30 @@ def get_expenses_display():
 		# If cost_elements table not available, use co_id in expenses if present
 		work['cost_element'] = work['co_id'] if 'co_id' in work.columns else (work[exp_ce_col] if exp_ce_col in work.columns else None)
     
+	# Join IOs to obtain project_id then join projects to obtain project_name
+	# Determine io_id column on expenses
+	io_id_col = next((c for c in ('io_id', 'IO_id', 'io', 'IO') if c in work.columns), None)
+	project_name_series = None
+	if io_id_col and ios is not None and not ios.empty and 'id' in ios.columns:
+		try:
+			# Build IO->project_id map
+			io_project_map = dict(zip(ios['id'], ios.get('project_id') if 'project_id' in ios.columns else [None]*len(ios)))
+			work['_io_project_id'] = work[io_id_col].map(io_project_map)
+			# Now map project_id -> project name
+			if projects is not None and not projects.empty and 'id' in projects.columns:
+				proj_name_col = 'name' if 'name' in projects.columns else (projects.columns[0] if len(projects.columns) else None)
+				if proj_name_col:
+					proj_map = dict(zip(projects['id'], projects[proj_name_col]))
+					project_name_series = work['_io_project_id'].map(proj_map)
+			else:
+				project_name_series = None
+		except Exception:
+			project_name_series = None
+	else:
+		project_name_series = None
+	# Attach project_name (may be None)
+	work['project_name'] = project_name_series if project_name_series is not None else None
+
 	# fiscal year passthrough: detect common variants and expose as 'fiscal_year'
 	fy_src = next((c for c in ('fiscal_year', 'Fiscal Year', 'fy', 'year', 'cap_year') if c in work.columns), None)
 	if fy_src is not None:
@@ -1249,7 +1278,8 @@ def get_expenses_display():
 	else:
 		work['fiscal_year'] = None
 
-	return work.loc[:, ['id', 'BU Name', 'expense', 'Name', 'cost_element', 'fiscal_year']].reset_index(drop=True)
+	# Final column selection including project_name
+	return work.loc[:, ['id', 'BU Name', 'expense', 'Name', 'cost_element', 'project_name', 'fiscal_year']].reset_index(drop=True)
 
 
 def get_capex_expenses_display():
