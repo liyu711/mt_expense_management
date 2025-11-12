@@ -36,8 +36,8 @@ input_types = [
 display_names = {
     "forecast_nonpc": ['PO', 'IO','Department', "Project Category", "Project Name", "Fiscal Year", "Non-personnel Expense"],
     "forecast_pc" : ['PO', 'IO','Department', "Project Category", "Project Name", "Fiscal Year", 'Human resource category', "Human resource FTE", "Personnel Expense"],
-    "budgets": ['PO', 'Department', "Fiscal Year", "Personnel Budget", "Non-personnel Budget"],
-    "fundings": ['PO', 'Department', "Fiscal Year", "Funding", "Funding From", "Funding For"],
+    "budgets": ['PO', 'Department', "Fiscal Year", "Personnel Budget (k CNY)", "Non-personnel Budget (k CNY)"],
+    "fundings": ['PO', 'Department', "Fiscal Year", "Funding (k CNY)", "Funding From", "Funding For"],
     "expenses": ['Department', "Fiscal Year", "From Period", "Order(IO)", "CO Object Name", "Cost Element", "Cost Element Name", "Val.in rep.cur.", "Name"],
     "capex_forecast" : ['PO', 'Department', 'CapYear', 'For Project', 'CapEx Description', 'CapEx Forecast', 'Cost Center'],
     "capex_budget" : ['PO',	'Department', 'CapYear', 'For Project',	'Capex Description', 'Approved Budget (k CNY)', 'Comments from finance'],
@@ -556,9 +556,15 @@ def render_mannual_input():
 
     combined_columns = ordered_prefix + remaining_base + hr_category_list + ['Forecast Sum']
     # For display, rename 'Non-personnel Expense' to 'Non-personnel Forecast' without changing values
-    combined_columns_display = [
-        ('Non-personnel Forecast' if c == 'Non-personnel Expense' else c) for c in combined_columns
-    ]
+    # For display purposes append unit suffix to monetary columns (labels-only, no numeric scaling)
+    combined_columns_display = []
+    for c in combined_columns:
+        if c == 'Non-personnel Expense':
+            combined_columns_display.append('Non-personnel Forecast (k CNY)')
+        elif c == 'Forecast Sum':
+            combined_columns_display.append('Forecast Sum (k CNY)')
+        else:
+            combined_columns_display.append(c)
     combined_data = []
     for d in combined_rows_dicts:
         # Use source names for value lookup; only headers are renamed for display

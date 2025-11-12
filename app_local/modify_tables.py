@@ -37,18 +37,32 @@ def standardize_columns_order(columns, table_name=None):
     group_ProjCat = ['Project Category', 'project_category', 'category', 'category_name']
     # For project name, prefer friendly 'Project'; only treat raw 'name' as project name for projects table
     group_Project = ['Project'] + (['name', 'project_name'] if (table_name == 'projects') else ['project_name'])
-    group_IO = ['IO', 'IO_num', 'io']
+    # include display variants used in the projects display
+    group_IO = ['IOs', 'IO', 'IO_num', 'io']
 
-    priority_groups = [
-        group_ID,
-        group_PO,
-        group_BU,
-        group_FY,
-        group_CapY,
-        group_ProjCat,
-        group_Project,
-        group_IO,
-    ]
+    # Default ordering; but for projects we want Project and IOs immediately after id
+    if table_name == 'projects':
+        priority_groups = [
+            group_ID,
+            group_Project,
+            group_IO,
+            group_PO,
+            group_BU,
+            group_FY,
+            group_CapY,
+            group_ProjCat,
+        ]
+    else:
+        priority_groups = [
+            group_ID,
+            group_PO,
+            group_BU,
+            group_FY,
+            group_CapY,
+            group_ProjCat,
+            group_Project,
+            group_IO,
+        ]
 
     picked = []
     for group in priority_groups:
@@ -179,8 +193,8 @@ modify_table_config = {
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
             {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
             {'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []},
-            {'name': 'human_resource_expense', 'type':'number', 'label': 'Personnel budget'},
-            {'name': 'non_personnel_expense', 'type':'number', 'label': 'Non-personnel budget'}
+            {'name': 'human_resource_expense', 'type':'number', 'label': 'Personnel Budget (k CNY)'},
+            {'name': 'non_personnel_expense', 'type':'number', 'label': 'Non-personnel Budget (k CNY)'}
         ],
         'merge_on': 'IO_num',
         'columns': ['IO_num', 'project_id']
@@ -192,7 +206,7 @@ modify_table_config = {
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
             {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
             {'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []},
-            {'name': 'funding', 'type': 'number', 'label': 'Funding (K CNY)'},
+            {'name': 'funding', 'type': 'number', 'label': 'Funding (k CNY)'},
             {'name': 'funding_from', 'type': 'text', 'label': 'Funding From'},
             {'name': 'funding_for', 'type': 'text', 'label': 'Funding For'}
         ],
@@ -223,7 +237,7 @@ modify_table_config = {
             {'name': 'cap_year', 'type': 'select', 'label': 'Capex Year', 'options': []},
             {'name': 'project_name', 'type': 'select', 'label': 'Project Name', 'options': []},
             {'name': 'capex_description', 'type': 'text', 'label': 'Capex Description'},
-            {'name': 'approved_budget', 'type': 'number', 'label': 'Approved Budget (K CNY)'}
+            {'name': 'approved_budget', 'type': 'number', 'label': 'Approved Budget (k CNY)'}
         ],
         'merge_on': 'capex_description',
         'columns': ['po_id', 'department_id',  'project_id', 'cap_year','capex_description', 'budget']
