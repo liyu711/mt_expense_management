@@ -70,7 +70,7 @@
         </div>
     </div>
 </div>
-<!-- All submenu groups are permanently expanded; toggle script removed. -->
+<!-- Submenu groups are collapsible with persistent state. -->
 <style>
 .sidebar-nav {
     position: fixed;
@@ -107,7 +107,9 @@
     padding: 12px 16px 4px 32px;
     color: #555;
     background: none;
-    cursor: default;
+    cursor: pointer;
+    user-select: none;
+    position: relative;
 }
 .nav-subgroup-title {
     font-weight: 500;
@@ -120,6 +122,7 @@
 .nav-sublinks {
     width: 100%;
 }
+.nav-sublinks.collapsed { display: none; }
 .nav-sublink {
     padding-left: 64px;
     font-size: 1em;
@@ -128,7 +131,53 @@
     background: #007bff;
     color: #fff;
 }
+/* Simple disclosure arrow driven by aria-expanded on title */
+.nav-group-title::after {
+        content: '▾';
+        position: absolute;
+        right: 12px;
+        top: 10px;
+        color: #888;
+}
+.nav-group-title[aria-expanded="false"]::after {
+        content: '▸';
+}
 body {
     margin-left: 220px;
 }
 </style>
+<script>
+(function(){
+    try {
+        var nav = document.querySelector('.sidebar-nav');
+        if (!nav) return;
+        var storageKey = 'sidebar.groups.v1';
+        var state = {};
+        try { state = JSON.parse(localStorage.getItem(storageKey) || '{}') || {}; } catch(e) { state = {}; }
+        var groups = nav.querySelectorAll('.nav-group');
+        groups.forEach(function(group, idx){
+            var title = group.querySelector('.nav-group-title');
+            var content = group.querySelector('.nav-sublinks');
+            if (!title || !content) return;
+            var key = content.id || title.id || ('group-' + idx);
+            var expanded = state.hasOwnProperty(key) ? !!state[key] : true; // default expanded
+            // Always expand if group contains the current active link
+            if (content.querySelector('.nav-sublink.active')) expanded = true;
+            content.classList.toggle('collapsed', !expanded);
+            title.setAttribute('role', 'button');
+            title.setAttribute('tabindex', '0');
+            if (content.id) title.setAttribute('aria-controls', content.id);
+            title.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+            function toggle(){
+                var isCollapsed = content.classList.toggle('collapsed');
+                var isExpanded = !isCollapsed;
+                title.setAttribute('aria-expanded', isExpanded ? 'true' : 'false');
+                state[key] = isExpanded;
+                try { localStorage.setItem(storageKey, JSON.stringify(state)); } catch(e) {}
+            }
+            title.addEventListener('click', function(ev){ toggle(); });
+            title.addEventListener('keydown', function(ev){ if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });
+        });
+    } catch(e) { /* no-op */ }
+})();
+</script>
