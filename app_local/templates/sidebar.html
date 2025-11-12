@@ -2,9 +2,13 @@
     <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="admin-options-toggle">
             Basic Data Maintenance
-            <span class="collapse-arrow" id="admin-arrow">&#9654;</span>
+            {%- set admin_default_open = request.path in [
+                '/reset', '/modify_po', '/modify_department', '/modify_porject_category', '/modify_staff_categories',
+                '/add_user', '/delete_user', '/modify_user_type'
+            ] -%}
+            <span class="collapse-arrow" id="admin-arrow" style="{{ 'transform: rotate(90deg);' if admin_default_open else '' }}">&#9654;</span>
         </div>
-        <div class="nav-sublinks collapsible-content" id="admin-options-content" style="display:none;">
+        <div class="nav-sublinks collapsible-content" id="admin-options-content" data-default-expanded="{{ 'true' if admin_default_open else 'false' }}" style="display:{{ 'block' if admin_default_open else 'none' }};">
             <a href="/reset" class="nav-link nav-sublink{% if request.path == '/reset' %} active{% endif %}">Delete Data</a>
             <a href="/modify_po" class="nav-link nav-sublink{% if request.path == '/modify_po' %} active{% endif %}">PO Name</a>
             <a href="/modify_department" class="nav-link nav-sublink{% if request.path == '/modify_department' %} active{% endif %}">BU Name</a>
@@ -19,9 +23,12 @@
     <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="create-options-toggle">
             Create Forecast
-            <span class="collapse-arrow" id="create-arrow">&#9654;</span>
+            {%- set create_default_open = request.path in [
+                '/modify_project', '/manual_input', '/capex_forecast'
+            ] -%}
+            <span class="collapse-arrow" id="create-arrow" style="{{ 'transform: rotate(90deg);' if create_default_open else '' }}">&#9654;</span>
         </div>
-        <div class="nav-sublinks collapsible-content" id="create-options-content" style="display:none;">
+        <div class="nav-sublinks collapsible-content" id="create-options-content" data-default-expanded="{{ 'true' if create_default_open else 'false' }}" style="display:{{ 'block' if create_default_open else 'none' }};">
             <a href="/modify_project" class="nav-link nav-sublink{% if request.path == '/modify_project' %} active{% endif %}">Create Project</a>
             <!-- <a href="/modify_io" class="nav-link nav-sublink{% if request.path == '/modify_io' %} active{% endif %}">Create IO</a> -->
             <a href="/manual_input" class="nav-link nav-sublink{% if request.path == '/manual_input' %} active{% endif %}" id="create-forecast-link">Create forecast</a>
@@ -32,9 +39,10 @@
     <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="create-funding-toggle">
             Create Funding
-            <span class="collapse-arrow" id="create-funding-arrow">&#9654;</span>
+            {%- set funding_default_open = request.path in ['/modify_funding'] -%}
+            <span class="collapse-arrow" id="create-funding-arrow" style="{{ 'transform: rotate(90deg);' if funding_default_open else '' }}">&#9654;</span>
         </div>
-        <div class="nav-sublinks collapsible-content" id="create-funding-content" style="display:none;">
+        <div class="nav-sublinks collapsible-content" id="create-funding-content" data-default-expanded="{{ 'true' if funding_default_open else 'false' }}" style="display:{{ 'block' if funding_default_open else 'none' }};">
             <a href="/modify_funding" class="nav-link nav-sublink{% if request.path == '/modify_funding' %} active{% endif %}" id="nav-create-funding">Create funding</a>
         </div>
     </div>
@@ -42,9 +50,10 @@
     <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="create-budgets-toggle">
             Create Budgets
-            <span class="collapse-arrow" id="create-budgets-arrow">&#9654;</span>
+            {%- set budgets_default_open = request.path in ['/upload_budget', '/capex_budget'] -%}
+            <span class="collapse-arrow" id="create-budgets-arrow" style="{{ 'transform: rotate(90deg);' if budgets_default_open else '' }}">&#9654;</span>
         </div>
-        <div class="nav-sublinks collapsible-content" id="create-budgets-content" style="display:none;">
+        <div class="nav-sublinks collapsible-content" id="create-budgets-content" data-default-expanded="{{ 'true' if budgets_default_open else 'false' }}" style="display:{{ 'block' if budgets_default_open else 'none' }};">
             <a href="/upload_budget" class="nav-link nav-sublink{% if request.path == '/upload_budget' %} active{% endif %}" id="nav-upload-budget">Create budget</a>
             <!-- <a href="/modify_funding" class="nav-link nav-sublink{% if request.path == '/moidfy_funding' %} active{% endif %}">Create funding</a> -->
             <a href="/capex_budget" class="nav-link nav-sublink{% if request.path == '/capex_budget' %} active{% endif %}">Capex budget</a>
@@ -54,9 +63,10 @@
     <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="data-visualization-toggle">
             Data Visualization
-            <span class="collapse-arrow" id="data-visualization-arrow">&#9654;</span>
+            {%- set dataviz_default_open = request.path in ['/select', '/data_summary', '/project_summary'] -%}
+            <span class="collapse-arrow" id="data-visualization-arrow" style="{{ 'transform: rotate(90deg);' if dataviz_default_open else '' }}">&#9654;</span>
         </div>
-        <div class="nav-sublinks collapsible-content" id="data-visualization-content" style="display:none;">
+        <div class="nav-sublinks collapsible-content" id="data-visualization-content" data-default-expanded="{{ 'true' if dataviz_default_open else 'false' }}" style="display:{{ 'block' if dataviz_default_open else 'none' }};">
             <a href="/select" class="nav-link nav-sublink{% if request.path == '/select' %} active{% endif %}" id="nav-select">Display Raw Data</a>
             <a href="/data_summary" class="nav-link nav-sublink{% if request.path == '/data_summary' %} active{% endif %}" id="nav-data-summary">Data Summary</a>
             <a href="/project_summary" class="nav-link nav-sublink{% if request.path == '/project_summary' %} active{% endif %}" id="nav-project-summary">Project Summary</a>
@@ -68,9 +78,10 @@
     <div class="nav-group">
         <div class="nav-link nav-group-title collapsible" id="finance-toggle">
             Finance
-            <span class="collapse-arrow" id="finance-arrow">&#9654;</span>
+            {%- set finance_default_open = request.path in ['/modify_staff_cost', '/file_upload'] -%}
+            <span class="collapse-arrow" id="finance-arrow" style="{{ 'transform: rotate(90deg);' if finance_default_open else '' }}">&#9654;</span>
         </div>
-        <div class="nav-sublinks collapsible-content" id="finance-content" style="display:none;">
+        <div class="nav-sublinks collapsible-content" id="finance-content" data-default-expanded="{{ 'true' if finance_default_open else 'false' }}" style="display:{{ 'block' if finance_default_open else 'none' }};">
             <a href="/modify_staff_cost" class="nav-link nav-sublink{% if request.path == '/modify_staff_cost' %} active{% endif %}">Modify Staff Cost</a>
             <a href="/file_upload" class="nav-link nav-sublink{% if request.path == '/file_upload' %} active{% endif %}" id="nav-file-upload">Upload actual expenditures or history files</a>
         </div>
@@ -83,7 +94,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var adminToggle = document.getElementById('admin-options-toggle');
     var adminContent = document.getElementById('admin-options-content');
     var adminArrow = document.getElementById('admin-arrow');
-    var adminExpanded = localStorage.getItem('adminOptionsExpanded') === 'true';
+    var adminExpandedStored = localStorage.getItem('adminOptionsExpanded');
+    var adminExpanded = adminExpandedStored === null ? (adminContent && adminContent.dataset.defaultExpanded === 'true') : (adminExpandedStored === 'true');
     function setAdminState(expanded) {
         if (expanded) {
             adminContent.style.display = 'block';
@@ -109,7 +121,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var createToggle = document.getElementById('create-options-toggle');
     var createContent = document.getElementById('create-options-content');
     var createArrow = document.getElementById('create-arrow');
-    var createExpanded = localStorage.getItem('createOptionsExpanded') === 'true';
+    var createExpandedStored = localStorage.getItem('createOptionsExpanded');
+    var createExpanded = createExpandedStored === null ? (createContent && createContent.dataset.defaultExpanded === 'true') : (createExpandedStored === 'true');
     function setCreateState(expanded) {
         if (expanded) {
             createContent.style.display = 'block';
@@ -135,7 +148,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var createFundingToggle = document.getElementById('create-funding-toggle');
     var createFundingContent = document.getElementById('create-funding-content');
     var createFundingArrow = document.getElementById('create-funding-arrow');
-    var createFundingExpanded = localStorage.getItem('createFundingExpanded') === 'true';
+    var createFundingExpandedStored = localStorage.getItem('createFundingExpanded');
+    var createFundingExpanded = createFundingExpandedStored === null ? (createFundingContent && createFundingContent.dataset.defaultExpanded === 'true') : (createFundingExpandedStored === 'true');
     function setCreateFundingState(expanded) {
         if (expanded) {
             createFundingContent.style.display = 'block';
@@ -161,7 +175,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var createBudgetsToggle = document.getElementById('create-budgets-toggle');
     var createBudgetsContent = document.getElementById('create-budgets-content');
     var createBudgetsArrow = document.getElementById('create-budgets-arrow');
-    var createBudgetsExpanded = localStorage.getItem('createBudgetsExpanded') === 'true';
+    var createBudgetsExpandedStored = localStorage.getItem('createBudgetsExpanded');
+    var createBudgetsExpanded = createBudgetsExpandedStored === null ? (createBudgetsContent && createBudgetsContent.dataset.defaultExpanded === 'true') : (createBudgetsExpandedStored === 'true');
     function setCreateBudgetsState(expanded) {
         if (expanded) {
             createBudgetsContent.style.display = 'block';
@@ -187,7 +202,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var dataVizToggle = document.getElementById('data-visualization-toggle');
     var dataVizContent = document.getElementById('data-visualization-content');
     var dataVizArrow = document.getElementById('data-visualization-arrow');
-    var dataVizExpanded = localStorage.getItem('dataVisualizationExpanded') === 'true';
+    var dataVizExpandedStored = localStorage.getItem('dataVisualizationExpanded');
+    var dataVizExpanded = dataVizExpandedStored === null ? (dataVizContent && dataVizContent.dataset.defaultExpanded === 'true') : (dataVizExpandedStored === 'true');
     function setDataVizState(expanded) {
         if (expanded) {
             dataVizContent.style.display = 'block';
@@ -213,7 +229,8 @@ document.addEventListener('DOMContentLoaded', function() {
     var financeToggle = document.getElementById('finance-toggle');
     var financeContent = document.getElementById('finance-content');
     var financeArrow = document.getElementById('finance-arrow');
-    var financeExpanded = localStorage.getItem('financeExpanded') === 'true';
+    var financeExpandedStored = localStorage.getItem('financeExpanded');
+    var financeExpanded = financeExpandedStored === null ? (financeContent && financeContent.dataset.defaultExpanded === 'true') : (financeExpandedStored === 'true');
     function setFinanceState(expanded) {
         if (expanded) {
             financeContent.style.display = 'block';
