@@ -402,3 +402,78 @@ def change_capex_budget():
         return {'status': 'ok'}, 200
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
+
+
+@capex_forecast_routes.route('/capex_budget/delete_capex_budget', methods=['POST'])
+def delete_capex_budget():
+    """Delete a CapEx budget row identified by (po, department, cap_year, project_name).
+
+    Accepts JSON or form fields:
+    - po, department, cap_year, project_name
+    Optional: capex_description (if provided, included in WHERE)
+    """
+    try:
+        # Accept payload
+        if request.is_json:
+            form = request.get_json() or {}
+        else:
+            form = dict(request.form)
+
+        po = form.get('po')
+        department = form.get('department')
+        cap_year = form.get('cap_year') or form.get('fiscal_year')
+        project_name = form.get('project_name') or form.get('project')
+        capex_description = form.get('capex_description') or form.get('description')
+
+        if not (po and department and cap_year and project_name):
+            return {'status': 'error', 'message': 'Missing required fields'}, 400
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if pos_df is not None and not pos_df.empty and 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if dept_df is not None and not dept_df.empty and 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+        proj_map = dict(zip(proj_df['name'], proj_df['id'])) if proj_df is not None and not proj_df.empty and 'name' in proj_df.columns and 'id' in proj_df.columns else {}
+
+        po_id = po_map.get(po)
+        department_id = dept_map.get(department)
+        project_id = proj_map.get(project_name)
+        try:
+            cap_year_val = int(cap_year)
+        except Exception:
+            cap_year_val = None
+
+        if po_id is None or department_id is None or project_id is None or cap_year_val is None:
+            return {'status': 'error', 'message': 'Unable to resolve identifiers'}, 400
+
+        if capex_description:
+            cursor.execute(
+                """
+                DELETE FROM capex_budgets
+                 WHERE po_id = ?
+                   AND department_id = ?
+                   AND project_id = ?
+                   AND cap_year = ?
+                   AND capex_description = ?
+                """,
+                (int(po_id), int(department_id), int(project_id), int(cap_year_val), capex_description)
+            )
+        else:
+            cursor.execute(
+                """
+                DELETE FROM capex_budgets
+                 WHERE po_id = ?
+                   AND department_id = ?
+                   AND project_id = ?
+                   AND cap_year = ?
+                """,
+                (int(po_id), int(department_id), int(project_id), int(cap_year_val))
+            )
+        cnxn.commit()
+        return {'status': 'ok'}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500

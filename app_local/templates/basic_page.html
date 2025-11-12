@@ -24,14 +24,10 @@
             align-items: center;
             justify-content: space-between;
             gap: 16px;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
-        .page-title {
-            margin: 0;
-            font-size: 24px;
-            font-weight: 600;
-            color: #222;
-        }
+        /* Hide page titles in main content area per request */
+        .page-title { display: none; }
         .page-controls {
             display: flex;
             flex-wrap: wrap;
@@ -49,7 +45,7 @@
 
     <main class="main-content" id="main-content">
         <header class="page-header">
-            <h1 class="page-title">{% block page_title %}{% endblock %}</h1>
+            <!-- page title removed from visible content -->
             <div class="page-controls">
                 {% block controls %}{% endblock %}
             </div>

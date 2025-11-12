@@ -1197,6 +1197,113 @@ def change_funding():
     return redirect(url_for('modify_tables.modify_table_router', action='modify_funding'))
 
 
+@modify_tables.route('/upload_budget/delete_budget', methods=['POST'])
+def delete_budget():
+    """Delete a budget row identified by (po, department, fiscal_year).
+
+    Accepts JSON or form fields: po, department, fiscal_year
+    """
+    try:
+        # Accept payload from JSON or form
+        if request.is_json:
+            form = request.get_json() or {}
+        else:
+            form = dict(request.form)
+
+        po = form.get('po')
+        department = form.get('department')
+        fiscal_year = form.get('fiscal_year') or form.get('year')
+
+        if not (po and department and fiscal_year):
+            return {'status': 'error', 'message': 'Missing required fields'}, 400
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if pos_df is not None and not pos_df.empty and 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if dept_df is not None and not dept_df.empty and 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+
+        po_id = po_map.get(po)
+        department_id = dept_map.get(department)
+        try:
+            fy = int(fiscal_year)
+        except Exception:
+            fy = None
+
+        if po_id is None or department_id is None or fy is None:
+            return {'status': 'error', 'message': 'Unable to resolve identifiers'}, 400
+
+        cursor.execute(
+            """
+            DELETE FROM budgets
+             WHERE po_id = ?
+               AND department_id = ?
+               AND fiscal_year = ?
+            """,
+            (int(po_id), int(department_id), int(fy))
+        )
+        cnxn.commit()
+        return {'status': 'ok'}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
+@modify_tables.route('/modify_funding/delete_funding', methods=['POST'])
+def delete_funding():
+    """Delete a funding row identified by (po, department, fiscal_year).
+
+    Accepts JSON or form fields: po, department, fiscal_year
+    """
+    try:
+        if request.is_json:
+            form = request.get_json() or {}
+        else:
+            form = dict(request.form)
+
+        po = form.get('po')
+        department = form.get('department')
+        fiscal_year = form.get('fiscal_year') or form.get('year')
+
+        if not (po and department and fiscal_year):
+            return {'status': 'error', 'message': 'Missing required fields'}, 400
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if pos_df is not None and not pos_df.empty and 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if dept_df is not None and not dept_df.empty and 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+
+        po_id = po_map.get(po)
+        department_id = dept_map.get(department)
+        try:
+            fy = int(fiscal_year)
+        except Exception:
+            fy = None
+
+        if po_id is None or department_id is None or fy is None:
+            return {'status': 'error', 'message': 'Unable to resolve identifiers'}, 400
+
+        cursor.execute(
+            """
+            DELETE FROM fundings
+             WHERE po_id = ?
+               AND department_id = ?
+               AND fiscal_year = ?
+            """,
+            (int(po_id), int(department_id), int(fy))
+        )
+        cnxn.commit()
+        return {'status': 'ok'}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
+
+
 
 
 # moved to app_local/project_routes.py: /modify_project/details

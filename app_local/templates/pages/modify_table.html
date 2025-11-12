@@ -546,9 +546,20 @@
                                     }
                                 }
                                 GenericTable.create(el, opts);
-                                // Inject per-row Delete actions strictly for CapEx Forecasts table
-                                if (tableName === 'capex_forecasts') {
-                                    function injectDeleteButtons(){
+                                // Inject per-row Delete actions for selected tables similar to CapEx Forecasts
+                                (function(){
+                                    function norm(s){ return (s||'').toLowerCase().replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim(); }
+                                    function pickByIncludes(map, includeAny){
+                                        var keys = Object.keys(map);
+                                        for (var i=0;i<keys.length;i++){
+                                            var k = keys[i];
+                                            for (var j=0;j<includeAny.length;j++){
+                                                if (k.indexOf(includeAny[j]) !== -1) return map[k];
+                                            }
+                                        }
+                                        return '';
+                                    }
+                                    function injectDeleteButtons(endpoint, extractor){
                                         try{
                                             var table = el.querySelector('table');
                                             if(!table) return;
@@ -572,54 +583,23 @@
                                                     ev.stopPropagation();
                                                     try{
                                                         var cells = Array.prototype.slice.call(tr.querySelectorAll('td, th'));
-                                                        // Build a case-insensitive, normalized header->cell map
-                                                        function norm(s){
-                                                            return (s||'').toLowerCase().replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim();
-                                                        }
                                                         var lowerMap = {};
                                                         for (var i = 0; i < headerTexts.length && i < cells.length; i++) {
                                                             var key = norm(headerTexts[i] || '');
                                                             lowerMap[key] = (cells[i].textContent || '').trim();
                                                         }
-                                                        function pickLower(map, keys){
-                                                            for (var j=0;j<keys.length;j++){
-                                                                var k = keys[j];
-                                                                if (map.hasOwnProperty(k) && map[k] !== '') return map[k];
-                                                            }
-                                                            return '';
-                                                        }
-                                                        var poVal = pickLower(lowerMap, ['po','po name','po_name','name_po']);
-                                                        var deptVal = pickLower(lowerMap, ['department','department name','department_name','bu','dept','bu name','name_departments']);
-                                                        var projVal = pickLower(lowerMap, ['project','project name','project_name']);
-                                                        var yearVal = pickLower(lowerMap, ['capex year','capital year','fiscal year','cap year','year','cap_year']);
-                                                        var descVal = pickLower(lowerMap, ['capex description','capex_description','capex desc','description','desc']);
-                                                        // Substring-based fallbacks if exact header match failed
-                                                        function pickByIncludes(map, includeAny){
-                                                            var keys = Object.keys(map);
-                                                            for (var i=0;i<keys.length;i++){
-                                                                var k = keys[i];
-                                                                for (var j=0;j<includeAny.length;j++){
-                                                                    if (k.indexOf(includeAny[j]) !== -1) return map[k];
-                                                                }
-                                                            }
-                                                            return '';
-                                                        }
-                                                        if (!poVal) poVal = pickByIncludes(lowerMap, ['po']);
-                                                        if (!deptVal) deptVal = pickByIncludes(lowerMap, ['department','dept','bu']);
-                                                        if (!projVal) projVal = pickByIncludes(lowerMap, ['project']);
-                                                        if (!yearVal) yearVal = pickByIncludes(lowerMap, ['capex','capital','fiscal','cap','year']);
-                                                        if (!descVal) descVal = pickByIncludes(lowerMap, ['description','desc']);
-
-                                                        if(!(poVal && deptVal && projVal && yearVal)){
-                                                            alert('Missing key fields for deletion.');
-                                                            return;
-                                                        }
-                                                        if(!confirm('Delete forecast for '+ (projVal||'') +' / '+ (deptVal||'') +' / '+ (poVal||'') +' ('+ (yearVal||'') +')?')) return;
-
-                                                        fetch('/capex_forecast/delete_capex_forecast', {
+                                                        var payload = extractor(lowerMap);
+                                                        if(!payload || payload.error){ alert(payload && payload.error || 'Missing key fields for deletion.'); return; }
+                                                        var labelParts = [];
+                                                        if(payload.project_name) labelParts.push(payload.project_name);
+                                                        if(payload.department) labelParts.push(payload.department);
+                                                        if(payload.po) labelParts.push(payload.po);
+                                                        if(payload.fiscal_year || payload.cap_year) labelParts.push('(' + (payload.fiscal_year || payload.cap_year) + ')');
+                                                        if(!confirm('Delete entry for ' + labelParts.join(' / ') + '?')) return;
+                                                        fetch(endpoint, {
                                                             method: 'POST',
                                                             headers: { 'Content-Type': 'application/json' },
-                                                            body: JSON.stringify({ po: poVal, department: deptVal, project_name: projVal, cap_year: yearVal, capex_description: descVal })
+                                                            body: JSON.stringify(payload)
                                                         }).then(function(r){ return r.json(); }).then(function(resp){
                                                             if(resp && resp.status === 'ok'){
                                                                 tr.remove();
@@ -634,12 +614,60 @@
                                             });
                                         }catch(e){}
                                     }
-                                    // initial injection after a short delay to allow render
-                                    setTimeout(injectDeleteButtons, 60);
-                                    // observe changes under the container to re-inject on pagination/redraw
-                                    var obs = new MutationObserver(function(){ injectDeleteButtons(); });
-                                    obs.observe(el, { childList: true, subtree: true });
-                                }
+
+                                    function extractorCapexForecast(map){
+                                        function pick(keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(map.hasOwnProperty(k) && map[k]) return map[k]; } return ''; }
+                                        var payload = {};
+                                        payload.po = pick(['po','po name','po_name','name_po']) || pickByIncludes(map,['po']);
+                                        payload.department = pick(['department','department name','department_name','bu','dept','bu name','name_departments']) || pickByIncludes(map,['department','dept','bu']);
+                                        payload.project_name = pick(['project','project name','project_name']) || pickByIncludes(map,['project']);
+                                        payload.cap_year = pick(['capex year','capital year','fiscal year','cap year','year','cap_year']) || pickByIncludes(map,['capex','capital','fiscal','cap','year']);
+                                        payload.capex_description = pick(['capex description','capex_description','capex desc','description','desc']) || pickByIncludes(map,['description','desc']);
+                                        if(!(payload.po && payload.department && payload.project_name && payload.cap_year)) return { error: 'Missing key fields' };
+                                        return payload;
+                                    }
+                                    function extractorBudget(map){
+                                        function pick(keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(map.hasOwnProperty(k) && map[k]) return map[k]; } return ''; }
+                                        var payload = {};
+                                        payload.po = pick(['po','po name','po_name','name_po']) || pickByIncludes(map,['po']);
+                                        payload.department = pick(['department','department name','department_name','bu','dept','bu name','name_departments']) || pickByIncludes(map,['department','dept','bu']);
+                                        payload.fiscal_year = pick(['fiscal year','year']) || pickByIncludes(map,['fiscal','year']);
+                                        if(!(payload.po && payload.department && payload.fiscal_year)) return { error: 'Missing key fields' };
+                                        return payload;
+                                    }
+                                    function extractorFunding(map){
+                                        return extractorBudget(map);
+                                    }
+                                    function extractorCapexBudget(map){
+                                        function pick(keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(map.hasOwnProperty(k) && map[k]) return map[k]; } return ''; }
+                                        var payload = {};
+                                        payload.po = pick(['po','po name','po_name','name_po']) || pickByIncludes(map,['po']);
+                                        payload.department = pick(['department','department name','department_name','bu','dept','bu name','name_departments']) || pickByIncludes(map,['department','dept','bu']);
+                                        payload.project_name = pick(['project','project name','project_name']) || pickByIncludes(map,['project']);
+                                        payload.cap_year = pick(['capex year','capital year','cap year','year','cap_year']) || pickByIncludes(map,['capex','capital','year']);
+                                        payload.capex_description = pick(['capex description','capex_description','capex desc','description','desc']) || pickByIncludes(map,['description','desc']);
+                                        if(!(payload.po && payload.department && payload.project_name && payload.cap_year)) return { error: 'Missing key fields' };
+                                        return payload;
+                                    }
+
+                                    if (tableName === 'capex_forecasts'){
+                                        setTimeout(function(){ injectDeleteButtons('/capex_forecast/delete_capex_forecast', extractorCapexForecast); }, 60);
+                                        var obs1 = new MutationObserver(function(){ injectDeleteButtons('/capex_forecast/delete_capex_forecast', extractorCapexForecast); });
+                                        obs1.observe(el, { childList: true, subtree: true });
+                                    } else if (tableName === 'budgets'){
+                                        setTimeout(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget); }, 60);
+                                        var obs2 = new MutationObserver(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget); });
+                                        obs2.observe(el, { childList: true, subtree: true });
+                                    } else if (tableName === 'fundings'){
+                                        setTimeout(function(){ injectDeleteButtons('/modify_funding/delete_funding', extractorFunding); }, 60);
+                                        var obs3 = new MutationObserver(function(){ injectDeleteButtons('/modify_funding/delete_funding', extractorFunding); });
+                                        obs3.observe(el, { childList: true, subtree: true });
+                                    } else if (tableName === 'capex_budgets'){
+                                        setTimeout(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); }, 60);
+                                        var obs4 = new MutationObserver(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); });
+                                        obs4.observe(el, { childList: true, subtree: true });
+                                    }
+                                })();
                             }catch(e){}
                         })();
                     </script>
