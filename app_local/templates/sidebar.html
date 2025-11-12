@@ -178,6 +178,29 @@ body {
             title.addEventListener('click', function(ev){ toggle(); });
             title.addEventListener('keydown', function(ev){ if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); toggle(); } });
         });
+
+        // Persist sidebar scroll position across pages
+        var scrollKey = 'sidebar.scrollTop.v1';
+        // Restore after groups are initialized so heights are correct
+        try {
+            var savedTop = localStorage.getItem(scrollKey);
+            if (savedTop !== null) {
+                var top = parseInt(savedTop, 10);
+                if (!isNaN(top)) nav.scrollTop = top;
+            }
+        } catch(e) {}
+        // Save on scroll (debounced) and also on unload/pagehide
+        var saveScroll = function(){
+            try { localStorage.setItem(scrollKey, String(nav.scrollTop)); } catch(e) {}
+        };
+        var scrollTimer = null;
+        nav.addEventListener('scroll', function(){
+            if (scrollTimer) clearTimeout(scrollTimer);
+            scrollTimer = setTimeout(saveScroll, 120);
+        });
+        window.addEventListener('beforeunload', saveScroll);
+        window.addEventListener('pagehide', saveScroll);
+        document.addEventListener('visibilitychange', function(){ if (document.visibilityState === 'hidden') saveScroll(); });
     } catch(e) { /* no-op */ }
 })();
 </script>
