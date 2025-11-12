@@ -1,17 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Reset Database</title>
-    <style>
-    body {
-        margin-left: 220px;
-    }
-    </style>
-</head>
-<body>
-    {% include 'sidebar.html' %}
-    <div style="padding: 24px;">
-        <h1>Reset Database</h1>
+{% extends 'basic_page.html' %}
+{% block title %}Reset Database{% endblock %}
+{% block page_title %}Reset Database{% endblock %}
+{% block content %}
+    <div>
         <form id="resetForm" action="/reset" method="POST">
             <button name="trigger_warning" type="button" onclick="showModal()">Reset database</button>
         </form>
@@ -55,5 +46,4 @@
             {% endif %}
         {% endwith %}
     </div>
-</body>
-</html>
+{% endblock %}

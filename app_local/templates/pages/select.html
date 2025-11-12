@@ -1,14 +1,12 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Select Data</title>
+{% extends 'basic_page.html' %}
+{% block title %}Select Data{% endblock %}
+{% block head %}
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-</head>
-<body>
-    {% include 'sidebar.html' %}
-    <div style="margin-left:50px;">
+{% endblock %}
+{% block page_title %}Select Data{% endblock %}
+{% block content %}
+    <div>
         <form method="POST" id="table_name">
             <label for="table_name">Table Name:</label>
             <select id="table_name" name="table_name">
@@ -138,6 +136,7 @@
             </table>
             <!-- jQuery and DataTables JS (CDN with local fallback) -->
             <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+            {% block scripts %}{% endblock %}
             <script>
                 // If CDN jQuery fails (no network), load local fallback if present
                 if (typeof jQuery === 'undefined') {
@@ -220,5 +219,4 @@
             </script>
         {% endif %}
     </div>
-</body>
-</html>
+{% endblock %}

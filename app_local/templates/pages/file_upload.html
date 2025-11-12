@@ -1,22 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>File Upload</title>
-    <style>
-        /* Simple toast styles */
-        .toast-container { position: fixed; top: 16px; right: 16px; z-index: 3000; }
-        .toast { min-width: 280px; margin-bottom: 10px; padding: 12px 14px; border-radius: 6px; color: #111; background: #f3f4f6; box-shadow: 0 8px 24px rgba(0,0,0,0.15); opacity: 0; transform: translateY(-8px); transition: opacity .2s ease, transform .2s ease; }
-        .toast.show { opacity: 1; transform: translateY(0); }
-        .toast.success { border-left: 6px solid #10b981; }
-        .toast.error { border-left: 6px solid #ef4444; }
-        .toast.warning { border-left: 6px solid #f59e0b; }
-        .toast .title { font-weight: 600; margin-right: 8px; }
-    </style>
-</head>
-<body>
-    {% include 'sidebar.html' %}
-    <div style="padding: 24px;">
-        <h1>Upload a File</h1>
+{% extends 'basic_page.html' %}
+{% block title %}File Upload{% endblock %}
+{% block page_title %}Upload a File{% endblock %}
+{% block head %}
+<style>
+    .toast-container { position: fixed; top: 16px; right: 16px; z-index: 3000; }
+    .toast { min-width: 280px; margin-bottom: 10px; padding: 12px 14px; border-radius: 6px; color: #111; background: #f3f4f6; box-shadow: 0 8px 24px rgba(0,0,0,0.15); opacity: 0; transform: translateY(-8px); transition: opacity .2s ease, transform .2s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { border-left: 6px solid #10b981; }
+    .toast.error { border-left: 6px solid #ef4444; }
+    .toast.warning { border-left: 6px solid #f59e0b; }
+    .toast .title { font-weight: 600; margin-right: 8px; }
+</style>
+{% endblock %}
+{% block content %}
+    <div>
         <form action="/file_upload" method="POST" enctype="multipart/form-data">
             <input type="file" name="file">
             <select name="my_dropdown" id="my_dropdown">
@@ -40,18 +37,17 @@
             {% endif %}
         {% endwith %}
     </div>
-    <script>
-        (function(){
-            var container = document.getElementById('toast-container');
-            if(!container) return;
-            var toasts = Array.prototype.slice.call(container.querySelectorAll('.toast'));
-            // Stagger show
-            toasts.forEach(function(t,i){ setTimeout(function(){ t.classList.add('show'); }, 60*i); });
-            // Auto-hide after 4s
-            setTimeout(function(){
-                toasts.forEach(function(t,i){ setTimeout(function(){ t.classList.remove('show'); t.style.opacity = 0; }, 40*i); });
-            }, 4000);
-        })();
-    </script>
-</body>
-</html>
+{% endblock %}
+{% block scripts %}
+<script>
+(function(){
+    var container = document.getElementById('toast-container');
+    if(!container) return;
+    var toasts = Array.prototype.slice.call(container.querySelectorAll('.toast'));
+    toasts.forEach(function(t,i){ setTimeout(function(){ t.classList.add('show'); }, 60*i); });
+    setTimeout(function(){
+        toasts.forEach(function(t,i){ setTimeout(function(){ t.classList.remove('show'); t.style.opacity = 0; }, 40*i); });
+    }, 4000);
+})();
+</script>
+{% endblock %}

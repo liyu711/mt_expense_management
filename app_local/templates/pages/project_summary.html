@@ -1,16 +1,10 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Project Summary</title>
-    <style>
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-    {% include 'sidebar.html' %}
-    <div style="margin-left:50px;padding:20px;">
-        <h2 style="margin-top:20px;">Project Summary</h2>
+{% extends 'basic_page.html' %}
+{% block title %}Project Summary{% endblock %}
+{% block page_title %}Project Summary{% endblock %}
+{% block head %}
+<style>.hidden{display:none;}</style>
+{% endblock %}
+{% block content %}
         <div>
             <label for="po">Choose PO</label>
             <select name="po" id="po">
@@ -60,6 +54,8 @@
                 </select>
             </div>
 
+{% endblock %}
+{% block scripts %}
             <script>
                 (function(){
                     var po = document.getElementById('po');
@@ -213,7 +209,5 @@
                     .then(function(data){ renderStats(data); renderCapex(data); })
                     .catch(function(){ renderStats({error:'network'}); renderCapex({error:'network'}); });
             })();
-        </script>
-    </div>
-</body>
-</html>
+    </script>
+{% endblock %}

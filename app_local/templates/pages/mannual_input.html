@@ -1,8 +1,7 @@
-<!DOCTYPE html>
-<html>
-
-<head>
-    <title>Manual Input</title>
+{% extends 'basic_page.html' %}
+{% block title %}Manual Input{% endblock %}
+{% block page_title %}Manual Input{% endblock %}
+{% block head %}
     <style>
         .form-group {
             display: flex;
@@ -80,13 +79,8 @@
             /* allow scrolling inside each table area */
         }
     </style>
-    <script>
-        // No JS needed: forecast form is always visible on /manual_input
-    </script>
-</head>
-
-<body>
-    {% include 'sidebar.html' %}
+{% endblock %}
+{% block content %}
     <div class="page-wrapper">
         <div class="page-top">
             <!-- Add button to open modal for manual forecast input -->
@@ -830,6 +824,4 @@
             }
         </style>
     </div>
-</body>
-
-</html>
+{% endblock %}

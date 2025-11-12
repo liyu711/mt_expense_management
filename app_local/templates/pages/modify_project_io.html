@@ -1,7 +1,7 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Modify Project & IO</title>
+{% extends 'basic_page.html' %}
+{% block title %}Modify Project & IO{% endblock %}
+{% block page_title %}Project & IO Management{% endblock %}
+{% block head %}
     <style>
         .form-group { display: flex; align-items: center; margin-bottom: 14px; }
         .form-group label { flex: 1 1 33%; max-width: 33%; min-width: 120px; text-align: left; margin-right: 12px; }
@@ -20,13 +20,11 @@
         .modal-content { position: relative; max-width: 760px; margin: 60px auto; background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 2010; }
         .modal-close { position: absolute; right: 10px; top: 8px; font-size: 24px; background: transparent; border: none; cursor: pointer; }
     </style>
-</head>
-<body>
-    {% include 'sidebar.html' %}
+{% endblock %}
+{% block content %}
     <div class="page-wrapper">
         <div class="page-top">
             <div class="container">
-                <h1>Project & IO Management</h1>
                 <div class="button-row">
                     <button id="add_project_button" type="button">Add new project</button>
                     <button id="modify_project_button" type="button">Modify existing project</button>
@@ -101,10 +99,12 @@
     </div>
 
         <!-- Generic table module -->
-        <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
+        
 
     <!-- IO Modify Modal removed: IOs managed within Project modal -->
-
+{% endblock %}
+{% block scripts %}
+    <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
     <script>
         // Basic modal open/close wiring
         (function(){
@@ -359,5 +359,4 @@
     </script>
 
     <!-- IO modal scripts removed -->
-</body>
-</html>
+{% endblock %}

@@ -1,17 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Data Summary</title>
+{% extends 'basic_page.html' %}
+{% block title %}Data Summary{% endblock %}
+{% block page_title %}Expense Summary{% endblock %}
+{% block head %}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-    <style>
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-    {% include 'sidebar.html' %}
-    <div style="margin-left:50px;padding:20px;">
-        <h2 style="margin-top:20px;">Expense Summary</h2>
+    <style>.hidden { display:none; }</style>
+{% endblock %}
+{% block content %}
         <div>
             <label for="po">Choose PO</label>
             <select name="po" id="po">
@@ -49,6 +43,8 @@
                 </select>
             </div>
             
+{% endblock %}
+{% block scripts %}
             <script>
                 // Ensure the handler is attached after the DOM is ready so the button exists
                 document.addEventListener('DOMContentLoaded', function(){
@@ -276,7 +272,5 @@
                     </tr>
                 </tbody>
             </table>
-        {% endif %}
-    </div>
-</body>
-</html>
+    {% endif %}
+{% endblock %}

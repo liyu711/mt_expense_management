@@ -1,14 +1,7 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Data Visualization</title>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-</head>
-<body>
-    {% include 'sidebar.html' %}
-    <div style="margin-left:50px;">
-        <h2>Data Visualization</h2>
+{% extends 'basic_page.html' %}
+{% block title %}Data Visualization{% endblock %}
+{% block page_title %}Data Visualization{% endblock %}
+{% block content %}
         <form id="chart-form" method="POST">
             <label for="table_name">Table:</label>
             <select id="table_name" name="table_name">
@@ -43,6 +36,9 @@
 
         <script id="chart-data-json" type="application/json">{{ data|tojson|safe }}</script>
         <script id="chart-columns-json" type="application/json">{{ columns|tojson|safe }}</script>
+{% endblock %}
+{% block scripts %}
+        <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
         <script>
         (function() {
             const xCol = "{{ x_col|default('') }}";
@@ -83,7 +79,5 @@
                 });
             }
         })();
-        </script>
-    </div>
-</body>
-</html>
+    </script>
+{% endblock %}
