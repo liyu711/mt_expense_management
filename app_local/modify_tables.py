@@ -1016,11 +1016,17 @@ def change_budget():
     Updates budgets row identified by (po_id, department_id, fiscal_year).
     """
     form = dict(request.form)
+    # New & potentially changed values
     po = form.get('po')
     department = form.get('department')
     fiscal_year = form.get('fiscal_year')
     hr_exp = form.get('human_resource_expense')
     nonpc_exp = form.get('non_personnel_expense')
+
+    # Original key fields (hidden inputs) to locate the existing row before updating keys
+    orig_po = form.get('original_po') or po
+    orig_department = form.get('original_department') or department
+    orig_fiscal_year = form.get('original_fiscal_year') or fiscal_year
 
     try:
         db = connect_local()
@@ -1033,47 +1039,66 @@ def change_budget():
         po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
         dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
 
+        # Map new identifiers
         po_id = po_map.get(po)
         department_id = dept_map.get(department)
 
+        # Map original identifiers for WHERE clause
+        orig_po_id = po_map.get(orig_po)
+        orig_department_id = dept_map.get(orig_department)
+
         # Coerce numeric types
-        fy_val = None
         try:
             fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
         except Exception:
-            fy_val = fiscal_year
-
-        hr_val = None
+            fy_val = None
         try:
             hr_val = float(hr_exp) if hr_exp not in (None, '') else None
         except Exception:
             hr_val = None
-
-        nonpc_val = None
         try:
             nonpc_val = float(nonpc_exp) if nonpc_exp not in (None, '') else None
         except Exception:
             nonpc_val = None
 
-        if po_id is None or department_id is None or fy_val is None or hr_val is None or nonpc_val is None:
-            # Missing required identifiers or values; redirect back without change
+        if None in (po_id, department_id, fy_val, hr_val, nonpc_val, orig_po_id, orig_department_id):
             return redirect(url_for('modify_tables.modify_table_router', action='upload_budget'))
 
-        # Perform update
+        # Original fiscal year coercion
+        try:
+            orig_fy_val = int(orig_fiscal_year) if orig_fiscal_year not in (None, '') else None
+        except Exception:
+            orig_fy_val = fy_val  # fallback
+
+        if orig_fy_val is None:
+            return redirect(url_for('modify_tables.modify_table_router', action='upload_budget'))
+
+        # Update both key columns and value columns
         cursor.execute(
             """
             UPDATE budgets
-               SET human_resource_expense = ?,
+               SET po_id = ?,
+                   department_id = ?,
+                   fiscal_year = ?,
+                   human_resource_expense = ?,
                    non_personnel_expense = ?
              WHERE po_id = ?
                AND department_id = ?
                AND fiscal_year = ?
             """,
-            (hr_val, nonpc_val, int(po_id), int(department_id), fy_val),
+            (
+                int(po_id),
+                int(department_id),
+                fy_val,
+                hr_val,
+                nonpc_val,
+                int(orig_po_id),
+                int(orig_department_id),
+                orig_fy_val,
+            ),
         )
         cnxn.commit()
     except Exception:
-        # ignore errors and redirect back
         pass
 
     return redirect(url_for('modify_tables.modify_table_router', action='upload_budget'))
@@ -1087,12 +1112,18 @@ def change_funding():
     Updates fundings row identified by (po_id, department_id, fiscal_year).
     """
     form = dict(request.form)
+    # New (possibly changed) identifiers
     po = form.get('po')
     department = form.get('department')
     fiscal_year = form.get('fiscal_year')
     funding = form.get('funding')
     funding_from = form.get('funding_from')
     funding_for = form.get('funding_for')
+
+    # Original key fields (hidden inputs)
+    orig_po = form.get('original_po') or po
+    orig_department = form.get('original_department') or department
+    orig_fiscal_year = form.get('original_fiscal_year') or fiscal_year
 
     try:
         db = connect_local()
@@ -1105,42 +1136,62 @@ def change_funding():
         po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
         dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
 
+        # New identifiers
         po_id = po_map.get(po)
         department_id = dept_map.get(department)
+        # Original identifiers for WHERE clause
+        orig_po_id = po_map.get(orig_po)
+        orig_department_id = dept_map.get(orig_department)
 
         # Coerce numeric types
-        fy_val = None
         try:
             fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
         except Exception:
-            fy_val = fiscal_year
-
-        fund_val = None
+            fy_val = None
         try:
             fund_val = float(funding) if funding not in (None, '') else None
         except Exception:
             fund_val = None
 
-        if po_id is None or department_id is None or fy_val is None or fund_val is None:
-            # Missing required identifiers or values; redirect back without change
+        if None in (po_id, department_id, fy_val, fund_val, orig_po_id, orig_department_id):
             return redirect(url_for('modify_tables.modify_table_router', action='modify_funding'))
 
-        # Perform update
+        # Original fiscal year coercion
+        try:
+            orig_fy_val = int(orig_fiscal_year) if orig_fiscal_year not in (None, '') else None
+        except Exception:
+            orig_fy_val = fy_val
+
+        if orig_fy_val is None:
+            return redirect(url_for('modify_tables.modify_table_router', action='modify_funding'))
+
         cursor.execute(
             """
             UPDATE fundings
-               SET funding = ?,
+               SET po_id = ?,
+                   department_id = ?,
+                   fiscal_year = ?,
+                   funding = ?,
                    funding_from = ?,
                    funding_for = ?
              WHERE po_id = ?
                AND department_id = ?
                AND fiscal_year = ?
             """,
-            (fund_val, funding_from, funding_for, int(po_id), int(department_id), fy_val),
+            (
+                int(po_id),
+                int(department_id),
+                fy_val,
+                fund_val,
+                funding_from,
+                funding_for,
+                int(orig_po_id),
+                int(orig_department_id),
+                orig_fy_val,
+            ),
         )
         cnxn.commit()
     except Exception:
-        # ignore errors and redirect back
         pass
 
     return redirect(url_for('modify_tables.modify_table_router', action='modify_funding'))

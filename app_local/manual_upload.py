@@ -608,48 +608,86 @@ def render_mannual_input():
 
 @manual_upload.route('/api/hr_cost', methods=['GET'])
 def api_hr_cost():
-    """Return the cost for a given human resource category name and year.
-    Query params: category (name), year (int)
-    Returns JSON: {"cost": <float>|null}
+    """Return hierarchical unit cost for a human resource category.
+    Query params:
+      category (required) - HR category name
+      year (required) - fiscal year
+      po (optional) - PO name for most specific match
+      department (optional) - Department/BU name for most specific match
+    Specificity order:
+      (po, department, category, year)
+      (department, category, year)
+      (po, category, year)
+      (category, year)
+    Returns JSON: {"cost": <float|null>}
     """
     category = request.args.get('category')
     year = request.args.get('year')
+    po_name = request.args.get('po') or selected_po
+    dept_name = request.args.get('department') or selected_department
     if not category or not year:
+        return jsonify({'cost': None}), 200
+    try:
+        y = int(year)
+    except Exception:
         return jsonify({'cost': None}), 200
     try:
         db = connect_local()
         cursor, cnxn = db.connect_to_db()
-        # find category id
-        cursor.execute("SELECT id FROM human_resource_categories WHERE name = ?", (category,))
-        row = cursor.fetchone()
-        if not row:
-            return jsonify({'cost': None}), 200
-        category_id = row[0]
-        # find cost for that category and year
+        # Resolve category id
+        cat_id = None
         try:
-            cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (category_id, int(year)))
-            r2 = cursor.fetchone()
+            cursor.execute("SELECT id FROM human_resource_categories WHERE name = ?", (category,))
+            r = cursor.fetchone()
+            if r: cat_id = r[0]
         except Exception:
-            r2 = None
-
-        # Fallback: some rows may have category_id stored as the category name (string). Try that too.
-        if not r2:
+            cat_id = None
+        # Resolve po_id
+        po_id = None
+        if po_name:
             try:
-                cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (category, int(year)))
-                r2 = cursor.fetchone()
+                cursor.execute("SELECT id FROM pos WHERE name = ?", (po_name,))
+                rp = cursor.fetchone()
+                if rp: po_id = rp[0]
             except Exception:
-                r2 = None
+                po_id = None
+        # Resolve department_id
+        dept_id = None
+        if dept_name:
+            try:
+                cursor.execute("SELECT id FROM departments WHERE name = ?", (dept_name,))
+                rd = cursor.fetchone()
+                if rd: dept_id = rd[0]
+            except Exception:
+                dept_id = None
 
-        if not r2:
-            return jsonify({'cost': None}), 200
-        return jsonify({'cost': r2[0]}), 200
+        def fetch(q, params):
+            try:
+                cursor.execute(q, params)
+                rr = cursor.fetchone()
+                return rr[0] if rr else None
+            except Exception:
+                return None
+
+        cost = None
+        if cost is None and all(v is not None for v in (po_id, dept_id, cat_id)):
+            cost = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND department_id = ? AND category_id = ? AND year = ? LIMIT 1", (po_id, dept_id, cat_id, y))
+        if cost is None and all(v is not None for v in (dept_id, cat_id)):
+            cost = fetch("SELECT cost FROM human_resource_cost WHERE department_id = ? AND category_id = ? AND year = ? LIMIT 1", (dept_id, cat_id, y))
+        if cost is None and all(v is not None for v in (po_id, cat_id)):
+            cost = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND category_id = ? AND year = ? LIMIT 1", (po_id, cat_id, y))
+        if cost is None and cat_id is not None:
+            cost = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (cat_id, y))
+        if cost is None:
+            # fallback where category stored as text
+            cost = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (category, y))
+        return jsonify({'cost': cost}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
     finally:
         try:
-            cursor.close()
-            cnxn.close()
-        except:
+            cursor.close(); cnxn.close()
+        except Exception:
             pass
 
 
@@ -1323,64 +1361,83 @@ def manual_change_forecast():
             except Exception:
                 pass
 
-        # Multi-category personnel updates: iterate fte__* inputs and compute personnel cost for summary
+        # Multi-category personnel updates: support forward (FTE->cost) and reverse (cost->FTE)
         total_personnel_cost = 0.0
+        def hierarchical_unit_cost(cat_name_local):
+            if not cat_name_local or fy_val is None:
+                return None
+            try:
+                cursor.execute("SELECT id FROM human_resource_categories WHERE name = ?", (cat_name_local,))
+                rr = cursor.fetchone(); cat_id_lookup = rr[0] if rr else None
+            except Exception:
+                cat_id_lookup = None
+            def fetch(q, params):
+                try:
+                    cursor.execute(q, params)
+                    fr = cursor.fetchone(); return fr[0] if fr else None
+                except Exception:
+                    return None
+            cost_local = None
+            if cost_local is None and all(v is not None for v in (po_id, dept_id, cat_id_lookup, fy_val)):
+                cost_local = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND department_id = ? AND category_id = ? AND year = ? LIMIT 1", (int(po_id), int(dept_id), int(cat_id_lookup), int(fy_val)))
+            if cost_local is None and all(v is not None for v in (dept_id, cat_id_lookup, fy_val)):
+                cost_local = fetch("SELECT cost FROM human_resource_cost WHERE department_id = ? AND category_id = ? AND year = ? LIMIT 1", (int(dept_id), int(cat_id_lookup), int(fy_val)))
+            if cost_local is None and all(v is not None for v in (po_id, cat_id_lookup, fy_val)):
+                cost_local = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND category_id = ? AND year = ? LIMIT 1", (int(po_id), int(cat_id_lookup), int(fy_val)))
+            if cost_local is None and all(v is not None for v in (cat_id_lookup, fy_val)):
+                cost_local = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (int(cat_id_lookup), int(fy_val)))
+            if cost_local is None:
+                cost_local = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (cat_name_local, int(fy_val)))
+            return cost_local
         for key in form.keys():
-            if key.startswith('fte__'):
-                slug = key[len('fte__'):]
-                fte_raw = form.get(key)
+            # Accept either fte__slug (forward) or cost__slug (reverse)
+            if key.startswith('fte__') or key.startswith('cost__'):
+                reverse_mode = key.startswith('cost__')
+                slug = key.split('__',1)[1]
+                fte_key = 'fte__' + slug
+                cost_key = 'cost__' + slug
                 cat_key = 'cat__' + slug
                 cat_name = form.get(cat_key)
                 if not cat_name:
                     continue
-                # Resolve hr category id for each cat_name
+                unit_rate = hierarchical_unit_cost(cat_name)
+                # Parse provided values
+                fte_raw = form.get(fte_key)
+                cost_raw = form.get(cost_key)
+                fte_local = None
+                cost_local = None
+                try:
+                    if fte_raw not in (None, ''):
+                        fte_local = float(fte_raw)
+                except Exception:
+                    fte_local = None
+                try:
+                    if cost_raw not in (None, ''):
+                        cost_local = float(cost_raw)
+                except Exception:
+                    cost_local = None
+                # Determine operation direction
+                if reverse_mode and cost_local is not None and unit_rate and unit_rate != 0:
+                    # Derive FTE from cost
+                    fte_local = cost_local / unit_rate
+                elif not reverse_mode and fte_local is not None and unit_rate is not None:
+                    cost_local = unit_rate * fte_local
+                # Accumulate total personnel cost
+                if cost_local is not None:
+                    total_personnel_cost += cost_local
+                # Resolve hr category id for update
                 hr_cat_id_local = None
                 if hrc_df is not None and 'name' in hrc_df.columns and 'id' in hrc_df.columns:
                     try:
-                        # exact, then case-insensitive fallback
                         hr_cat_id_local = dict(zip(hrc_df['name'], hrc_df['id'])).get(cat_name)
-                        if hr_cat_id_local is None and cat_name:
+                        if hr_cat_id_local is None:
                             name_lower_map = {str(n).strip().lower(): i for n, i in zip(hrc_df['name'], hrc_df['id'])}
                             hr_cat_id_local = name_lower_map.get(str(cat_name).strip().lower())
                     except Exception:
                         hr_cat_id_local = None
-                try:
-                    fte_local = float(fte_raw)
-                except Exception:
-                    fte_local = 0.0
-                # Compute cost = base_cost(category, year) * fte
-                base_cost = None
-                try:
-                    cursor.execute("SELECT id FROM human_resource_categories WHERE name = ?", (cat_name,))
-                    r = cursor.fetchone()
-                    if r:
-                        cid = r[0]
-                        try:
-                            cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (cid, int(fy_val) if fy_val is not None else None))
-                            cr = cursor.fetchone()
-                            if cr:
-                                base_cost = cr[0]
-                        except Exception:
-                            base_cost = None
-                    # Fallback where category_id stored as name
-                    if base_cost is None:
-                        try:
-                            cursor.execute("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ?", (cat_name, int(fy_val) if fy_val is not None else None))
-                            cr2 = cursor.fetchone()
-                            if cr2:
-                                base_cost = cr2[0]
-                        except Exception:
-                            base_cost = None
-                except Exception:
-                    base_cost = None
-                try:
-                    cnum = float(base_cost) if base_cost is not None else 0.0
-                except Exception:
-                    cnum = 0.0
-                total_personnel_cost += (cnum * fte_local)
-                # Determine IO for update: use provided io_id or infer from existing rows
+                # Determine IO for update
                 candidate_io_id = io_id if io_id is not None else infer_io_id_for_category(hr_cat_id_local)
-                if all(v is not None for v in (po_id, dept_id, proj_id, candidate_io_id, pc_id, fy_val, hr_cat_id_local)):
+                if fte_local is not None and all(v is not None for v in (po_id, dept_id, proj_id, candidate_io_id, pc_id, fy_val, hr_cat_id_local)):
                     try:
                         cursor.execute(
                             """

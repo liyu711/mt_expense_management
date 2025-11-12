@@ -149,11 +149,156 @@ def change_project():
             sets.append('fiscal_year = ?')
             params.append(fy_val)
 
+        # Determine existing department_id for cascade comparison
+        old_dept_id = None
+        try:
+            proj_df_current = select_all_from_table(cursor, cnxn, 'projects')
+            if proj_df_current is not None and not proj_df_current.empty and 'id' in proj_df_current.columns and 'department_id' in proj_df_current.columns:
+                match_old = proj_df_current[proj_df_current['id'].astype(int) == int(pid_val)].head(1)
+                if not match_old.empty:
+                    try:
+                        old_dept_id = int(match_old.iloc[0]['department_id']) if pd.notna(match_old.iloc[0]['department_id']) else None
+                    except Exception:
+                        old_dept_id = None
+        except Exception:
+            old_dept_id = None
+
+        # Determine old and new PO ids via departments table to support PO cascade
+        old_po_id = None
+        new_po_id = None
+        try:
+            depts_tbl = select_all_from_table(cursor, cnxn, 'departments')
+            if depts_tbl is not None and not depts_tbl.empty and 'id' in depts_tbl.columns:
+                if old_dept_id is not None and 'po_id' in depts_tbl.columns:
+                    try:
+                        old_po_id = int(depts_tbl[depts_tbl['id'].astype(int) == int(old_dept_id)]['po_id'].iloc[0])
+                    except Exception:
+                        old_po_id = None
+                if dept_id is not None and 'po_id' in depts_tbl.columns:
+                    try:
+                        new_po_id = int(depts_tbl[depts_tbl['id'].astype(int) == int(dept_id)]['po_id'].iloc[0])
+                    except Exception:
+                        new_po_id = None
+        except Exception:
+            old_po_id = None
+            new_po_id = None
+
+        dept_changed = (dept_id is not None and dept_id != old_dept_id)
+
         if sets:
             q = f"UPDATE projects SET {', '.join(sets)} WHERE id = ?"
             params.append(pid_val)
             cursor.execute(q, tuple(params))
             cnxn.commit()
+
+        # Cascade department (and implied PO) change to dependent tables if department actually changed
+        if dept_changed:
+            try:
+                # Update non-PC forecasts
+                cursor.execute(
+                    "UPDATE project_forecasts_nonpc SET department_id = ? WHERE project_id = ?",
+                    (int(dept_id), int(pid_val))
+                )
+            except Exception:
+                pass
+            try:
+                # Update PC forecasts
+                cursor.execute(
+                    "UPDATE project_forecasts_pc SET department_id = ? WHERE project_id = ?",
+                    (int(dept_id), int(pid_val))
+                )
+            except Exception:
+                pass
+            # If the new department is under a different PO, cascade PO_id as well
+            try:
+                if new_po_id is not None:
+                    # Only overwrite rows that matched the old PO (or had NULL)
+                    if old_po_id is not None:
+                        cursor.execute(
+                            "UPDATE project_forecasts_nonpc SET PO_id = ? WHERE project_id = ? AND (PO_id = ? OR PO_id IS NULL)",
+                            (int(new_po_id), int(pid_val), int(old_po_id))
+                        )
+                        cursor.execute(
+                            "UPDATE project_forecasts_pc SET PO_id = ? WHERE project_id = ? AND (PO_id = ? OR PO_id IS NULL)",
+                            (int(new_po_id), int(pid_val), int(old_po_id))
+                        )
+                    else:
+                        cursor.execute(
+                            "UPDATE project_forecasts_nonpc SET PO_id = ? WHERE project_id = ? AND PO_id IS NULL",
+                            (int(new_po_id), int(pid_val))
+                        )
+                        cursor.execute(
+                            "UPDATE project_forecasts_pc SET PO_id = ? WHERE project_id = ? AND PO_id IS NULL",
+                            (int(new_po_id), int(pid_val))
+                        )
+            except Exception:
+                pass
+            # Update CapEx tables tied to project
+            try:
+                cursor.execute(
+                    "UPDATE capex_forecasts SET department_id = ? WHERE project_id = ? AND (department_id = ? OR department_id IS NULL)",
+                    (int(dept_id), int(pid_val), int(old_dept_id) if old_dept_id is not None else -1)
+                )
+            except Exception:
+                pass
+            try:
+                cursor.execute(
+                    "UPDATE capex_budgets SET department_id = ? WHERE project_id = ? AND (department_id = ? OR department_id IS NULL)",
+                    (int(dept_id), int(pid_val), int(old_dept_id) if old_dept_id is not None else -1)
+                )
+            except Exception:
+                pass
+            try:
+                cursor.execute(
+                    "UPDATE capex_expenses SET department_id = ? WHERE project_id = ? AND (department_id = ? OR department_id IS NULL)",
+                    (int(dept_id), int(pid_val), int(old_dept_id) if old_dept_id is not None else -1)
+                )
+            except Exception:
+                pass
+            # Also cascade PO to CapEx tables when department's PO changes
+            try:
+                if new_po_id is not None:
+                    if old_po_id is not None:
+                        cursor.execute(
+                            "UPDATE capex_forecasts SET po_id = ? WHERE project_id = ? AND (po_id = ? OR po_id IS NULL)",
+                            (int(new_po_id), int(pid_val), int(old_po_id))
+                        )
+                        cursor.execute(
+                            "UPDATE capex_budgets SET po_id = ? WHERE project_id = ? AND (po_id = ? OR po_id IS NULL)",
+                            (int(new_po_id), int(pid_val), int(old_po_id))
+                        )
+                        cursor.execute(
+                            "UPDATE capex_expenses SET po_id = ? WHERE project_id = ? AND (po_id = ? OR po_id IS NULL)",
+                            (int(new_po_id), int(pid_val), int(old_po_id))
+                        )
+                    else:
+                        cursor.execute(
+                            "UPDATE capex_forecasts SET po_id = ? WHERE project_id = ? AND po_id IS NULL",
+                            (int(new_po_id), int(pid_val))
+                        )
+                        cursor.execute(
+                            "UPDATE capex_budgets SET po_id = ? WHERE project_id = ? AND po_id IS NULL",
+                            (int(new_po_id), int(pid_val))
+                        )
+                        cursor.execute(
+                            "UPDATE capex_expenses SET po_id = ? WHERE project_id = ? AND po_id IS NULL",
+                            (int(new_po_id), int(pid_val))
+                        )
+            except Exception:
+                pass
+            # Update operating expenses where IOs belong to this project
+            try:
+                cursor.execute(
+                    "UPDATE expenses SET department_id = ? WHERE (department_id = ? OR department_id IS NULL) AND io_id IN (SELECT id FROM IOs WHERE project_id = ?)",
+                    (int(dept_id), int(old_dept_id) if old_dept_id is not None else -1, int(pid_val))
+                )
+            except Exception:
+                pass
+            # No explicit PO on expenses; PO linkage is via department for display
+            try:
+                cnxn.commit()
+            except Exception:
+                pass
 
         # Handle IO updates as part of merged modify form
         try:

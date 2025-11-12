@@ -382,11 +382,10 @@
             })();
         </script>
         <script>
-            // Per-category HR cost updater based on FTE and /api/hr_cost
+            // Per-category HR cost updater based on FTE and /api/hr_cost (hierarchical by PO/Department)
             (function(){
                 function parseNum(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
                 function getFY(){
-                    // Prefer modify modal fiscal year if active, else add modal
                     var modifyFy = document.querySelector('#modify_forecast select[name="fiscal_year"]');
                     if (modifyFy && modifyFy.value) return modifyFy.value;
                     var addFy = document.querySelector('#upload_forecast select[name="fiscal_year"]');
@@ -399,12 +398,23 @@
                     hidden.forEach(function(h){ list.push({ slug: h.name.replace('cat__',''), name: h.value, scope: scope }); });
                     return list;
                 }
-                var costCache = {}; // key: name|year -> base cost
+                var costCache = {}; // key: name|year|po|dept -> base cost
                 function fetchBaseCost(name, year){
-                    var key = name + '|' + year;
+                    var poVal = '';
+                    var deptVal = '';
+                    var poAdd = document.getElementById('po_select');
+                    var deptAdd = document.getElementById('department_select');
+                    var poMod = document.getElementById('po_select_modify');
+                    var deptMod = document.getElementById('department_select_modify');
+                    if (poMod && poMod.value) poVal = poMod.value; else if (poAdd && poAdd.value) poVal = poAdd.value;
+                    if (deptMod && deptMod.value) deptVal = deptMod.value; else if (deptAdd && deptAdd.value) deptVal = deptAdd.value;
+                    var key = [name, year, poVal, deptVal].join('|');
                     if (costCache.hasOwnProperty(key)) return Promise.resolve(costCache[key]);
                     if (!name || !year) return Promise.resolve(null);
-                    return fetch('/api/hr_cost?category=' + encodeURIComponent(name) + '&year=' + encodeURIComponent(year))
+                    var qs = new URLSearchParams({category: name, year: year});
+                    if (poVal) qs.append('po', poVal);
+                    if (deptVal) qs.append('department', deptVal);
+                    return fetch('/api/hr_cost?' + qs.toString())
                         .then(function(r){ return r.json(); })
                         .then(function(j){ var c = (j && j.cost != null) ? parseNum(j.cost) : null; costCache[key] = c; return c; })
                         .catch(function(){ costCache[key] = null; return null; });
@@ -444,7 +454,7 @@
                 function bindFY(){
                     var fyAdd = document.querySelector('#upload_forecast select[name="fiscal_year"]');
                     var fyMod = document.querySelector('#modify_forecast select[name="fiscal_year"]');
-                    [fyAdd, fyMod].forEach(function(fy){ if (fy){ fy.addEventListener('change', updateAll); }});
+                    [fyAdd, fyMod].forEach(function(fy){ if (fy){ fy.addEventListener('change', function(){ costCache = {}; updateAll(); }); }});
                 }
                 // expose helpers for after rebuilding HR inputs
                 window.updateAllHrCosts = updateAll;
@@ -453,11 +463,16 @@
                 // initial bind on DOM ready
                 function init(){ bindFte('add'); bindFte('modify'); bindFY(); }
                 if (document.readyState === 'complete' || document.readyState === 'interactive') init(); else document.addEventListener('DOMContentLoaded', init);
-                // when opening Add modal, rebind and compute shortly after
+                // when opening Add or Modify, rebind and compute shortly after
                 var addBtn = document.getElementById('add_button');
                 if (addBtn){ addBtn.addEventListener('click', function(){ setTimeout(function(){ bindFte(); updateAll(); }, 100); }); }
                 var modifyBtn = document.getElementById('modify_button');
                 if (modifyBtn){ modifyBtn.addEventListener('click', function(){ setTimeout(function(){ bindFte('modify'); updateAll(); }, 100); }); }
+                // Invalidate cache and recompute when hierarchy changes
+                ['po_select','department_select','po_select_modify','department_select_modify'].forEach(function(id){
+                    var el = document.getElementById(id);
+                    if (el){ el.addEventListener('change', function(){ costCache = {}; updateAll(); }); }
+                });
             })();
         </script>
         <!-- GenericTable for forecasts display -->
@@ -565,22 +580,28 @@
                                     var slug = slugify(catName);
                                     var fteInput = document.querySelector('#modify_forecast input[name="fte__' + slug + '"]');
                                     if (!fteInput) return;
-                                    // fetch base cost
-                                    promises.push(
-                                        fetch('/api/hr_cost?category=' + encodeURIComponent(catName) + '&year=' + encodeURIComponent(year))
-                                          .then(r=>r.json())
-                                          .then(function(j){
-                                            var base = j && j.cost != null ? parseFloat(j.cost) : null;
-                                            var c = parseFloat(costVal);
-                                            if (base && base > 0){
-                                                var fte = c / base;
-                                                fteInput.value = (isFinite(fte)? fte.toFixed(1): '0');
-                                            } else {
-                                                // fallback can't derive FTE, set 0
-                                                fteInput.value = '0';
-                                            }
-                                          }).catch(function(){ fteInput.value = '0'; })
-                                    );
+                                                                        // fetch base cost using hierarchical context: PO + Department + Fiscal Year
+                                                                        var poVal = poSel && poSel.value ? poSel.value : '';
+                                                                        var deptVal = deptSel && deptSel.value ? deptSel.value : '';
+                                                                        var params = new URLSearchParams({ category: catName, year: String(year) });
+                                                                        if (poVal) params.append('po', poVal);
+                                                                        if (deptVal) params.append('department', deptVal);
+                                                                        promises.push(
+                                                                                fetch('/api/hr_cost?' + params.toString())
+                                                                                    .then(function(r){ return r.json(); })
+                                                                                    .then(function(j){
+                                                                                        var base = j && j.cost != null ? parseFloat(j.cost) : null;
+                                                                                        var c = parseFloat(costVal);
+                                                                                        if (base && base > 0){
+                                                                                                var fte = c / base;
+                                                                                                fteInput.value = (isFinite(fte)? fte.toFixed(1): '0');
+                                                                                        } else {
+                                                                                                // fallback can't derive FTE, set 0
+                                                                                                fteInput.value = '0';
+                                                                                        }
+                                                                                    })
+                                                                                    .catch(function(){ fteInput.value = '0'; })
+                                                                        );
                                 });
                                 Promise.all(promises).then(function(){
                                     // Recalculate cost spans based on filled FTEs

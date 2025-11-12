@@ -94,7 +94,6 @@ CREATE TABLE project_forecasts_nonpc(
     non_personnel_expense REAL,
     FOREIGN KEY (department_id) REFERENCES departments(id),
     FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (PO_id) REFERENCES POs(id),
     FOREIGN KEY (project_category_id) REFERENCES project_categories(id),
     FOREIGN KEY (io_id) REFERENCES IOs(id)
 );
@@ -112,7 +111,6 @@ CREATE TABLE project_forecasts_pc(
     -- personnel_expense REAL,
     FOREIGN KEY (department_id) REFERENCES departments(id),
     FOREIGN KEY (project_id) REFERENCES projects(id),
-    FOREIGN KEY (PO_id) REFERENCES POs(id),
     FOREIGN KEY (project_category_id) REFERENCES project_categories(id),
     FOREIGN KEY (io_id) REFERENCES IOs(id),
     FOREIGN KEY (human_resource_category_id) REFERENCES human_resource_categories(id)

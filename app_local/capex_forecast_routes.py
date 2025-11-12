@@ -136,6 +136,7 @@ def change_capex_forecast():
     Updates capex_forecasts.capex_forecast and cost_center WHERE po_id, department_id, project_id, cap_year and capex_description match.
     """
     form = dict(request.form)
+    # New values (can be changed by user)
     po = form.get('po')
     department = form.get('department')
     cap_year = form.get('cap_year')
@@ -143,6 +144,13 @@ def change_capex_forecast():
     capex_description = form.get('capex_description')
     capex_forecast = form.get('capex_forecast')
     cost_center = form.get('cost_center')
+
+    # Original key fields to locate existing row
+    orig_po = form.get('original_po') or po
+    orig_department = form.get('original_department') or department
+    orig_cap_year = form.get('original_cap_year') or cap_year
+    orig_project_name = form.get('original_project_name') or project_name
+    orig_description = form.get('original_capex_description')
 
     try:
         db = connect_local()
@@ -160,6 +168,11 @@ def change_capex_forecast():
         department_id = dept_map.get(department)
         project_id = proj_map.get(project_name)
 
+        # originals
+        orig_po_id = po_map.get(orig_po)
+        orig_department_id = dept_map.get(orig_department)
+        orig_project_id = proj_map.get(orig_project_name)
+
         try:
             cap_year_val = int(cap_year) if cap_year not in (None, '') else None
         except Exception:
@@ -169,30 +182,48 @@ def change_capex_forecast():
         except Exception:
             forecast_val = None
 
-        if po_id is None or department_id is None or project_id is None or cap_year_val is None:
+        # Coerce originals
+        try:
+            orig_cap_year_val = int(orig_cap_year) if orig_cap_year not in (None, '') else None
+        except Exception:
+            orig_cap_year_val = cap_year_val
+
+        if None in (po_id, department_id, project_id, cap_year_val, orig_po_id, orig_department_id, orig_project_id, orig_cap_year_val):
             return {'status': 'error', 'message': 'Missing identifiers'}, 400
 
-        cursor.execute(
-            """
-            UPDATE capex_forecasts
-               SET capex_description = ?,
-                   capex_forecast = ?,
-                   cost_center = ?
-             WHERE po_id = ?
-               AND department_id = ?
-               AND project_id = ?
-               AND cap_year = ?
-            """,
-            (
-                capex_description,
-                forecast_val,
-                cost_center,
-                int(po_id),
-                int(department_id),
-                int(project_id),
-                int(cap_year_val),
-            ),
+        # Build SQL with optional original description clause to narrow update if available
+        base_sql = (
+            "UPDATE capex_forecasts\n"
+            "   SET po_id = ?,\n"
+            "       department_id = ?,\n"
+            "       project_id = ?,\n"
+            "       cap_year = ?,\n"
+            "       capex_description = ?,\n"
+            "       capex_forecast = ?,\n"
+            "       cost_center = ?\n"
+            " WHERE po_id = ?\n"
+            "   AND department_id = ?\n"
+            "   AND project_id = ?\n"
+            "   AND cap_year = ?"
         )
+        params = [
+            int(po_id),
+            int(department_id),
+            int(project_id),
+            int(cap_year_val),
+            capex_description,
+            forecast_val,
+            cost_center,
+            int(orig_po_id),
+            int(orig_department_id),
+            int(orig_project_id),
+            int(orig_cap_year_val),
+        ]
+        if orig_description:
+            base_sql += "\n   AND capex_description = ?"
+            params.append(orig_description)
+
+        cursor.execute(base_sql, tuple(params))
         cnxn.commit()
         return {'status': 'ok'}, 200
     except Exception as e:
@@ -289,12 +320,19 @@ def change_capex_budget():
     Updates capex_budgets.budget and capex_description WHERE po_id, department_id, project_id, cap_year match.
     """
     form = dict(request.form)
+    # New values
     po = form.get('po')
     department = form.get('department')
     cap_year = form.get('cap_year') or form.get('fiscal_year')
     project_name = form.get('project_name') or form.get('project')
     capex_description = form.get('capex_description')
     approved_budget = form.get('approved_budget') or form.get('budget')
+
+    # Original key fields
+    orig_po = form.get('original_po') or po
+    orig_department = form.get('original_department') or department
+    orig_cap_year = form.get('original_cap_year') or cap_year
+    orig_project_name = form.get('original_project_name') or project_name
 
     try:
         db = connect_local()
@@ -312,6 +350,11 @@ def change_capex_budget():
         department_id = dept_map.get(department)
         project_id = proj_map.get(project_name)
 
+        # original ids for where clause
+        orig_po_id = po_map.get(orig_po)
+        orig_department_id = dept_map.get(orig_department)
+        orig_project_id = proj_map.get(orig_project_name)
+
         try:
             cap_year_val = int(cap_year) if cap_year not in (None, '') else None
         except Exception:
@@ -320,14 +363,22 @@ def change_capex_budget():
             budget_val = float(approved_budget) if approved_budget not in (None, '') else None
         except Exception:
             budget_val = None
+        try:
+            orig_cap_year_val = int(orig_cap_year) if orig_cap_year not in (None, '') else None
+        except Exception:
+            orig_cap_year_val = cap_year_val
 
-        if po_id is None or department_id is None or project_id is None or cap_year_val is None or budget_val is None:
+        if None in (po_id, department_id, project_id, cap_year_val, budget_val, orig_po_id, orig_department_id, orig_project_id, orig_cap_year_val):
             return {'status': 'error', 'message': 'Missing identifiers'}, 400
 
         cursor.execute(
             """
             UPDATE capex_budgets
-               SET capex_description = ?,
+               SET po_id = ?,
+                   department_id = ?,
+                   project_id = ?,
+                   cap_year = ?,
+                   capex_description = ?,
                    budget = ?
              WHERE po_id = ?
                AND department_id = ?
@@ -335,12 +386,16 @@ def change_capex_budget():
                AND cap_year = ?
             """,
             (
-                capex_description,
-                budget_val,
                 int(po_id),
                 int(department_id),
                 int(project_id),
                 int(cap_year_val),
+                capex_description,
+                budget_val,
+                int(orig_po_id),
+                int(orig_department_id),
+                int(orig_project_id),
+                int(orig_cap_year_val),
             ),
         )
         cnxn.commit()

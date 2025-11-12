@@ -128,6 +128,27 @@
                                         {% endif %}
                                     </div>
                                 {% endfor %}
+                                                                {% if table_name in ['budgets','fundings'] %}
+                                                                    <input type="hidden" name="original_po" value="">
+                                                                    <input type="hidden" name="original_department" value="">
+                                                                    <input type="hidden" name="original_fiscal_year" value="">
+                                                                {% elif table_name == 'capex_forecasts' %}
+                                                                    <input type="hidden" name="original_po" value="">
+                                                                    <input type="hidden" name="original_department" value="">
+                                                                    <input type="hidden" name="original_cap_year" value="">
+                                                                    <input type="hidden" name="original_project_name" value="">
+                                                                    <input type="hidden" name="original_capex_description" value="">
+                                                                {% elif table_name == 'capex_budgets' %}
+                                                                    <input type="hidden" name="original_po" value="">
+                                                                    <input type="hidden" name="original_department" value="">
+                                                                    <input type="hidden" name="original_cap_year" value="">
+                                                                    <input type="hidden" name="original_project_name" value="">
+                                                                {% elif table_name == 'human_resource_cost' %}
+                                                                    <input type="hidden" name="original_po" value="">
+                                                                    <input type="hidden" name="original_department" value="">
+                                                                    <input type="hidden" name="original_staff_category" value="">
+                                                                    <input type="hidden" name="original_year" value="">
+                                                                {% endif %}
                                 <div style="margin-top:12px;">
                                     <button type="submit">Submit</button>
                                     <button type="button" id="modalCancelChange">Cancel</button>
@@ -258,6 +279,12 @@
                                                 } else {
                                                     setDeptAndMaybeProjects();
                                                 }
+                                                // populate originals
+                                                var oPo = modal.querySelector('input[name="original_po"]'); if(oPo && poVal) oPo.value = poVal;
+                                                var oDept = modal.querySelector('input[name="original_department"]'); if(oDept && deptVal) oDept.value = deptVal;
+                                                var oYear = modal.querySelector('input[name="original_cap_year"]'); if(oYear && yearVal) oYear.value = yearVal;
+                                                var oProj = modal.querySelector('input[name="original_project_name"]'); if(oProj && projVal) oProj.value = projVal;
+                                                var oDesc = modal.querySelector('input[name="original_capex_description"]'); if(oDesc && descVal) oDesc.value = descVal;
                                             }catch(e){}
                                         };
                                     } else if (tableName === 'departments'){
@@ -336,6 +363,9 @@
                                                 if(hrIn && hrVal){ hrIn.value = hrVal; }
                                                 if(npIn && npVal){ npIn.value = npVal; }
                                                 if(deptSel && deptVal){ deptSel.value = deptVal; }
+                                                var bPo = modal.querySelector('input[name="original_po"]'); if(bPo && poVal) bPo.value = poVal;
+                                                var bDept = modal.querySelector('input[name="original_department"]'); if(bDept && deptVal) bDept.value = deptVal;
+                                                var bFy = modal.querySelector('input[name="original_fiscal_year"]'); if(bFy && fyVal) bFy.value = fyVal;
                                             }catch(e){}
                                         };
                                     } else if (tableName === 'fundings'){
@@ -360,6 +390,9 @@
                                                 if(fromIn){ fromIn.value = fromVal; }
                                                 if(forIn){ forIn.value = forVal; }
                                                 if(deptSel && deptVal){ deptSel.value = deptVal; }
+                                                var fPo = modal.querySelector('input[name="original_po"]'); if(fPo && poVal) fPo.value = poVal;
+                                                var fDept = modal.querySelector('input[name="original_department"]'); if(fDept && deptVal) fDept.value = deptVal;
+                                                var fFy = modal.querySelector('input[name="original_fiscal_year"]'); if(fFy && fyVal) fFy.value = fyVal;
                                             }catch(e){}
                                         };
                                     } else if (tableName === 'capex_budgets'){
@@ -382,6 +415,10 @@
                                                 if(yearSel && yearVal){ yearSel.value = String(yearVal); }
                                                 if(descIn){ descIn.value = descVal; }
                                                 if(budIn && budgetVal){ budIn.value = budgetVal; }
+                                                var cbPo = modal.querySelector('input[name="original_po"]'); if(cbPo && poVal) cbPo.value = poVal;
+                                                var cbDept = modal.querySelector('input[name="original_department"]'); if(cbDept && deptVal) cbDept.value = deptVal;
+                                                var cbYear = modal.querySelector('input[name="original_cap_year"]'); if(cbYear && yearVal) cbYear.value = yearVal;
+                                                var cbProj = modal.querySelector('input[name="original_project_name"]'); if(cbProj && projVal) cbProj.value = projVal;
                                                 function setDeptAndProjects(){
                                                     if(deptSel && deptVal){ deptSel.value = deptVal; }
                                                     var currentPO = poSel ? poSel.value : '';
@@ -476,6 +513,10 @@
                                                 } else if (deptSel && deptVal){
                                                     deptSel.value = deptVal;
                                                 }
+                                                var scPo = modal.querySelector('input[name="original_po"]'); if(scPo && poVal) scPo.value = poVal;
+                                                var scDept = modal.querySelector('input[name="original_department"]'); if(scDept && deptVal) scDept.value = deptVal;
+                                                var scCat = modal.querySelector('input[name="original_staff_category"]'); if(scCat && catVal) scCat.value = catVal;
+                                                var scYear = modal.querySelector('input[name="original_year"]'); if(scYear && yearVal) scYear.value = yearVal;
                                             }catch(e){}
                                         };
                                     }
@@ -840,6 +881,69 @@
             // Also attach when modal opens (in case fields are re-rendered)
             var addBtn = document.getElementById('add_button');
             if (addBtn) addBtn.addEventListener('click', function () { setTimeout(attachChangeHandlers, 30); });
+        })();
+    </script>
+    <script>
+        // Enable dependent dropdowns inside the Change modal (modifyModalChange): update Departments after PO and Projects after PO/Dept/Year
+        (function(){
+            var modal = document.getElementById('modifyModalChange');
+            function attachHandlers(){
+                if (!modal) return;
+                // PO change -> refresh departments
+                var poSelects = modal.querySelectorAll('select[name="po"], #change_po');
+                poSelects.forEach(function(sel){
+                    sel.addEventListener('change', function(){
+                        var po = sel.value || '';
+                        if (!po) return;
+                        fetch('/capex_forecast/department_update?po=' + encodeURIComponent(po))
+                            .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
+                            .then(function(json){
+                                var deptSelects = modal.querySelectorAll('select[name="department"], #change_department');
+                                deptSelects.forEach(function(dsel){
+                                    dsel.innerHTML = '';
+                                    var placeholder = document.createElement('option');
+                                    placeholder.value = ''; placeholder.disabled = true; placeholder.selected = true; placeholder.textContent = 'Select an option';
+                                    dsel.appendChild(placeholder);
+                                    (json && json.departments ? json.departments : []).forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; dsel.appendChild(o); });
+                                });
+                                // Clear projects when PO changes
+                                var projSelects = modal.querySelectorAll('select[name="project_name"], #change_project_name');
+                                projSelects.forEach(function(ps){ ps.innerHTML=''; var ph=document.createElement('option'); ph.value=''; ph.disabled=true; ph.selected=true; ph.textContent='Select an option'; ps.appendChild(ph); });
+                            })
+                            .catch(function(){});
+                    });
+                });
+
+                function refreshProjects(){
+                    var po = (modal.querySelector('select[name="po"], #change_po')||{}).value || '';
+                    var dept = (modal.querySelector('select[name="department"], #change_department')||{}).value || '';
+                    var year = (modal.querySelector('select[name="cap_year"], #change_cap_year, select[name="fiscal_year"], #change_fiscal_year')||{}).value || '';
+                    var projSelects = modal.querySelectorAll('select[name="project_name"], #change_project_name');
+                    if (!po || !dept || !year || projSelects.length === 0) return;
+                    var url = '/capex_forecast/project_update?po=' + encodeURIComponent(po) + '&department=' + encodeURIComponent(dept) + '&fiscal_year=' + encodeURIComponent(year);
+                    fetch(url)
+                        .then(function(res){ return res.ok ? res.json() : { projects: [] }; })
+                        .then(function(json){
+                            projSelects.forEach(function(ps){
+                                ps.innerHTML='';
+                                var ph=document.createElement('option'); ph.value=''; ph.disabled=true; ph.selected=true; ph.textContent='Select an option'; ps.appendChild(ph);
+                                (json && json.projects ? json.projects : []).forEach(function(n){ var o=document.createElement('option'); o.value=n; o.textContent=n; ps.appendChild(o); });
+                            });
+                        })
+                        .catch(function(){});
+                }
+
+                // Department and Cap Year changes -> refresh projects
+                var deptSelects = modal.querySelectorAll('select[name="department"], #change_department');
+                deptSelects.forEach(function(sel){ sel.addEventListener('change', refreshProjects); });
+                var yearSelects = modal.querySelectorAll('select[name="cap_year"], #change_cap_year, select[name="fiscal_year"], #change_fiscal_year');
+                yearSelects.forEach(function(sel){ sel.addEventListener('change', refreshProjects); });
+            }
+
+            function onOpen(){ setTimeout(attachHandlers, 30); }
+            var modifyBtn = document.getElementById('modify_button');
+            if (document.readyState === 'complete' || document.readyState === 'interactive') attachHandlers(); else document.addEventListener('DOMContentLoaded', attachHandlers);
+            if (modifyBtn) modifyBtn.addEventListener('click', onOpen);
         })();
     </script>
     {% if table_name == 'projects' %}

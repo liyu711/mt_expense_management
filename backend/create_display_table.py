@@ -167,13 +167,39 @@ def get_pc_display():
 	try:
 		hr_cost_df = select_all_from_table(cursor, cnxn, 'human_resource_cost')
 		if hr_cost_df is not None and not hr_cost_df.empty and 'category_id' in hr_cost_df.columns and 'year' in hr_cost_df.columns and 'cost' in hr_cost_df.columns:
-			# Build lookup dict keyed by (category_id, year)
-			hr_cost_df_local = hr_cost_df[['category_id', 'year', 'cost']].copy()
-			try:
-				hr_cost_df_local['year'] = hr_cost_df_local['year'].astype(int)
-			except Exception:
-				pass
-			cost_lookup = {(int(r['category_id']), int(r['year'])): float(r['cost']) for _, r in hr_cost_df_local.iterrows() if r['category_id'] is not None}
+			# Prefer more specific matches first: (po_id, department_id, category_id, year), falling back to less specific keys
+			# Build several lookup dicts with decreasing specificity
+			hr_local = hr_cost_df.copy()
+			# Coerce to ints where possible
+			for col in ['po_id', 'department_id', 'category_id', 'year']:
+				if col in hr_local.columns:
+					try:
+						hr_local[col] = pd.to_numeric(hr_local[col], errors='coerce').astype('Int64')
+					except Exception:
+						pass
+
+			cost_pod_dept_cat_year = {}
+			cost_dept_cat_year = {}
+			cost_po_cat_year = {}
+			cost_cat_year = {}
+			for _, r in hr_local.iterrows():
+				try:
+					cat = int(r['category_id']) if pd.notna(r['category_id']) else None
+					yr = int(r['year']) if pd.notna(r['year']) else None
+					if cat is None or yr is None:
+						continue
+					costv = float(r['cost']) if r['cost'] is not None else None
+					po = int(r['po_id']) if 'po_id' in hr_local.columns and pd.notna(r['po_id']) else None
+					dept = int(r['department_id']) if 'department_id' in hr_local.columns and pd.notna(r['department_id']) else None
+					if po is not None and dept is not None:
+						cost_pod_dept_cat_year[(po, dept, cat, yr)] = costv
+					if dept is not None:
+						cost_dept_cat_year[(dept, cat, yr)] = costv
+					if po is not None:
+						cost_po_cat_year[(po, cat, yr)] = costv
+					cost_cat_year[(cat, yr)] = costv
+				except Exception:
+					continue
 
 			# Determine columns
 			fte_col = 'Work Hours(FTE)' if 'Work Hours(FTE)' in df.columns else ('human_resource_fte' if 'human_resource_fte' in df.columns else None)
@@ -203,8 +229,27 @@ def get_pc_display():
 					if cat_id is None or fy is None:
 						personnel_costs.append(None)
 						continue
-					key = (int(cat_id), int(fy))
-					hourly = cost_lookup.get(key)
+					# Try hierarchical lookup: most specific -> least specific
+					po_val = None
+					dept_val = None
+					try:
+						po_val = int(row.get('PO_id')) if 'PO_id' in df.columns and row.get('PO_id') not in (None, '') else None
+					except Exception:
+						po_val = None
+					try:
+						dept_val = int(row.get('department_id')) if 'department_id' in df.columns and row.get('department_id') not in (None, '') else None
+					except Exception:
+						dept_val = None
+
+					hourly = None
+					if po_val is not None and dept_val is not None:
+						hourly = cost_pod_dept_cat_year.get((po_val, dept_val, int(cat_id), int(fy)))
+					if hourly is None and dept_val is not None:
+						hourly = cost_dept_cat_year.get((dept_val, int(cat_id), int(fy)))
+					if hourly is None and po_val is not None:
+						hourly = cost_po_cat_year.get((po_val, int(cat_id), int(fy)))
+					if hourly is None:
+						hourly = cost_cat_year.get((int(cat_id), int(fy)))
 					if hourly is None:
 						personnel_costs.append(None)
 					else:

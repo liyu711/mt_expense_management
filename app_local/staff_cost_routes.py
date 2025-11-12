@@ -7,11 +7,18 @@ staff_cost_routes = Blueprint('staff_cost_routes', __name__)
 def change_staff_cost():
     """Update an existing staff cost entry keyed by (po_id, department_id, category_id, year)."""
     form = dict(request.form)
+    # New (possibly changed) values
     po_name = form.get('po')
     dept_name = form.get('department')
     staff_category = form.get('staff_category')
     year = form.get('year')
     cost = form.get('cost')
+
+    # Original key fields
+    orig_po = form.get('original_po') or po_name
+    orig_department = form.get('original_department') or dept_name
+    orig_staff_category = form.get('original_staff_category') or staff_category
+    orig_year = form.get('original_year') or year
 
     try:
         db = connect_local()
@@ -24,9 +31,14 @@ def change_staff_cost():
         po_map = dict(zip(pos_df['name'], pos_df['id'])) if 'name' in pos_df.columns and 'id' in pos_df.columns else {}
         dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
         cat_map = dict(zip(hr_df['name'], hr_df['id'])) if 'name' in hr_df.columns and 'id' in hr_df.columns else {}
+
         po_id = po_map.get(po_name)
         department_id = dept_map.get(dept_name)
         category_id = cat_map.get(staff_category)
+        # originals
+        orig_po_id = po_map.get(orig_po)
+        orig_department_id = dept_map.get(orig_department)
+        orig_category_id = cat_map.get(orig_staff_category)
 
         # Types
         try:
@@ -34,25 +46,43 @@ def change_staff_cost():
         except Exception:
             year_val = None
         try:
+            orig_year_val = int(orig_year) if orig_year not in (None, '') else None
+        except Exception:
+            orig_year_val = year_val
+        try:
             cost_val = float(cost) if cost not in (None, '') else None
         except Exception:
             cost_val = None
 
         # Validate
-        if None in (po_id, department_id, category_id, year_val, cost_val):
+        if None in (po_id, department_id, category_id, year_val, cost_val, orig_po_id, orig_department_id, orig_category_id, orig_year_val):
             return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
 
         # Update exactly the targeted row
         cursor.execute(
             """
             UPDATE human_resource_cost
-               SET cost = ?
+               SET po_id = ?,
+                   department_id = ?,
+                   category_id = ?,
+                   year = ?,
+                   cost = ?
              WHERE po_id = ?
                AND department_id = ?
                AND category_id = ?
                AND year = ?
             """,
-            (cost_val, int(po_id), int(department_id), int(category_id), int(year_val))
+            (
+                int(po_id),
+                int(department_id),
+                int(category_id),
+                int(year_val),
+                cost_val,
+                int(orig_po_id),
+                int(orig_department_id),
+                int(orig_category_id),
+                int(orig_year_val),
+            )
         )
         cnxn.commit()
     except Exception:
