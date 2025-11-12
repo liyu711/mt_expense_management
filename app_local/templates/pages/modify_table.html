@@ -1,8 +1,7 @@
-{% extends 'basic_page.html' %}
-
-{% block title %}Modify {{ title }}{% endblock %}
-
-{% block head_extra %}
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Modify {{ title }}</title>
     <style>
         .form-group {
             display: flex;
@@ -45,23 +44,20 @@
             overflow: auto;
         }
     </style>
-{% endblock %}
-
-{% block page_title %}{{ title }}{% endblock %}
-
-{% block page_controls %}
-    <button id="add_button" type="button">Add</button>
-    {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'fundings' or table_name == 'capex_budgets' %}
-    <button id="modify_button" type="button">Modify</button>
-    {% endif %}
-{% endblock %}
-
-{% block content %}
+</head>
+<body>
+    {% include 'sidebar.html' %}
     <div class="page-wrapper">
         <div class="page-top">
             <div class="container">
+                <h1>{{ title }}</h1>
+                <!-- Add and Modify buttons to trigger modal popups -->
+                <button id="add_button" type="button">Add</button>
+                {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'fundings' or table_name == 'capex_budgets' %}
+                <button id="modify_button" type="button">Modify</button>
+                {% endif %}
 
-    <!-- Modal structure: hidden by default -->
+        <!-- Modal structure: hidden by default -->
         <div id="modifyModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="modalTitle">
             <div class="modal-overlay" id="modalOverlay"></div>
             <div class="modal-content" role="document">
@@ -688,9 +684,6 @@
             })();
             </script>
             {% endif %}
-{% endblock %}
-
-{% block scripts %}
     <script>
         // Modal open/close logic
         (function(){
@@ -1060,4 +1053,5 @@
         /* Ensure form layout inside modal looks consistent */
         .modal-content .form-group { margin-bottom: 14px; }
     </style>
-{% endblock %}
+</body>
+</html>

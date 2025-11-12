@@ -1,16 +1,14 @@
-{% extends 'basic_page.html' %}
-
-{% block title %}Select Data{% endblock %}
-
-{% block head_extra %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Select Data</title>
     <!-- DataTables CSS -->
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-{% endblock %}
-
-{% block page_title %}Select Data{% endblock %}
-
-{% block content %}
-    <div>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div style="margin-left:50px;">
         <form method="POST" id="table_name">
             <label for="table_name">Table Name:</label>
             <select id="table_name" name="table_name">
@@ -161,9 +159,6 @@
             </script>
             <!-- DataTables CSS (CDN with local fallback) -->
             <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-        {% endblock %}
-
-{% block scripts %}
             <script>
             // Resilient init: wait until jQuery and DataTables are available, then initialize
             (function initDataTableRetry(retries){
@@ -223,4 +218,7 @@
                 }
             })();
             </script>
-        {% endblock %}
+        {% endif %}
+    </div>
+</body>
+</html>

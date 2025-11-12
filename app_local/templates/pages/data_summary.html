@@ -1,18 +1,17 @@
-{% extends 'basic_page.html' %}
-
-{% block title %}Data Summary{% endblock %}
-
-{% block head_extra %}
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Data Summary</title>
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
     <style>
         .hidden { display: none; }
     </style>
-{% endblock %}
-
-{% block page_title %}Expense Summary{% endblock %}
-
-{% block content %}
-    <div style="padding:20px;">
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <div style="margin-left:50px;padding:20px;">
+        <h2 style="margin-top:20px;">Expense Summary</h2>
         <div>
             <label for="po">Choose PO</label>
             <select name="po" id="po">
@@ -49,48 +48,7 @@
                     {% endif %}
                 </select>
             </div>
-        </div>
-        <hr style="margin:20px 0;" />
-        <div id="stats" style="margin-top:12px;">
-            <h3 style="margin:0 0 8px;">Statistics</h3>
-            <div id="stats-content"><em>Loading…</em></div>
-            <div style="margin-top:10px;">
-                <button id="calculate_stats">Refresh statistics</button>
-            </div>
-        </div>
-        <div id="capex-stats" style="margin-top:18px;">
-            <h3 style="margin:0 0 8px;">Capex Statistics</h3>
-            <div id="capex-stats-content"><em>Loading…</em></div>
-        </div>
-        {% if summary_row %}
-            <h3>Aggregated Summary</h3>
-            <table id="summary_table" class="display" style="width:60%" border="1">
-                <thead>
-                    <tr>
-                        <th>Metric</th>
-                        <th>Amount</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    <tr>
-                        <td>Forecasted Expense</td>
-                        <td>{{ summary_row['Forecasted Expense'] }}</td>
-                    </tr>
-                    <tr>
-                        <td>Budget and Funding</td>
-                        <td>{{ summary_row['Budget and Funding'] }}</td>
-                    </tr>
-                    <tr>
-                        <td>Actual Expenditure</td>
-                        <td>{{ summary_row['Actual Expenditure'] }}</td>
-                    </tr>
-                </tbody>
-            </table>
-        {% endif %}
-    </div>
-{% endblock %}
-
-{% block scripts %}
+            
             <script>
                 // Ensure the handler is attached after the DOM is ready so the button exists
                 document.addEventListener('DOMContentLoaded', function(){
@@ -216,6 +174,19 @@
                         });
                 })();
             </script>
+        </div>
+        <hr style="margin:20px 0;" />
+        <div id="stats" style="margin-top:12px;">
+            <h3 style="margin:0 0 8px;">Statistics</h3>
+            <div id="stats-content"><em>Loading…</em></div>
+            <div style="margin-top:10px;">
+                <button id="calculate_stats">Refresh statistics</button>
+            </div>
+        </div>
+        <div id="capex-stats" style="margin-top:18px;">
+            <h3 style="margin:0 0 8px;">Capex Statistics</h3>
+            <div id="capex-stats-content"><em>Loading…</em></div>
+        </div>
         <script>
             (function(){
                 function fmt(n){
@@ -281,4 +252,31 @@
                 });
             })();
         </script>
-{% endblock %}
+        {% if summary_row %}
+            <h3>Aggregated Summary</h3>
+            <table id="summary_table" class="display" style="width:60%" border="1">
+                <thead>
+                    <tr>
+                        <th>Metric</th>
+                        <th>Amount</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Forecasted Expense</td>
+                        <td>{{ summary_row['Forecasted Expense'] }}</td>
+                    </tr>
+                    <tr>
+                        <td>Budget and Funding</td>
+                        <td>{{ summary_row['Budget and Funding'] }}</td>
+                    </tr>
+                    <tr>
+                        <td>Actual Expenditure</td>
+                        <td>{{ summary_row['Actual Expenditure'] }}</td>
+                    </tr>
+                </tbody>
+            </table>
+        {% endif %}
+    </div>
+</body>
+</html>
