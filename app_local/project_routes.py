@@ -578,3 +578,120 @@ def list_projects():
         return {'columns': final_cols, 'rows': rows}, 200
     except Exception as e:
         return {'columns': [], 'rows': [], 'error': str(e)}, 200
+
+
+@project_routes.route('/modify_project/delete_project', methods=['POST'])
+def delete_project():
+    """Delete a project and all associated dependent data.
+
+    Accepts JSON or form data. Preferred identifier is project_id; otherwise
+    attempts to resolve by (Project name, Department name, Fiscal Year).
+
+    Cascade deletions:
+    - project_forecasts_pc, project_forecasts_nonpc
+    - capex_forecasts, capex_budgets, capex_expenses
+    - IOs belonging to the project
+    - expenses tied to those IOs
+    - finally, the project itself
+    """
+    try:
+        payload = request.get_json() if request.is_json else dict(request.form)
+        pid = payload.get('project_id') or payload.get('id')
+        proj_name = payload.get('project_name') or payload.get('Project') or payload.get('name')
+        dept_name = payload.get('department') or payload.get('BU') or payload.get('department_name')
+        fiscal_year = payload.get('fiscal_year') or payload.get('Fiscal Year') or payload.get('year')
+
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+
+        # Resolve project id
+        pid_val = None
+        if pid not in (None, ''):
+            try:
+                pid_val = int(pid)
+            except Exception:
+                pid_val = None
+        if pid_val is None:
+            # Try resolve by (name, department, fiscal_year)
+            try:
+                proj_tbl = select_all_from_table(cursor, cnxn, 'projects')
+                dept_tbl = select_all_from_table(cursor, cnxn, 'departments')
+                dept_map = {}
+                if dept_tbl is not None and not dept_tbl.empty and 'id' in dept_tbl.columns and 'name' in dept_tbl.columns:
+                    dept_map = {str(v).strip().lower(): int(k) for k, v in dict(zip(dept_tbl['id'], dept_tbl['name'])).items()}
+                dept_id = None
+                if dept_name not in (None, ''):
+                    dept_id = dept_map.get(str(dept_name).strip().lower())
+                fy_val = None
+                try:
+                    fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
+                except Exception:
+                    fy_val = None
+                if proj_tbl is not None and not proj_tbl.empty:
+                    cand = proj_tbl.copy()
+                    if proj_name not in (None, '') and 'name' in cand.columns:
+                        cand = cand[cand['name'].astype(str).str.strip().str.lower() == str(proj_name).strip().lower()]
+                    if dept_id is not None and 'department_id' in cand.columns:
+                        try:
+                            cand = cand[cand['department_id'].astype(int) == int(dept_id)]
+                        except Exception:
+                            cand = cand[cand['department_id'] == dept_id]
+                    if fy_val is not None and 'fiscal_year' in cand.columns:
+                        try:
+                            cand = cand[cand['fiscal_year'].astype(int) == int(fy_val)]
+                        except Exception:
+                            cand = cand[cand['fiscal_year'] == fy_val]
+                    if not cand.empty:
+                        try:
+                            pid_val = int(cand.iloc[0]['id'])
+                        except Exception:
+                            pid_val = None
+            except Exception:
+                pid_val = None
+
+        if pid_val is None:
+            return {'status': 'error', 'message': 'Project not found'}, 404
+
+        # Start cascade deletes in order: children first
+        try:
+            # Delete expenses referencing IOs of this project
+            cursor.execute("DELETE FROM expenses WHERE io_id IN (SELECT id FROM IOs WHERE project_id = ?)", (int(pid_val),))
+        except Exception:
+            pass
+        try:
+            # Delete IOs for this project
+            cursor.execute("DELETE FROM IOs WHERE project_id = ?", (int(pid_val),))
+        except Exception:
+            pass
+        # Delete project forecast tables
+        for sql in [
+            "DELETE FROM project_forecasts_pc WHERE project_id = ?",
+            "DELETE FROM project_forecasts_nonpc WHERE project_id = ?",
+        ]:
+            try:
+                cursor.execute(sql, (int(pid_val),))
+            except Exception:
+                pass
+        # Delete CapEx tables
+        for sql in [
+            "DELETE FROM capex_forecasts WHERE project_id = ?",
+            "DELETE FROM capex_budgets WHERE project_id = ?",
+            "DELETE FROM capex_expenses WHERE project_id = ?",
+        ]:
+            try:
+                cursor.execute(sql, (int(pid_val),))
+            except Exception:
+                pass
+        # Finally delete the project itself
+        try:
+            cursor.execute("DELETE FROM projects WHERE id = ?", (int(pid_val),))
+        except Exception:
+            pass
+
+        try:
+            cnxn.commit()
+        except Exception:
+            pass
+        return {'status': 'ok'}, 200
+    except Exception as e:
+        return {'status': 'error', 'message': str(e)}, 500
