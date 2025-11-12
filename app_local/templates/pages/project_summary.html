@@ -1,219 +1,100 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Project Summary</title>
-    <style>
-        .hidden { display: none; }
-    </style>
-</head>
-<body>
-    {% include 'sidebar.html' %}
-    <div class="page-content" style="margin-left:50px;padding:20px;">
-        <h2 style="margin-top:20px;">Project Summary</h2>
-        <div>
-            <label for="po">Choose PO</label>
-            <select name="po" id="po">
-                <option value="">-- select PO --</option>
-                <option value="All" {% if selected_po == 'All' %}selected{% endif %}>All</option>
-                {% if pos %}
-                    {% for p in pos %}
-                        <option value="{{ p.name }}" data-po-id="{{ p.id }}" {% if selected_po and selected_po == p.name %}selected{% endif %}>{{ p.name }}</option>
-                    {% endfor %}
-                {% endif %}
-            </select>
-            <div id="department_wrapper" class="{% if not selected_po %}hidden{% endif %}" style="margin-top:10px;">
-                <label for="department">Choose BU</label>
-                <select name="department" id="department">
-                    <option value="">-- select BU --</option>
-                    <option value="All" {% if selected_department == 'All' %}selected{% endif %}>All</option>
-                    {% if departments %}
-                        {% for d in departments %}
-                            {% set dept_name = d.get('name') or d.get('name_dept') or d.get('name_departments') %}
-                            <option value="{{ dept_name }}" data-dept-id="{{ d.get('id') }}" {% if selected_department and selected_department == dept_name %}selected{% endif %}>{{ dept_name }}</option>
-                        {% endfor %}
-                    {% endif %}
-                </select>
-            </div>
-            <div id="fiscal_year_wrapper" class="{% if not selected_department or not selected_po %}hidden{% endif %}" style="margin-top:10px;">
-                <label for="fiscal_year">Choose Fiscal Year</label>
-                <select name="fiscal_year" id="fiscal_year">
-                    <option value="">-- select Year --</option>
-                    <option value="All" {% if selected_fiscal_year == 'All' %}selected{% endif %}>All</option>
-                    {% if fiscal_years %}
-                        {% for y in fiscal_years %}
-                            <option value="{{ y }}" {% if selected_fiscal_year and selected_fiscal_year == y %}selected{% endif %}>{{ y }}</option>
-                        {% endfor %}
-                    {% endif %}
-                </select>
-            </div>
-            <div id="project_wrapper" class="{% if not selected_po %}hidden{% endif %}" style="margin-top:10px;">
-                <label for="project">Choose Project</label>
-                <select name="project" id="project">
-                    <option value="">-- select Project --</option>
-                    <option value="All" {% if selected_project == 'All' %}selected{% endif %}>All</option>
-                    {% if projects %}
-                        {% for p in projects %}
-                            <option value="{{ p.name }}" {% if selected_project and selected_project == p.name %}selected{% endif %}>{{ p.name }}</option>
-                        {% endfor %}
-                    {% endif %}
-                </select>
-            </div>
+{% extends 'basic_page.html' %}
 
-            <script>
-                (function(){
-                    var po = document.getElementById('po');
-                    var deptWrap = document.getElementById('department_wrapper');
-                    var fyWrap = document.getElementById('fiscal_year_wrapper');
-                    var projectWrap = document.getElementById('project_wrapper');
-                    if(!po) return;
-                    po.addEventListener('change', function(){
-                        // reset downstream selects
-                        var dept = document.getElementById('department');
-                        var fy = document.getElementById('fiscal_year');
-                        var project = document.getElementById('project');
-                        if(dept) dept.selectedIndex = 0;
-                        if(fy) fy.selectedIndex = 0;
-                        if(project) project.selectedIndex = 0;
+{% block title %}Project Summary{% endblock %}
 
-                        if(deptWrap) deptWrap.style.display = (po.value && po.value !== '') ? '' : 'none';
-                        if(fyWrap) fyWrap.style.display = 'none';
-                        if(projectWrap) projectWrap.style.display = (po.value && po.value !== '') ? '' : 'none';
+{% block head_extra %}<style>.hidden{display:none;}</style>{% endblock %}
 
-                        // clear selections server-side then set PO
-                        var clears = [];
-                        clears.push(fetch('/data_summary/department_selection', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({department:''})}).catch(function(){}));
-                        clears.push(fetch('/data_summary/fiscal_year_selection', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({fiscal_year:''})}).catch(function(){}));
-                        clears.push(fetch('/project_summary/project_selection', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project:''})}).catch(function(){}));
-                        Promise.all(clears).then(function(){
-                            fetch('/data_summary/po_selection', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({po: po.value})})
-                            .then(function(){ window.location.reload(); });
-                        });
-                    });
-                })();
-            </script>
-            <script>
-                (function(){
-                    var dept = document.getElementById('department');
-                    var fyWrap = document.getElementById('fiscal_year_wrapper');
-                    if(!dept) return;
-                    dept.addEventListener('change', function(){
-                        if(fyWrap){
-                            var poSel = document.getElementById('po');
-                            var poHas = poSel && poSel.value && poSel.value !== '';
-                            fyWrap.style.display = (dept.value && dept.value !== '' && poHas) ? '' : 'none';
-                        }
-                        fetch('/data_summary/department_selection', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({department: dept.value})})
-                        .then(function(){ window.location.reload(); });
-                    });
-                })();
-            </script>
-            <script>
-                (function(){
-                    var fy = document.getElementById('fiscal_year');
-                    if(!fy) return;
-                    fy.addEventListener('change', function(){
-                        fetch('/data_summary/fiscal_year_selection', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({fiscal_year: fy.value})})
-                        .then(function(){ window.location.reload(); });
-                    });
-                })();
-            </script>
-            <script>
-                (function(){
-                    var pj = document.getElementById('project');
-                    if(!pj) return;
-                    pj.addEventListener('change', function(){
-                        fetch('/project_summary/project_selection', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({project: pj.value})})
-                        .then(function(){ window.location.reload(); });
-                    });
-                })();
-            </script>
-        </div>
-        <hr style="margin:20px 0;" />
-        <div id="stats">
-            <h3>Project Statistics</h3>
-            <div id="stats-content" style="margin-top:10px;">
-                <em>Loading…</em>
-            </div>
-            <div id="capex-stats-content" style="margin-top:18px;">
-                <h3 style="margin:0 0 8px;">Capex Statistics</h3>
-                <em>Loading…</em>
-            </div>
-        </div>
+{% block page_title %}Project Summary{% endblock %}
 
-        <script>
-            (function(){
-                function fmt(n){
-                    if(n === null || n === undefined || isNaN(Number(n))) return '-';
-                    try {
-                        return Number(n).toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 });
-                    } catch(e) {
-                        return String(n);
-                    }
-                }
-
-                function renderStats(data){
-                    var el = document.getElementById('stats-content');
-                    if(!el) return;
-                    if(!data || data.error){
-                        el.innerHTML = '<span style="color:#a00;">Failed to load statistics</span>';
-                        return;
-                    }
-                    var rows = [
-                        { label: 'Personnel Forecast', key: 'personnel_forecast' },
-                        { label: 'Non-personnel Forecast', key: 'non_personnel_forecast' },
-                        { label: 'Total Forecast', key: 'total_forecast' },
-                        { label: 'Personnel Expense', key: 'Personnel Expense' },
-                        { label: 'Non-personnel Expense', key: 'Non-personnel Expense' },
-                        { label: 'Total Expense', key: 'Total Expense' }
-                    ];
-
-                    var selected = data.selected_project ? (' for <strong>' + (data.selected_project || '') + '</strong>') : '';
-                    var html = '';
-                    html += '<div style="margin-bottom:8px;color:#555;">Stats' + selected + '</div>';
-                    html += '<table style="border-collapse:collapse;min-width:420px;">';
-                    html += '<tbody>';
-                    rows.forEach(function(r){
-                        html += '<tr>' +
-                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap;">' + r.label + '</td>' +
-                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data[r.key]) + '</td>' +
-                        '</tr>';
-                    });
-                    html += '</tbody></table>';
-                    el.innerHTML = html;
-                }
-
-                function renderCapex(data){
-                    var el = document.getElementById('capex-stats-content');
-                    if(!el) return;
-                    if(!data || data.error){
-                        el.innerHTML = '<h3 style="margin:0 0 8px;">Capex Statistics</h3><span style="color:#a00;">Failed to load capex statistics</span>';
-                        return;
-                    }
-                    var rows = [
-                        { label: 'Capex Forecast', key: 'capex_forecast' },
-                        { label: 'Capex Expense', key: 'capex_expense' }
-                    ];
-                    var html = '<h3 style="margin:0 0 8px;">Capex Statistics</h3>';
-                    html += '<table style="border-collapse:collapse;min-width:420px;">';
-                    html += '<tbody>';
-                    rows.forEach(function(r){
-                        html += '<tr>' +
-                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap;">' + r.label + '</td>' +
-                            '<td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;">' + fmt(data[r.key]) + '</td>' +
-                        '</tr>';
-                    });
-                    html += '</tbody></table>';
-                    el.innerHTML = html;
-                }
-
-                // Fetch stats on load
-                fetch('/project_summary/get_statistics', { method: 'GET' })
-                    .then(function(resp){ return resp.ok ? resp.json() : {error:'bad status'}; })
-                    .then(function(data){ renderStats(data); renderCapex(data); })
-                    .catch(function(){ renderStats({error:'network'}); renderCapex({error:'network'}); });
-            })();
-        </script>
+{% block content %}
+<div style="padding:20px;">
+    <label for="po">Choose PO</label>
+    <select name="po" id="po">
+        <option value="">-- select PO --</option>
+        <option value="All" {% if selected_po == 'All' %}selected{% endif %}>All</option>
+        {% if pos %}{% for p in pos %}<option value="{{ p.name }}" data-po-id="{{ p.id }}" {% if selected_po and selected_po == p.name %}selected{% endif %}>{{ p.name }}</option>{% endfor %}{% endif %}
+    </select>
+    <div id="department_wrapper" class="{% if not selected_po %}hidden{% endif %}" style="margin-top:10px;">
+        <label for="department">Choose BU</label>
+        <select name="department" id="department">
+            <option value="">-- select BU --</option>
+            <option value="All" {% if selected_department == 'All' %}selected{% endif %}>All</option>
+            {% if departments %}{% for d in departments %}{% set dept_name = d.get('name') or d.get('name_dept') or d.get('name_departments') %}
+                <option value="{{ dept_name }}" data-dept-id="{{ d.get('id') }}" {% if selected_department and selected_department == dept_name %}selected{% endif %}>{{ dept_name }}</option>
+            {% endfor %}{% endif %}
+        </select>
     </div>
-</body>
-</html>
+    <div id="fiscal_year_wrapper" class="{% if not selected_department or not selected_po %}hidden{% endif %}" style="margin-top:10px;">
+        <label for="fiscal_year">Choose Fiscal Year</label>
+        <select name="fiscal_year" id="fiscal_year">
+            <option value="">-- select Year --</option>
+            <option value="All" {% if selected_fiscal_year == 'All' %}selected{% endif %}>All</option>
+            {% if fiscal_years %}{% for y in fiscal_years %}<option value="{{ y }}" {% if selected_fiscal_year and selected_fiscal_year == y %}selected{% endif %}>{{ y }}</option>{% endfor %}{% endif %}
+        </select>
+    </div>
+    <div id="project_wrapper" class="{% if not selected_po %}hidden{% endif %}" style="margin-top:10px;">
+        <label for="project">Choose Project</label>
+        <select name="project" id="project">
+            <option value="">-- select Project --</option>
+            <option value="All" {% if selected_project == 'All' %}selected{% endif %}>All</option>
+            {% if projects %}{% for pr in projects %}<option value="{{ pr.name }}" {% if selected_project and selected_project == pr.name %}selected{% endif %}>{{ pr.name }}</option>{% endfor %}{% endif %}
+        </select>
+    </div>
+    <hr style="margin:20px 0;" />
+    <div id="stats">
+        <h3>Project Statistics</h3>
+        <div id="stats-content" style="margin-top:10px;"><em>Loading…</em></div>
+        <div id="capex-stats-content" style="margin-top:18px;"><h3 style="margin:0 0 8px;">Capex Statistics</h3><em>Loading…</em></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+(function(){
+    var po = document.getElementById('po');
+    var deptWrap = document.getElementById('department_wrapper');
+    var fyWrap = document.getElementById('fiscal_year_wrapper');
+    var projectWrap = document.getElementById('project_wrapper');
+    if(po){
+        po.addEventListener('change', function(){
+            var dept = document.getElementById('department');
+            var fy = document.getElementById('fiscal_year');
+            var project = document.getElementById('project');
+            if(dept) dept.selectedIndex = 0;
+            if(fy) fy.selectedIndex = 0;
+            if(project) project.selectedIndex = 0;
+            if(deptWrap) deptWrap.style.display = (po.value? '' : 'none');
+            if(fyWrap) fyWrap.style.display = 'none';
+            if(projectWrap) projectWrap.style.display = (po.value? '' : 'none');
+            Promise.all([
+                fetch('/data_summary/department_selection',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({department:''})}).catch(()=>{}),
+                fetch('/data_summary/fiscal_year_selection',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fiscal_year:''})}).catch(()=>{}),
+                fetch('/project_summary/project_selection',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project:''})}).catch(()=>{})
+            ]).then(function(){
+                fetch('/data_summary/po_selection',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({po:po.value})}).then(()=>window.location.reload());
+            });
+        });
+    }
+    var dept = document.getElementById('department');
+    if(dept){
+        dept.addEventListener('change', function(){
+            if(fyWrap){ var poSel=document.getElementById('po'); var poHas=poSel&&poSel.value; fyWrap.style.display=(dept.value && poHas)? '' : 'none'; }
+            fetch('/data_summary/department_selection',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({department:dept.value})}).then(()=>window.location.reload());
+        });
+    }
+    var fy = document.getElementById('fiscal_year');
+    if(fy){ fy.addEventListener('change', function(){ fetch('/data_summary/fiscal_year_selection',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({fiscal_year:fy.value})}).then(()=>window.location.reload()); }); }
+    var pj = document.getElementById('project');
+    if(pj){ pj.addEventListener('change', function(){ fetch('/project_summary/project_selection',{method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({project:pj.value})}).then(()=>window.location.reload()); }); }
+})();
+</script>
+<script>
+(function(){
+    function fmt(n){ if(n===null||n===undefined||isNaN(Number(n))) return '-'; try{ return Number(n).toLocaleString(undefined,{minimumFractionDigits:1, maximumFractionDigits:1}); }catch(e){ return String(n); } }
+    function renderStats(data){ var el=document.getElementById('stats-content'); if(!el) return; if(!data||data.error){ el.innerHTML='<span style="color:#a00;">Failed to load statistics</span>'; return; } var rows=[{label:'Personnel Forecast',key:'personnel_forecast'},{label:'Non-personnel Forecast',key:'non_personnel_forecast'},{label:'Total Forecast',key:'total_forecast'},{label:'Personnel Expense',key:'Personnel Expense'},{label:'Non-personnel Expense',key:'Non-personnel Expense'},{label:'Total Expense',key:'Total Expense'}]; var selected=data.selected_project?(' for <strong>'+data.selected_project+'</strong>'):''; var html='<div style="margin-bottom:8px;color:#555;">Stats'+selected+'</div><table style="border-collapse:collapse;min-width:420px;"><tbody>'; rows.forEach(function(r){ html+='<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap;">'+r.label+'</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;">'+fmt(data[r.key])+'</td></tr>'; }); html+='</tbody></table>'; el.innerHTML=html; }
+    function renderCapex(data){ var el=document.getElementById('capex-stats-content'); if(!el) return; if(!data||data.error){ el.innerHTML='<h3 style="margin:0 0 8px;">Capex Statistics</h3><span style="color:#a00;">Failed to load capex statistics</span>'; return; } var rows=[{label:'Capex Forecast', key:'capex_forecast'},{label:'Capex Expense', key:'capex_expense'}]; var html='<h3 style="margin:0 0 8px;">Capex Statistics</h3><table style="border-collapse:collapse;min-width:420px;"><tbody>'; rows.forEach(function(r){ html+='<tr><td style="padding:6px 10px;border-bottom:1px solid #eee;white-space:nowrap;">'+r.label+'</td><td style="padding:6px 10px;border-bottom:1px solid #eee;text-align:right;font-variant-numeric:tabular-nums;">'+fmt(data[r.key])+'</td></tr>'; }); html+='</tbody></table>'; el.innerHTML=html; }
+    fetch('/project_summary/get_statistics',{method:'GET'}).then(function(resp){ return resp.ok?resp.json():{error:'bad status'}; }).then(function(data){ renderStats(data); renderCapex(data); }).catch(function(){ renderStats({error:'network'}); renderCapex({error:'network'}); });
+})();
+</script>
+{% endblock %}

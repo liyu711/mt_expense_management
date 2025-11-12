@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{% block title %}{% endblock %}</title>
+    {% block head_extra %}{% endblock %}
+    <style>
+        :root { --sidebar-width: 220px; }
+        html, body { height: 100%; }
+        body { min-height: 100vh; background: #fff; }
+        .main-content {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            padding: 24px;
+            box-sizing: border-box;
+        }
+        .page-header {
+            display: flex;
+            align-items: flex-end;
+            flex-wrap: wrap;
+            gap: 12px 16px;
+            padding: 0 0 12px 0;
+            border-bottom: 1px solid #e5e7eb;
+            margin-bottom: 16px;
+        }
+        .page-header h1 { margin: 0; font-size: 22px; font-weight: 600; color: #111827; }
+        .page-controls { margin-left: auto; display: flex; gap: 8px; align-items: center; }
+        .page-content { flex: 1 1 auto; display: block; min-height: 0; }
+        .container { padding: 16px 0; }
+        .table-container { overflow: auto; }
+        table { border-collapse: collapse; width: 100%; }
+        th, td { border: 1px solid #e5e7eb; padding: 8px 10px; text-align: left; }
+        thead th { background: #f3f4f6; font-weight: 600; }
+        @media (max-width: 640px) { .main-content { padding: 12px; } .page-header { gap: 8px 12px; } }
+    </style>
+</head>
+<body>
+    {% include 'sidebar.html' %}
+    <main class="main-content">
+        <header class="page-header">
+            <h1>{% block page_title %}{% endblock %}</h1>
+            <div class="page-controls">
+                {% block page_controls %}{% endblock %}
+            </div>
+        </header>
+        <section class="page-content">
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
