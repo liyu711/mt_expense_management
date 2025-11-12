@@ -56,6 +56,29 @@
         </section>
     </main>
 
+    <!-- Global modal sizing & scroll behavior override (ensures tall modals stay accessible) -->
+    <style>
+        /* Make entire modal scroll container-friendly on very small screens */
+        .modal { overflow-x: hidden; overflow-y: auto; }
+        /* Constrain modal content to viewport height and enable internal scrolling */
+        .modal-content {
+            max-height: calc(100vh - 120px) !important; /* leave room for top/bottom margins */
+            overflow-y: auto !important;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch; /* smooth scrolling on iOS */
+        }
+        /* Denser layout on narrow viewports */
+        @media (max-width: 800px) {
+            .modal-content {
+                margin: 20px auto !important;
+                width: calc(100% - 32px) !important;
+                max-height: calc(100vh - 40px) !important;
+            }
+        }
+        /* If a modal internally needs full-bleed sections, allow opting out per element */
+        .modal-content.no-scroll { max-height: none !important; overflow: visible !important; }
+    </style>
+
     {% block scripts %}{% endblock %}
 </body>
 </html>
