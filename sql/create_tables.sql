@@ -87,14 +87,12 @@ create table project_forecasts_nonpc(
 	department_id int,
 	project_category_id int,
 	project_id int,
-	io_id int,
 	fiscal_year DATE,
 	non_personnel_expense float,
 	foreign key (department_id) references departments(id),
 	foreign key (project_id) references projects(id),
 	foreign key (PO_id) references POs(id),
-	foreign key (project_category_id) references project_categories(id),
-	foreign key (io_id) references IOs(id)
+	foreign key (project_category_id) references project_categories(id)
 );
 
 
@@ -105,7 +103,6 @@ create table project_forecasts_pc(
 	department_id int,
 	project_category_id int,
 	project_id int,
-	io_id int,
 	fiscal_year DATE,
 	human_resource_category_id int,
 	huamn_resource_fte float,
@@ -114,8 +111,7 @@ create table project_forecasts_pc(
 	foreign key (project_id) references projects(id),
 	foreign key (PO_id) references POs(id),
 	foreign key (project_category_id) references project_categories(id),
-	foreign key (io_id) references IOs(id),
-	foreign key (human_resource_category_id) references human_resource_categories(id),
+	foreign key (human_resource_category_id) references human_resource_categories(id)
 );
 
 ---- Budget

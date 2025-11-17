@@ -116,6 +116,7 @@ def delete_staff_cost():
         if None in (po_id, department_id, category_id, year_val):
             return { 'status': 'error', 'message': 'Invalid identifiers' }, 400
 
+        # 1) Delete the HR unit cost entry
         cursor.execute(
             """
             DELETE FROM human_resource_cost
@@ -126,6 +127,10 @@ def delete_staff_cost():
             """,
             (int(po_id), int(department_id), int(category_id), int(year_val))
         )
+        # 2) Do NOT cascade delete personnel forecasts.
+        #    Leaving project_forecasts_pc rows intact ensures the Manual Input change flow
+        #    can continue to update FTEs even when no unit rate exists for the category.
+
         cnxn.commit()
         return { 'status': 'ok' }, 200
     except Exception as e:

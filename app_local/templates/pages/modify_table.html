@@ -565,6 +565,29 @@
                                                                     deptSel.innerHTML = '';
                                                                     var placeholder = document.createElement('option');
                                                                     placeholder.value=''; placeholder.disabled=true; placeholder.selected=true; placeholder.textContent='Select an option';
+                                                            // Configure Delete column for Staff Cost with cascade warning
+                                                            opts.deleteColumn = {
+                                                                header: 'Delete',
+                                                                widthPx: 110,
+                                                                confirm: function(row){
+                                                                    function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                                                    var po = pick(row, ['PO','po','PO Name','name_po']);
+                                                                    var dept = pick(row, ['BU','Department','department','department_name','name_departments']);
+                                                                    var cat = pick(row, ['Staff Category','staff_category','Category','category','name']);
+                                                                    var year = pick(row, ['Year','year','Fiscal Year','fiscal_year']);
+                                                                    return 'Delete Staff Cost for ' + [cat, dept, po, year?('('+year+')'):''].filter(Boolean).join(' / ') + '\n\nNote: This will also delete associated personnel forecasts under Manual Input for the same PO/BU/Year and category. Continue?';
+                                                                },
+                                                                endpoint: '/modify_staff_cost/delete_staff_cost',
+                                                                payload: function(row){
+                                                                    function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                                                    return {
+                                                                        po: pick(row, ['PO','po','PO Name','name_po']),
+                                                                        department: pick(row, ['BU','Department','department','department_name','name_departments']),
+                                                                        staff_category: pick(row, ['Staff Category','staff_category','Category','category','name']),
+                                                                        year: pick(row, ['Year','year','Fiscal Year','fiscal_year'])
+                                                                    };
+                                                                }
+                                                            };
                                                                     deptSel.appendChild(placeholder);
                                                                     (json && json.departments ? json.departments : []).forEach(function(name){
                                                                         var opt = document.createElement('option'); opt.value = name; opt.textContent = name; deptSel.appendChild(opt);
@@ -581,6 +604,34 @@
                                         };
                                     }
                                 }
+                                // Fallback: ensure delete column is configured for Staff Cost even if change modal isn't present
+                                try {
+                                    var tableNameEnsure = el.getAttribute('data-table') || '';
+                                    if (tableNameEnsure === 'human_resource_cost' && !opts.deleteColumn) {
+                                        opts.deleteColumn = {
+                                            header: 'Delete',
+                                            widthPx: 110,
+                                            confirm: function(row){
+                                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                                var po = pick(row, ['PO','po','PO Name','name_po']);
+                                                var dept = pick(row, ['BU','Department','department','department_name','name_departments']);
+                                                var cat = pick(row, ['Staff Category','staff_category','Category','category','name']);
+                                                var year = pick(row, ['Year','year','Fiscal Year','fiscal_year']);
+                                                return 'Delete Staff Cost for ' + [cat, dept, po, year?('('+year+')'):''].filter(Boolean).join(' / ') + '\n\nNote: This will also delete associated personnel forecasts under Manual Input for the same PO/BU/Year and category. Continue?';
+                                            },
+                                            endpoint: '/modify_staff_cost/delete_staff_cost',
+                                            payload: function(row){
+                                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                                return {
+                                                    po: pick(row, ['PO','po','PO Name','name_po']),
+                                                    department: pick(row, ['BU','Department','department','department_name','name_departments']),
+                                                    staff_category: pick(row, ['Staff Category','staff_category','Category','category','name']),
+                                                    year: pick(row, ['Year','year','Fiscal Year','fiscal_year'])
+                                                };
+                                            }
+                                        };
+                                    }
+                                } catch(e){}
                                 GenericTable.create(el, opts);
                                 // Inject per-row Delete actions for selected tables similar to CapEx Forecasts
                                 (function(){
@@ -709,10 +760,6 @@
                                         setTimeout(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); }, 60);
                                         var obs4 = new MutationObserver(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); });
                                         obs4.observe(el, { childList: true, subtree: true });
-                                    } else if (tableName === 'human_resource_cost'){
-                                        setTimeout(function(){ injectDeleteButtons('/modify_staff_cost/delete_staff_cost', extractorStaffCost); }, 60);
-                                        var obs5 = new MutationObserver(function(){ injectDeleteButtons('/modify_staff_cost/delete_staff_cost', extractorStaffCost); });
-                                        obs5.observe(el, { childList: true, subtree: true });
                                     }
                                 })();
                             }catch(e){}

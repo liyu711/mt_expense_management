@@ -8,12 +8,10 @@ tables_to_consider = [
 
 table_column_dict = {
     "project_forecasts_nonpc": [
-        "id", "PO_id", "department_id", "project_category_id", "project_id",
-        "io_id", "fiscal_year"
+        "id", "PO_id", "department_id", "project_category_id", "project_id", "fiscal_year"
     ],
     "project_forecasts_pc": [
-        "id", "PO_id", "department_id", "project_category_id", "project_id",
-        "io_id", "fiscal_year", "human_resource_category_id"
+        "id", "PO_id", "department_id", "project_category_id", "project_id", "fiscal_year", "human_resource_category_id"
     ],
     "budgets": [
         "id", "po_id", "department_id", "fiscal_year"

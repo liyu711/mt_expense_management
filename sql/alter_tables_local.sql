@@ -12,13 +12,11 @@ CREATE TABLE project_forecasts_nonpc(
 	department_id INTEGER,
 	project_category_id INTEGER,
 	project_id INTEGER,
-	io_id INTEGER,
 	fiscal_year INTEGER,
 	non_personnel_expense REAL,
 	FOREIGN KEY (department_id) REFERENCES departments(id),
 	FOREIGN KEY (project_id) REFERENCES projects(id),
-	FOREIGN KEY (project_category_id) REFERENCES project_categories(id),
-	FOREIGN KEY (io_id) REFERENCES IOs(id)
+	FOREIGN KEY (project_category_id) REFERENCES project_categories(id)
 );
 INSERT OR IGNORE INTO project_forecasts_nonpc SELECT * FROM _temp_project_forecasts_nonpc;
 DROP TABLE _temp_project_forecasts_nonpc;
@@ -31,14 +29,12 @@ CREATE TABLE project_forecasts_pc(
 	department_id INTEGER,
 	project_category_id INTEGER,
 	project_id INTEGER,
-	io_id INTEGER,
 	fiscal_year INTEGER,
 	human_resource_category_id INTEGER,
 	human_resource_fte REAL,
 	FOREIGN KEY (department_id) REFERENCES departments(id),
 	FOREIGN KEY (project_id) REFERENCES projects(id),
 	FOREIGN KEY (project_category_id) REFERENCES project_categories(id),
-	FOREIGN KEY (io_id) REFERENCES IOs(id),
 	FOREIGN KEY (human_resource_category_id) REFERENCES human_resource_categories(id)
 );
 INSERT OR IGNORE INTO project_forecasts_pc SELECT * FROM _temp_project_forecasts_pc;
