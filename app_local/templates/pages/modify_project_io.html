@@ -221,21 +221,19 @@
                                             var projId = pick(lowerMap, ['id']);
                                             var projName = pick(lowerMap, ['project']) || pickByIncludes(lowerMap, ['project']);
                                             var dept = pick(lowerMap, ['bu','department','department name']) || pickByIncludes(lowerMap, ['bu','department']);
-                                            var year = pick(lowerMap, ['fiscal year','year']) || pickByIncludes(lowerMap, ['year']);
                                             var warn = 'WARNING: Deleting this project will permanently delete the project and ALL associated data, including: \n\n'
                                                       + '- IOs under this project\n'
                                                       + '- Operating expenses linked to those IOs\n'
                                                       + '- Project forecasts (PC and Non-PC)\n'
                                                       + '- CapEx forecasts, budgets, and expenses\n\n'
                                                       + 'This action cannot be undone.\n\n'
-                                                      + 'Confirm DELETE for: ' + (projName||'Project') + ' / ' + (dept||'BU') + (year ? ' ('+year+')' : '') + '?';
+                                                                          + 'Confirm DELETE for: ' + (projName||'Project') + ' / ' + (dept||'BU') + '?';
                                             if(!confirm(warn)) return;
                                             var payload = {};
                                             if(projId) payload.project_id = projId;
                                             else {
                                                 payload.project_name = projName;
                                                 payload.department = dept;
-                                                payload.fiscal_year = year;
                                             }
                                             fetch('/modify_project/delete_project', {
                                                 method: 'POST',
@@ -326,7 +324,7 @@
                                     // set hidden id
                                     var hid = document.getElementById('proj_project_id');
                                     if (hid) hid.value = info.id || '';
-                                    // Fill fields: name, category, po, then dept after options refreshed, fiscal_year
+                                    // Fill fields: name, category, po, then dept after options refreshed
                                     var nameInput = document.getElementById('proj_name');
                                     if (nameInput && info.name != null) nameInput.value = info.name;
                                     var catSel = document.getElementById('proj_category');
@@ -346,8 +344,7 @@
                                                 if (deptSel && info.department != null) deptSel.value = info.department;
                                             });
                                     }
-                                    var fySel = document.getElementById('proj_fiscal_year');
-                                    if (fySel && info.fiscal_year != null) fySel.value = String(info.fiscal_year);
+                                    // No fiscal year field on projects anymore
                                     // Prefill IO inputs with existing IOs for this project
                                     try {
                                         var pid = (hid && hid.value) ? hid.value : null;

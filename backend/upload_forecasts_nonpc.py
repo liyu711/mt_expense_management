@@ -38,7 +38,7 @@ def upload_nonpc_forecasts_local_m(df_upload):
     # Remove rows from df_fin that exist in existing_values based on shared columns
     merged = df_fin.merge(existing_values[shared_columns], on=shared_columns, how='left', indicator=True)
     df_filtered = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
-    # print(df_filtered)
+    print(df_filtered)
     return df_filtered.to_sql("project_forecasts_nonpc", con=engine, if_exists='append', index=False)
     # print(existing_values)
     
@@ -178,11 +178,6 @@ def upload_nonpc_forecasts_df2(df_upload, engine, cursor, cnxn, type):
             projects_merged = projects_merged.drop_duplicates(subset=['name'])
     except Exception:
         pass
-    # try:
-    #     if io_merged is not None and not io_merged.empty and 'IO_num' in io_merged.columns:
-    #         io_merged = io_merged.drop_duplicates(subset=['IO_num'])
-    # except Exception:
-    #     pass
     try:
         if pos_merged is not None and not pos_merged.empty and 'name' in pos_merged.columns:
             pos_merged = pos_merged.drop_duplicates(subset=['name'])
@@ -202,8 +197,7 @@ def upload_nonpc_forecasts_df2(df_upload, engine, cursor, cnxn, type):
     df_upload_fin = pd.merge(df_upload_fin, pos_merged, left_on='PO', right_on='name', how='left')
     df_upload_fin.drop(['PO', 'name'], axis=1, inplace=True)
     df_upload_fin.rename(columns={'id': 'po_id', 'Fiscal Year': 'fiscal_year', 'Non-personnel cost':'non_personnel_expense'}, inplace=True)
-    df_upload_fin.drop(['fiscal_year_x'], axis=1, inplace=True)
-    df_upload_fin.rename(columns={'fiscal_year_y': 'fiscal_year', 'department_id_x': 'department_id'}, inplace=True)
+    df_upload_fin.rename(columns={'department_id_x': 'department_id'}, inplace=True)
     print(df_upload_fin)
     return df_upload_fin
 

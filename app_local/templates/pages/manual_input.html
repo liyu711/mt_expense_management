@@ -150,7 +150,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="Non_personnel_cost">Non-personnel Expense (k CNY)</label>
+                        <label for="Non_personnel_cost">Non-personnel Expense</label>
                         <input type="text" name="Non_personnel_cost">
                     </div>
                     <div style="margin-top:12px;">
@@ -213,7 +213,7 @@
                         </div>
                     </div>
                     <div class="form-group">
-                        <label for="Non_personnel_cost_modify">Non-personnel Expense (k CNY)</label>
+                        <label for="Non_personnel_cost_modify">Non-personnel Expense</label>
                         <input type="number" name="Non_personnel_cost" id="Non_personnel_cost_modify" step="0.01" inputmode="decimal" pattern="^-?\\d+(?:\\.\\d{1,4})?$" style="width:100%;">
                     </div>
                     <div style="margin-top:12px;">
@@ -491,21 +491,6 @@
                             }
                         }
                         var rows = (data||[]).map(function(arr){ var o={}; (cols||[]).forEach(function(c,i){ o[c] = (arr||[])[i]; }); return o; });
-                        // Helper: pick first matching key from a row object, supports unit-suffixed display labels
-                        function pickRowValue(obj, keys){
-                            if(!obj) return undefined;
-                            for(var i=0;i<keys.length;i++){ var k = keys[i]; if(obj.hasOwnProperty(k)) return obj[k]; }
-                            // fallback: try startsWith match (case-insensitive) to catch labels like 'Forecast Sum (k CNY)'
-                            var objKeys = Object.keys(obj||{});
-                            for(var i=0;i<keys.length;i++){
-                                var target = String(keys[i]||'').toLowerCase();
-                                for(var j=0;j<objKeys.length;j++){
-                                    var cand = String(objKeys[j]||'').toLowerCase();
-                                    if(cand.indexOf(target) === 0) return obj[objKeys[j]];
-                                }
-                            }
-                            return undefined;
-                        }
                         // Helper slugify (scoped)
                         function slugify(str){ return String(str||'').toLowerCase().trim().replace(/[^a-z0-9]+/g,'_').replace(/^_+|_+$/g,''); }
                         // Prefill logic for modify modal when a table row is clicked
@@ -574,18 +559,13 @@
                             fetchDepartments().then(fetchProjects).then(function(){
                                 if (pcInp && row['Project Category']) pcInp.value = row['Project Category'];
                                 if (ioInp && row['IO']) ioInp.value = row['IO'];
-                                var nonpc = pickRowValue(row, ['Non-personnel Forecast', 'Non-personnel Expense']);
+                                var nonpc = (row['Non-personnel Forecast']!=null && row['Non-personnel Forecast']!=='') ? row['Non-personnel Forecast'] : row['Non-personnel Expense'];
                                 if (nonpcInp && nonpc!=null && nonpc!=='') nonpcInp.value = nonpc;
                                 // Prefill per-category FTEs by converting cost -> FTE using /api/hr_cost
                                 var year = fiscalYear;
                                 var promises = [];
                                 Object.keys(row).forEach(function(key){
-                                    var kl = String(key||'').toLowerCase();
-                                    // Skip obvious metadata keys (match by prefix to allow unit-suffixed variants)
-                                    var skipPrefixes = ['id','po','department','fiscal year','project category','project','project name','io'];
-                                    if (skipPrefixes.some(function(p){ return kl.indexOf(p) === 0; })) return;
-                                    // Skip forecast sum / non-personnel forecast columns (may have (k CNY) suffix)
-                                    if (kl.indexOf('forecast sum') === 0 || kl.indexOf('non-personnel forecast') === 0 || kl.indexOf('non-personnel expense') === 0) return;
+                                    if (['id','PO','Department','Fiscal Year','Project Category','Project','Project Name','IO','Forecast Sum','Non-personnel Forecast'].indexOf(key) >= 0) return;
                                     // Remaining keys are HR categories (cost values)
                                     var costVal = row[key];
                                     if (costVal == null || costVal === '') return;
@@ -626,7 +606,7 @@
                             columns: cols,
                             rows: rows,
                             defaultPageSize: 25,
-                            groups: groupCols.length ? { 'Personnel Cost (k CNY)': groupCols } : null,
+                            groups: groupCols.length ? { 'Personnel Cost': groupCols } : null,
                             rowClickEditModal: {
                                 selector: '#modifyForecastModal',
                                 prefill: prefillModifyModal,

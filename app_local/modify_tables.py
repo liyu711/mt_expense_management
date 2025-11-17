@@ -88,7 +88,7 @@ modify_table_config = {
         'title': 'Modify BU',
         'table_name': 'departments',
         'fields': [
-            {'name': 'Department', 'type': 'text', 'label': 'Department Name'},
+            {'name': 'Department', 'type': 'text', 'label': 'BU Name'},
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []}
         ],
         # We'll merge on Department name and include po_id when present
@@ -121,10 +121,9 @@ modify_table_config = {
             {'name': 'category', 'type': 'select', 'label': 'Category Name', 'options': []},
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
             {'name': 'department', 'type': 'select', 'label': 'BU', 'options': []}
-            ,{'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []}
         ],
         'merge_on': 'name',
-        'columns': ['name', 'category_id', 'department_id', 'fiscal_year']
+        'columns': ['name', 'category_id', 'department_id']
     },
     'modify_io': {
         'title': 'Modify IO',
@@ -191,10 +190,10 @@ modify_table_config = {
         'table_name': 'budgets',
         'fields': [
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
-            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'BU', 'options': []},
             {'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []},
-            {'name': 'human_resource_expense', 'type':'number', 'label': 'Personnel Budget (k CNY)'},
-            {'name': 'non_personnel_expense', 'type':'number', 'label': 'Non-personnel Budget (k CNY)'}
+            {'name': 'human_resource_expense', 'type':'number', 'label': 'Personnel budget'},
+            {'name': 'non_personnel_expense', 'type':'number', 'label': 'Non-personnel budget'}
         ],
         'merge_on': 'IO_num',
         'columns': ['IO_num', 'project_id']
@@ -204,9 +203,9 @@ modify_table_config = {
         'table_name': 'fundings',
         'fields': [
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
-            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'BU', 'options': []},
             {'name': 'fiscal_year', 'type': 'select', 'label': 'Fiscal Year', 'options': []},
-            {'name': 'funding', 'type': 'number', 'label': 'Funding (k CNY)'},
+            {'name': 'funding', 'type': 'number', 'label': 'Funding (K CNY)'},
             {'name': 'funding_from', 'type': 'text', 'label': 'Funding From'},
             {'name': 'funding_for', 'type': 'text', 'label': 'Funding For'}
         ],
@@ -218,7 +217,7 @@ modify_table_config = {
         'table_name': 'capex_forecasts',
         'fields': [
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
-            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'BU', 'options': []},
             {'name': 'cap_year', 'type': 'select', 'label': 'Capex Year', 'options': []},
             {'name': 'project_name', 'type': 'select', 'label': 'Project Name', 'options': []},
             {'name': 'capex_description', 'type': 'text', 'label': 'Capex Description'},
@@ -233,11 +232,11 @@ modify_table_config = {
         'table_name': 'capex_budgets',
         'fields': [
             {'name': 'po', 'type': 'select', 'label': 'PO', 'options': []},
-            {'name': 'department', 'type': 'select', 'label': 'Department', 'options': []},
+            {'name': 'department', 'type': 'select', 'label': 'BU', 'options': []},
             {'name': 'cap_year', 'type': 'select', 'label': 'Capex Year', 'options': []},
             {'name': 'project_name', 'type': 'select', 'label': 'Project Name', 'options': []},
             {'name': 'capex_description', 'type': 'text', 'label': 'Capex Description'},
-            {'name': 'approved_budget', 'type': 'number', 'label': 'Approved Budget (k CNY)'}
+            {'name': 'approved_budget', 'type': 'number', 'label': 'Approved Budget (K CNY)'}
         ],
         'merge_on': 'capex_description',
         'columns': ['po_id', 'department_id',  'project_id', 'cap_year','capex_description', 'budget']
@@ -299,7 +298,6 @@ def modify_table_router(action):
                 'category': ('table', 'project_categories', 'category'),
                 'po': ('table', 'pos', 'name'),
                 'department': ('table', 'departments', 'name'),
-                'fiscal_year': ('years', 2020, 2031),
             },
             'modify_department': {
                 'po': ('table', 'pos', 'name'),
@@ -568,6 +566,53 @@ def modify_table_router(action):
                     keep_cols = [c for c in expected_cols if c in df_upload.columns]
                     if keep_cols:
                         df_upload = df_upload[keep_cols]
+
+                    # De-duplication: avoid adding duplicates only when all key fields (po_id, department_id, category_id, year) match
+                    # Allow addition when the fiscal year is different.
+                    try:
+                        if df_upload is not None and not df_upload.empty:
+                            r0 = df_upload.iloc[0]
+                            po_id_val = r0.get('po_id')
+                            dept_id_val = r0.get('department_id')
+                            cat_id_val = r0.get('category_id')
+                            year_val = r0.get('year')
+                            if pd.notna(po_id_val) and pd.notna(dept_id_val) and pd.notna(cat_id_val):
+                                try:
+                                    po_id_i = int(po_id_val)
+                                except Exception:
+                                    po_id_i = None
+                                try:
+                                    dept_id_i = int(dept_id_val)
+                                except Exception:
+                                    dept_id_i = None
+                                try:
+                                    cat_id_i = int(cat_id_val)
+                                except Exception:
+                                    cat_id_i = None
+                                try:
+                                    year_i = int(year_val) if pd.notna(year_val) and year_val not in (None, '') else None
+                                except Exception:
+                                    year_i = None
+                                if None not in (po_id_i, dept_id_i, cat_id_i, year_i):
+                                    cursor.execute(
+                                        """
+                                        SELECT 1
+                                          FROM human_resource_cost
+                                         WHERE po_id = ?
+                                           AND department_id = ?
+                                           AND category_id = ?
+                                           AND year = ?
+                                         LIMIT 1
+                                        """,
+                                        (po_id_i, dept_id_i, cat_id_i, year_i)
+                                    )
+                                    exists = cursor.fetchone() is not None
+                                    if exists:
+                                        # Duplicate found: skip insertion and return to page
+                                        return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
+                    except Exception:
+                        # If duplicate check fails, continue with normal flow
+                        pass
                 except Exception:
                     # Fallback minimal mapping
                     try:

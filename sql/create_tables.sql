@@ -1,12 +1,5 @@
 -- Query for creating all the tables in cost
 
-
--- remove all tables
-
----- Predictions
-/*ϵͳ��ɫ��ְ���б�
-- id pk
-- ְ��
 */
 create table roles(
 	id int identity(1,1) primary key,
@@ -26,7 +19,7 @@ create table co_object_names(
 	name varchar(256) not null
 );
 
--- Cost element �б�
+
 create table cost_elements (
 	id int identity(1,1) primary key,
 	co_id int not null,

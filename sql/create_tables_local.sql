@@ -46,7 +46,6 @@ CREATE TABLE projects(
     name TEXT,
     category_id INTEGER,
     department_id INTEGER,
-    fiscal_year INTEGER,
     FOREIGN KEY (category_id) REFERENCES project_categories(id),
     FOREIGN KEY (department_id) REFERENCES departments(id)
 );

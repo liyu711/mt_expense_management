@@ -5,26 +5,26 @@ staff_cost_routes = Blueprint('staff_cost_routes', __name__)
 
 @staff_cost_routes.route('/change_staff_cost', methods=['POST'])
 def change_staff_cost():
-    """Update an existing staff cost entry keyed by (po_id, department_id, category_id, year)."""
-    form = dict(request.form)
-    # New (possibly changed) values
-    po_name = form.get('po')
-    dept_name = form.get('department')
-    staff_category = form.get('staff_category')
-    year = form.get('year')
-    cost = form.get('cost')
+    """Simplified update: ONLY update cost for an existing staff cost row.
 
-    # Original key fields
-    orig_po = form.get('original_po') or po_name
-    orig_department = form.get('original_department') or dept_name
-    orig_staff_category = form.get('original_staff_category') or staff_category
-    orig_year = form.get('original_year') or year
+    Original identifying fields (po, department, staff_category, year) are treated as immutable keys.
+    Any attempt to change them is ignored; we always look up by the original_* hidden fields if present.
+    This removes previous logic that allowed cascading key changes.
+    """
+    form = dict(request.form)
+    # Immutable key fields supplied via hidden inputs (fallback to visible inputs if hidden missing)
+    orig_po = form.get('original_po') or form.get('po')
+    orig_department = form.get('original_department') or form.get('department')
+    orig_staff_category = form.get('original_staff_category') or form.get('staff_category')
+    orig_year = form.get('original_year') or form.get('year')
+    # New cost value (required)
+    cost = form.get('cost')
 
     try:
         db = connect_local()
         cursor, cnxn = db.connect_to_db()
 
-        # Map names to IDs
+        # Maps for key resolution
         pos_df = select_all_from_table(cursor, cnxn, 'pos')
         dept_df = select_all_from_table(cursor, cnxn, 'departments')
         hr_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
@@ -32,56 +32,38 @@ def change_staff_cost():
         dept_map = dict(zip(dept_df['name'], dept_df['id'])) if 'name' in dept_df.columns and 'id' in dept_df.columns else {}
         cat_map = dict(zip(hr_df['name'], hr_df['id'])) if 'name' in hr_df.columns and 'id' in hr_df.columns else {}
 
-        po_id = po_map.get(po_name)
-        department_id = dept_map.get(dept_name)
-        category_id = cat_map.get(staff_category)
-        # originals
-        orig_po_id = po_map.get(orig_po)
-        orig_department_id = dept_map.get(orig_department)
-        orig_category_id = cat_map.get(orig_staff_category)
-
-        # Types
+        po_id = po_map.get(orig_po)
+        department_id = dept_map.get(orig_department)
+        category_id = cat_map.get(orig_staff_category)
         try:
-            year_val = int(year) if year not in (None, '') else None
+            year_val = int(orig_year) if orig_year not in (None, '') else None
         except Exception:
             year_val = None
-        try:
-            orig_year_val = int(orig_year) if orig_year not in (None, '') else None
-        except Exception:
-            orig_year_val = year_val
         try:
             cost_val = float(cost) if cost not in (None, '') else None
         except Exception:
             cost_val = None
 
-        # Validate
-        if None in (po_id, department_id, category_id, year_val, cost_val, orig_po_id, orig_department_id, orig_category_id, orig_year_val):
+        # Validate essentials
+        if None in (po_id, department_id, category_id, year_val, cost_val):
             return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
 
-        # Update exactly the targeted row
+        # Only update cost
         cursor.execute(
             """
             UPDATE human_resource_cost
-               SET po_id = ?,
-                   department_id = ?,
-                   category_id = ?,
-                   year = ?,
-                   cost = ?
+               SET cost = ?
              WHERE po_id = ?
                AND department_id = ?
                AND category_id = ?
                AND year = ?
             """,
             (
+                cost_val,
                 int(po_id),
                 int(department_id),
                 int(category_id),
                 int(year_val),
-                cost_val,
-                int(orig_po_id),
-                int(orig_department_id),
-                int(orig_category_id),
-                int(orig_year_val),
             )
         )
         cnxn.commit()
@@ -89,6 +71,65 @@ def change_staff_cost():
         pass
 
     return redirect(url_for('modify_tables.modify_table_router', action='modify_staff_cost'))
+
+
+@staff_cost_routes.route('/modify_staff_cost/delete_staff_cost', methods=['POST'])
+def delete_staff_cost():
+    """Delete a staff cost row identified by (po, department, staff_category, year)."""
+    try:
+        if request.is_json:
+            payload = request.get_json(silent=True) or {}
+            po_name = payload.get('po')
+            dept_name = payload.get('department') or payload.get('bu')
+            staff_category = payload.get('staff_category') or payload.get('category')
+            year = payload.get('year')
+        else:
+            form = dict(request.form)
+            po_name = form.get('po')
+            dept_name = form.get('department') or form.get('bu')
+            staff_category = form.get('staff_category') or form.get('category')
+            year = form.get('year')
+
+        # Basic validation
+        if not (po_name and dept_name and staff_category and year):
+            return { 'status': 'error', 'message': 'Missing key fields' }, 400
+
+        # Connect and map names to IDs
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        pos_df = select_all_from_table(cursor, cnxn, 'pos')
+        dept_df = select_all_from_table(cursor, cnxn, 'departments')
+        hr_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+
+        po_map = dict(zip(pos_df['name'], pos_df['id'])) if pos_df is not None and not pos_df.empty and 'name' in pos_df.columns and 'id' in pos_df.columns else {}
+        dept_map = dict(zip(dept_df['name'], dept_df['id'])) if dept_df is not None and not dept_df.empty and 'name' in dept_df.columns and 'id' in dept_df.columns else {}
+        cat_map = dict(zip(hr_df['name'], hr_df['id'])) if hr_df is not None and not hr_df.empty and 'name' in hr_df.columns and 'id' in hr_df.columns else {}
+
+        po_id = po_map.get(po_name)
+        department_id = dept_map.get(dept_name)
+        category_id = cat_map.get(staff_category)
+        try:
+            year_val = int(year) if year not in (None, '') else None
+        except Exception:
+            year_val = None
+
+        if None in (po_id, department_id, category_id, year_val):
+            return { 'status': 'error', 'message': 'Invalid identifiers' }, 400
+
+        cursor.execute(
+            """
+            DELETE FROM human_resource_cost
+             WHERE po_id = ?
+               AND department_id = ?
+               AND category_id = ?
+               AND year = ?
+            """,
+            (int(po_id), int(department_id), int(category_id), int(year_val))
+        )
+        cnxn.commit()
+        return { 'status': 'ok' }, 200
+    except Exception as e:
+        return { 'status': 'error', 'message': str(e) }, 500
 
 
 @staff_cost_routes.route('/modify_staff_cost/categories', methods=['GET'])

@@ -35,7 +35,6 @@ def get_project_details():
         out = {
             'id': int(row['id']) if 'id' in proj_df.columns else None,
             'name': row['name'] if 'name' in proj_df.columns else None,
-            'fiscal_year': int(row['fiscal_year']) if 'fiscal_year' in proj_df.columns and pd.notna(row['fiscal_year']) else None,
         }
 
         # Map ids to names
@@ -82,7 +81,6 @@ def change_project():
     name = form.get('name')
     category = form.get('category')
     department = form.get('department')
-    fiscal_year = form.get('fiscal_year')
 
     try:
         db = connect_local()
@@ -106,12 +104,8 @@ def change_project():
         except Exception:
             pass
 
-        # Coerce fiscal year
+        # projects no longer store fiscal_year
         fy_val = None
-        try:
-            fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
-        except Exception:
-            fy_val = None
 
         # Resolve target project id
         pid_val = None
@@ -145,9 +139,7 @@ def change_project():
         if dept_id is not None:
             sets.append('department_id = ?')
             params.append(dept_id)
-        if fy_val is not None:
-            sets.append('fiscal_year = ?')
-            params.append(fy_val)
+        # no fiscal_year update on projects
 
         # Determine existing department_id for cascade comparison
         old_dept_id = None
@@ -450,7 +442,7 @@ def list_projects():
         # Base display (friendly names)
         df = get_projects_display()
         if df is None or df.empty:
-            empty_cols = standardize_columns_order(['id', 'Project', 'PO', 'BU', 'Fiscal Year', 'IOs'], table_name='projects')
+            empty_cols = standardize_columns_order(['id', 'Project', 'PO', 'BU', 'IOs'], table_name='projects')
             return {'columns': empty_cols, 'rows': []}, 200
 
         # Normalize for frontend (friendly column headers)
@@ -458,12 +450,17 @@ def list_projects():
         for cand_in, cand_out in [
             ('project_name','Project'), ('name','Project'),
             ('po_name','PO'), ('name_po','PO'), ('po','PO'),
-            ('department_name','BU'), ('name_departments','BU'), ('department','BU'),
-            ('fiscal_year','Fiscal Year'), ('Fiscal Year','Fiscal Year')
+            ('department_name','BU'), ('name_departments','BU'), ('department','BU')
         ]:
             if cand_in in df.columns:
                 rename_map[cand_in] = cand_out
         out = df.rename(columns=rename_map).copy()
+        # Drop raw fiscal_year column if present on display; projects no longer carry it
+        if 'fiscal_year' in out.columns:
+            try:
+                out = out.drop(columns=['fiscal_year'])
+            except Exception:
+                pass
 
         # Try to attach the underlying project id from local DB
         try:
@@ -478,7 +475,7 @@ def list_projects():
             if dept_tbl is not None and not dept_tbl.empty and 'id' in dept_tbl.columns and 'name' in dept_tbl.columns:
                 dept_map = dict(zip(dept_tbl['id'], dept_tbl['name']))
 
-            # Prepare a key in projects table: (name, dept_name, fiscal_year)
+            # Prepare a key in projects table: (name, dept_name)
             key_series = None
             if proj_tbl is not None and not proj_tbl.empty:
                 p = proj_tbl.copy()
@@ -494,8 +491,7 @@ def list_projects():
                 def mkkey_p(row):
                     n = str(row.get('name','')).strip().lower()
                     d = str(row.get('__dept_name__','')).strip().lower()
-                    fy = str(row.get('fiscal_year','')).strip()
-                    return f"{n}|||{d}|||{fy}"
+                    return f"{n}|||{d}"
 
                 p['__key__'] = p.apply(mkkey_p, axis=1)
                 id_by_key = dict(zip(p['__key__'], p['id'])) if 'id' in p.columns else {}
@@ -506,8 +502,7 @@ def list_projects():
             def mkkey_out(row):
                 n = str(row.get('Project','')).strip().lower()
                 d = str(row.get('BU','')).strip().lower()
-                fy = str(row.get('Fiscal Year','')).strip()
-                return f"{n}|||{d}|||{fy}"
+                return f"{n}|||{d}"
 
             out['id'] = out.apply(lambda r: id_by_key.get(mkkey_out(r)), axis=1)
 
@@ -585,7 +580,7 @@ def delete_project():
     """Delete a project and all associated dependent data.
 
     Accepts JSON or form data. Preferred identifier is project_id; otherwise
-    attempts to resolve by (Project name, Department name, Fiscal Year).
+    attempts to resolve by (Project name, Department name).
 
     Cascade deletions:
     - project_forecasts_pc, project_forecasts_nonpc
@@ -599,7 +594,7 @@ def delete_project():
         pid = payload.get('project_id') or payload.get('id')
         proj_name = payload.get('project_name') or payload.get('Project') or payload.get('name')
         dept_name = payload.get('department') or payload.get('BU') or payload.get('department_name')
-        fiscal_year = payload.get('fiscal_year') or payload.get('Fiscal Year') or payload.get('year')
+    # no fiscal_year in projects anymore
 
         db = connect_local()
         cursor, cnxn = db.connect_to_db()
@@ -612,7 +607,7 @@ def delete_project():
             except Exception:
                 pid_val = None
         if pid_val is None:
-            # Try resolve by (name, department, fiscal_year)
+            # Try resolve by (name, department)
             try:
                 proj_tbl = select_all_from_table(cursor, cnxn, 'projects')
                 dept_tbl = select_all_from_table(cursor, cnxn, 'departments')
@@ -622,11 +617,6 @@ def delete_project():
                 dept_id = None
                 if dept_name not in (None, ''):
                     dept_id = dept_map.get(str(dept_name).strip().lower())
-                fy_val = None
-                try:
-                    fy_val = int(fiscal_year) if fiscal_year not in (None, '') else None
-                except Exception:
-                    fy_val = None
                 if proj_tbl is not None and not proj_tbl.empty:
                     cand = proj_tbl.copy()
                     if proj_name not in (None, '') and 'name' in cand.columns:
@@ -636,11 +626,6 @@ def delete_project():
                             cand = cand[cand['department_id'].astype(int) == int(dept_id)]
                         except Exception:
                             cand = cand[cand['department_id'] == dept_id]
-                    if fy_val is not None and 'fiscal_year' in cand.columns:
-                        try:
-                            cand = cand[cand['fiscal_year'].astype(int) == int(fy_val)]
-                        except Exception:
-                            cand = cand[cand['fiscal_year'] == fy_val]
                     if not cand.empty:
                         try:
                             pid_val = int(cand.iloc[0]['id'])

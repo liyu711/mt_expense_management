@@ -346,7 +346,81 @@
                                             }catch(e){}
                                         };
                                     } else if (tableName === 'human_resource_cost'){
-                                        opts.rowClickEditModal.prefill = function(modal, row){ try{}catch(e){} };
+                                        // Prefill Change form for Staff Cost; lock PO and Department selections
+                                        opts.rowClickEditModal.prefill = function(modal, row){
+                                            try{
+                                                function pick(obj, keys){
+                                                    for(var i=0;i<keys.length;i++){ var k = keys[i]; if(obj.hasOwnProperty(k) && obj[k] != null && obj[k] !== '') return String(obj[k]); }
+                                                    return '';
+                                                }
+                                                var poVal = pick(row, ['PO','po','PO Name','name_po']);
+                                                var deptVal = pick(row, ['BU','Department','department','department_name','name_departments']);
+                                                var catVal = pick(row, ['Staff Category','staff_category','Category','category','name']);
+                                                var yearVal = pick(row, ['Year','year','Fiscal Year','fiscal_year']);
+                                                // Prefer unit expense shown in the table (which may be in k CNY)
+                                                var costVal = pick(row, [
+                                                    'Unit Expense (k CNY)', 'Unit Expense',
+                                                    'Unit Cost (k CNY)', 'Unit Cost',
+                                                    'Cost (k CNY)',
+                                                    'Cost','cost','human_resource_expense'
+                                                ]);
+
+                                                var poSel = modal.querySelector('select[name="po"]');
+                                                var deptSel = modal.querySelector('select[name="department"]');
+                                                var catSel = modal.querySelector('select[name="staff_category"]');
+                                                var yearSel = modal.querySelector('select[name="year"]');
+                                                var costIn = modal.querySelector('input[name="cost"]');
+
+                                                if (poSel && poVal){ poSel.value = poVal; }
+                                                // We need to ensure department options exist (they may have been empty from initial handler attach)
+                                                function ensureDeptOptions(selectedDept){
+                                                    if(!deptSel) return;
+                                                    // Fetch filtered departments by PO; if endpoint fails, just set value
+                                                    if(poSel && poSel.value){
+                                                        fetch('/capex_forecast/department_update?po=' + encodeURIComponent(poSel.value))
+                                                            .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
+                                                            .then(function(json){
+                                                                try{
+                                                                    // Rebuild options
+                                                                    deptSel.innerHTML = '';
+                                                                    var ph = document.createElement('option');
+                                                                    ph.value = ''; ph.disabled = true; ph.selected = true; ph.textContent = 'Select an option';
+                                                                    deptSel.appendChild(ph);
+                                                                    (json && json.departments ? json.departments : []).forEach(function(name){
+                                                                        var o = document.createElement('option'); o.value = name; o.textContent = name; deptSel.appendChild(o);
+                                                                    });
+                                                                    if(selectedDept){ deptSel.value = selectedDept; }
+                                                                }catch(e){ if(selectedDept){ deptSel.value = selectedDept; } }
+                                                            })
+                                                            .catch(function(){ if(selectedDept){ deptSel.value = selectedDept; } });
+                                                    } else {
+                                                        if(selectedDept){ deptSel.value = selectedDept; }
+                                                    }
+                                                }
+                                                if (deptSel && deptVal){ ensureDeptOptions(deptVal); }
+                                                if (catSel && catVal){ catSel.value = catVal; }
+                                                if (yearSel && yearVal){ yearSel.value = String(yearVal); }
+                                                if (costIn && (costVal !== null && costVal !== '')){
+                                                    // Sanitize common formatting (commas, units) before putting into number input
+                                                    var numeric = String(costVal).replace(/,/g,'').replace(/[^0-9.-]/g,'');
+                                                    if (!numeric) numeric = String(costVal);
+                                                    costIn.value = numeric;
+                                                }
+
+                                                // Hidden originals for immutable key lookup
+                                                var oPo = modal.querySelector('input[name="original_po"]'); if(oPo && poVal) oPo.value = poVal;
+                                                var oDept = modal.querySelector('input[name="original_department"]'); if(oDept && deptVal) oDept.value = deptVal;
+                                                var oCat = modal.querySelector('input[name="original_staff_category"]'); if(oCat && catVal) oCat.value = catVal;
+                                                var oYear = modal.querySelector('input[name="original_year"]'); if(oYear && yearVal) oYear.value = yearVal;
+
+                                                // Lock PO and Department to prevent key changes in Change modal
+                                                // Delay locking Department until after options are rebuilt so selection sticks
+                                                if (poSel){ poSel.disabled = true; poSel.style.background = '#f9f9f9'; poSel.style.cursor = 'not-allowed'; }
+                                                if (deptSel){
+                                                    setTimeout(function(){ deptSel.disabled = true; deptSel.style.background = '#f9f9f9'; deptSel.style.cursor = 'not-allowed'; }, 50);
+                                                }
+                                            }catch(e){}
+                                        };
                                     } else if (tableName === 'human_resource_categories'){
                                         opts.rowClickEditModal.prefill = function(modal, row){
                                             try{
@@ -490,59 +564,6 @@
                                                 }
                                             }catch(e){}
                                         };
-                                    } else if (tableName === 'human_resource_cost'){
-                                        opts.rowClickEditModal.prefill = function(modal, row){
-                                            try{
-                                                // Determine values from row with robust key detection
-                                                function pick(row, keys){
-                                                    for(var i=0;i<keys.length;i++){ var k = keys[i]; if(row.hasOwnProperty(k) && row[k] != null && row[k] !== '') return String(row[k]); }
-                                                    return '';
-                                                }
-                                                var poVal = pick(row, ['PO','po','PO Name','name_po']);
-                                                var deptVal = pick(row, ['BU','Department','department','department_name','name_departments']);
-                                                var catVal = pick(row, ['Staff Category','staff_category','Category','category','name']);
-                                                var yearVal = pick(row, ['Year','year','Fiscal Year','fiscal_year']);
-                                                var costVal = pick(row, ['Cost','cost','human_resource_expense']);
-
-                                                var poSel = modal.querySelector('select[name="po"]');
-                                                var deptSel = modal.querySelector('select[name="department"]');
-                                                var catSel = modal.querySelector('select[name="staff_category"]');
-                                                var yearSel = modal.querySelector('select[name="year"]');
-                                                var costIn = modal.querySelector('input[name="cost"]');
-
-                                                if (poSel && poVal){ poSel.value = poVal; }
-                                                if (yearSel && yearVal){ yearSel.value = String(yearVal); }
-                                                if (catSel && catVal){ catSel.value = catVal; }
-                                                if (costIn && costVal){ costIn.value = costVal; }
-
-                                                // For Department, rebuild options based on selected PO, then set value
-                                                if (poSel && deptSel && poSel.value){
-                                                    var po = poSel.value;
-                                                    fetch('/capex_forecast/department_update?po=' + encodeURIComponent(po))
-                                                        .then(function(res){ return res.ok ? res.json() : { departments: [] }; })
-                                                        .then(function(json){
-                                                            try{
-                                                                // Rebuild department options
-                                                                while (deptSel.firstChild) deptSel.removeChild(deptSel.firstChild);
-                                                                var placeholder = document.createElement('option');
-                                                                placeholder.value = ''; placeholder.disabled = true; placeholder.selected = true; placeholder.textContent = 'Select an option';
-                                                                deptSel.appendChild(placeholder);
-                                                                (json && json.departments ? json.departments : []).forEach(function(name){
-                                                                    var opt = document.createElement('option'); opt.value = name; opt.textContent = name; deptSel.appendChild(opt);
-                                                                });
-                                                                if (deptVal){ deptSel.value = deptVal; }
-                                                            }catch(e){}
-                                                        })
-                                                        .catch(function(){});
-                                                } else if (deptSel && deptVal){
-                                                    deptSel.value = deptVal;
-                                                }
-                                                var scPo = modal.querySelector('input[name="original_po"]'); if(scPo && poVal) scPo.value = poVal;
-                                                var scDept = modal.querySelector('input[name="original_department"]'); if(scDept && deptVal) scDept.value = deptVal;
-                                                var scCat = modal.querySelector('input[name="original_staff_category"]'); if(scCat && catVal) scCat.value = catVal;
-                                                var scYear = modal.querySelector('input[name="original_year"]'); if(scYear && yearVal) scYear.value = yearVal;
-                                            }catch(e){}
-                                        };
                                     }
                                 }
                                 GenericTable.create(el, opts);
@@ -650,6 +671,17 @@
                                         return payload;
                                     }
 
+                                    function extractorStaffCost(map){
+                                        function pick(keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(map.hasOwnProperty(k) && map[k]) return map[k]; } return ''; }
+                                        var payload = {};
+                                        payload.po = pick(['po','po name','po_name','name_po']) || pickByIncludes(map,['po']);
+                                        payload.department = pick(['bu','department','department name','department_name','name_departments','dept','bu name']) || pickByIncludes(map,['bu','department','dept']);
+                                        payload.staff_category = pick(['staff category','category','name']) || pickByIncludes(map,['category']);
+                                        payload.year = pick(['year','fiscal year']) || pickByIncludes(map,['year','fiscal']);
+                                        if(!(payload.po && payload.department && payload.staff_category && payload.year)) return { error: 'Missing key fields' };
+                                        return payload;
+                                    }
+
                                     if (tableName === 'capex_forecasts'){
                                         setTimeout(function(){ injectDeleteButtons('/capex_forecast/delete_capex_forecast', extractorCapexForecast); }, 60);
                                         var obs1 = new MutationObserver(function(){ injectDeleteButtons('/capex_forecast/delete_capex_forecast', extractorCapexForecast); });
@@ -666,6 +698,10 @@
                                         setTimeout(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); }, 60);
                                         var obs4 = new MutationObserver(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); });
                                         obs4.observe(el, { childList: true, subtree: true });
+                                    } else if (tableName === 'human_resource_cost'){
+                                        setTimeout(function(){ injectDeleteButtons('/modify_staff_cost/delete_staff_cost', extractorStaffCost); }, 60);
+                                        var obs5 = new MutationObserver(function(){ injectDeleteButtons('/modify_staff_cost/delete_staff_cost', extractorStaffCost); });
+                                        obs5.observe(el, { childList: true, subtree: true });
                                     }
                                 })();
                             }catch(e){}
@@ -1098,14 +1134,11 @@
     {% endif %}
     <style>
         /* Modal styles */
-        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; overflow-y: auto; padding: 12px 0; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; }
         .modal-overlay { position: absolute; left:0; top:0; width:100%; height:100%; background: rgba(0,0,0,0.4); }
-        .modal-content { position: relative; max-width: 760px; width: min(92vw, 760px); margin: 24px auto; background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 2010; max-height: calc(100vh - 48px); overflow: auto; }
+        .modal-content { position: relative; max-width: 760px; margin: 60px auto; background: #fff; border-radius: 6px; padding: 20px; box-shadow: 0 8px 24px rgba(0,0,0,0.2); z-index: 2010; }
         .modal-close { position: absolute; right: 10px; top: 8px; font-size: 24px; background: transparent; border: none; cursor: pointer; }
         /* Ensure form layout inside modal looks consistent */
         .modal-content .form-group { margin-bottom: 14px; }
-        @media (max-height: 700px) {
-            .modal-content { margin: 12px auto; max-height: calc(100vh - 24px); }
-        }
     </style>
 {% endblock %}

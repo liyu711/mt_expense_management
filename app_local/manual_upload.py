@@ -36,8 +36,8 @@ input_types = [
 display_names = {
     "forecast_nonpc": ['PO', 'IO','Department', "Project Category", "Project Name", "Fiscal Year", "Non-personnel Expense"],
     "forecast_pc" : ['PO', 'IO','Department', "Project Category", "Project Name", "Fiscal Year", 'Human resource category', "Human resource FTE", "Personnel Expense"],
-    "budgets": ['PO', 'Department', "Fiscal Year", "Personnel Budget (k CNY)", "Non-personnel Budget (k CNY)"],
-    "fundings": ['PO', 'Department', "Fiscal Year", "Funding (k CNY)", "Funding From", "Funding For"],
+    "budgets": ['PO', 'Department', "Fiscal Year", "Personnel Budget", "Non-personnel Budget"],
+    "fundings": ['PO', 'Department', "Fiscal Year", "Funding", "Funding From", "Funding For"],
     "expenses": ['Department', "Fiscal Year", "From Period", "Order(IO)", "CO Object Name", "Cost Element", "Cost Element Name", "Val.in rep.cur.", "Name"],
     "capex_forecast" : ['PO', 'Department', 'CapYear', 'For Project', 'CapEx Description', 'CapEx Forecast', 'Cost Center'],
     "capex_budget" : ['PO',	'Department', 'CapYear', 'For Project',	'Capex Description', 'Approved Budget (k CNY)', 'Comments from finance'],
@@ -556,15 +556,9 @@ def render_mannual_input():
 
     combined_columns = ordered_prefix + remaining_base + hr_category_list + ['Forecast Sum']
     # For display, rename 'Non-personnel Expense' to 'Non-personnel Forecast' without changing values
-    # For display purposes append unit suffix to monetary columns (labels-only, no numeric scaling)
-    combined_columns_display = []
-    for c in combined_columns:
-        if c == 'Non-personnel Expense':
-            combined_columns_display.append('Non-personnel Forecast (k CNY)')
-        elif c == 'Forecast Sum':
-            combined_columns_display.append('Forecast Sum (k CNY)')
-        else:
-            combined_columns_display.append(c)
+    combined_columns_display = [
+        ('Non-personnel Forecast' if c == 'Non-personnel Expense' else c) for c in combined_columns
+    ]
     combined_data = []
     for d in combined_rows_dicts:
         # Use source names for value lookup; only headers are renamed for display
@@ -838,21 +832,19 @@ def manual_departments():
 
 @manual_upload.route('/manual_input/projects', methods=['GET'])
 def manual_projects():
-    """Return projects filtered by provided query params: po (name), department (name), fiscal_year.
+    """Return projects filtered by provided query params: po (name), department (name).
+    Project list is NOT gated by fiscal_year (projects are independent of FY).
     If a param is not provided, fall back to module-level selected_* variables.
     Response JSON: {'projects': [{'name': <str>} , ...]}
     """
     print("projects route")
     po_name = request.args.get('po') or selected_po
     dept_name = request.args.get('department') or selected_department
-    fy = request.args.get('fiscal_year') or selected_fiscal_year
+    # fiscal year is intentionally ignored for project listing
     try:
         proj_df = get_projects_display()
     except Exception:
         proj_df = None
-    # Hierarchy: if no fiscal year selected, project options should be empty
-    if not fy or str(fy).strip() == '' or str(fy) == 'All':
-        return jsonify({'projects': []}), 200
     result = []
     if proj_df is None:
         return jsonify({'projects': []}), 200
@@ -869,9 +861,6 @@ def manual_projects():
             po_val = p.get('po_name') or p.get('PO Name') or p.get('PO') or p.get('po')
             # normalize department name candidates
             dept_val = p.get('department_name') or p.get('Department Name') or p.get('Department') or p.get('department')
-            # normalize fiscal year candidates
-            fy_val = p.get('fiscal_year') or p.get('Fiscal Year') or p.get('fy') or p.get('fiscal')
-
             if not proj_name:
                 continue
 
@@ -880,8 +869,6 @@ def manual_projects():
                 ok = ok and (po_val == po_name)
             if dept_name and dept_name != '' and dept_name != 'All':
                 ok = ok and (dept_val == dept_name)
-            if fy and fy != '' and fy != 'All':
-                ok = ok and (str(fy_val) == str(fy))
             if ok:
                 result.append({'name': proj_name})
     except Exception:
@@ -1204,7 +1191,7 @@ def manual_change_forecast():
     """Modify existing forecasts:
     - Update project_forecasts_nonpc.non_personnel_expense when Non_personnel_cost is provided
     - Update project_forecasts_pc.human_resource_fte when Human_resource_FTE is provided
-    Matching keys: PO, Department, fiscal_year, Project_Name, Project_Category, IO
+    Matching keys for forecasts include fiscal_year, but project resolution uses only Project Name and Department (no fiscal_year).
     For personnel, also match Human_resource_category.
     """
     form = request.form
@@ -1239,7 +1226,7 @@ def manual_change_forecast():
         if depts_df is not None and 'name' in depts_df.columns and 'id' in depts_df.columns:
             dept_id = dict(zip(depts_df['name'], depts_df['id'])).get(dept_name)
 
-        # Filter projects by name (and optionally department/fiscal_year if duplicates exist)
+        # Resolve project strictly by name (and optionally by department). Projects do not have fiscal_year.
         proj_id = None
         if projs_df is not None:
             try:
@@ -1248,11 +1235,6 @@ def manual_change_forecast():
                     mask = dfp['name'].astype(str) == str(project_name)
                     if dept_id is not None and 'department_id' in dfp.columns:
                         mask &= (dfp['department_id'] == int(dept_id))
-                    if fiscal_year and 'fiscal_year' in dfp.columns:
-                        try:
-                            mask &= (dfp['fiscal_year'].astype(str) == str(int(fiscal_year)))
-                        except Exception:
-                            mask &= (dfp['fiscal_year'].astype(str) == str(fiscal_year))
                     rows = dfp[mask]
                     if not rows.empty and 'id' in rows.columns:
                         proj_id = rows.iloc[0]['id']
@@ -1495,21 +1477,9 @@ def upload_forecast_merged():
         nonpc_row = dict(base_context)
         nonpc_row["Non-personnel cost"] = nonpc_val
         df_nonpc = pd.DataFrame([nonpc_row])
-        try:
-            df_nonpc["IO"] = df_nonpc["IO"].astype(int)
-        except Exception:
-            pass
-        try:
-            changed = upload_nonpc_forecasts_local_m(df_nonpc)
-            if changed > 0:
-                results.append("Non-personnel forecast uploaded successfully.")
-            else:
-                results.append("Non-personnel forecast already exists.")
-        except Exception as e:
-            results.append(f"Non-personnel upload failed: {e}")
-
-    # Personnel uploads (multiple categories)
-    # Expect pairs: cat__<slug>=<Category Name>, fte__<slug>=<FTE>
+        df_nonpc["IO"] = df_nonpc["IO"].astype(int)
+        changed = upload_nonpc_forecasts_local_m(df_nonpc)
+        
     pc_rows = []
     for key in form.keys():
         if key.startswith('fte__'):
@@ -1636,14 +1606,9 @@ def manual_delete_forecast():
                 dfp = projs_df
                 if 'name' in dfp.columns:
                     mask = dfp['name'].astype(str).str.strip().str.lower() == str(project_name).strip().lower()
-                    # If duplicates exist, prefer those matching department and/or fiscal year if such columns exist
+                    # Prefer match by department when available; do not use fiscal_year (projects table no longer has it)
                     if dept_id is not None and 'department_id' in dfp.columns:
                         mask &= (dfp['department_id'] == int(dept_id))
-                    if 'fiscal_year' in dfp.columns:
-                        try:
-                            mask &= (dfp['fiscal_year'].astype(int) == int(fy_val))
-                        except Exception:
-                            mask &= (dfp['fiscal_year'].astype(str) == str(fy_val))
                     rows = dfp[mask]
                     if not rows.empty and 'id' in rows.columns:
                         proj_id = int(rows.iloc[0]['id'])

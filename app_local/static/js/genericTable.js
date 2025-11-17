@@ -52,6 +52,17 @@
 
     const table = document.createElement('table');
     table.className = 'gt-table';
+    // Fixed layout so column widths from <colgroup> are respected
+    table.style.tableLayout = 'fixed';
+
+    // Prepare colgroup for column width control
+    const colgroup = document.createElement('colgroup');
+    const colEls = [];
+    (cfg.columns || []).forEach(function(){
+      const colEl = document.createElement('col');
+      colEls.push(colEl);
+      colgroup.appendChild(colEl);
+    });
 
     const thead = document.createElement('thead');
     const groupRow = document.createElement('tr'); // optional top grouping row
@@ -74,10 +85,21 @@
     // Column filter state
     const filters = {}; // colName -> selected value (or null)
 
-    cfg.columns.forEach(function(col){
+    // Small display mapping for column headers: show BU instead of Department-related labels
+    function displayLabel(col){
+      var c = String(col || '');
+      var lower = c.toLowerCase();
+      // Common department labels to map
+      if (lower === 'department' || lower === 'department name' || lower === 'name_departments' || lower === 'department_name') return 'BU';
+      if (lower === 'dept') return 'BU';
+      // Preserve other labels
+      return c;
+    }
+
+    cfg.columns.forEach(function(col, colIdx){
       const th = document.createElement('th');
       const label = document.createElement('span');
-      label.textContent = col;
+      label.textContent = displayLabel(col);
       label.className = 'gt-col-label';
 
       const sortBtn = document.createElement('button');
@@ -120,6 +142,33 @@
       filterSel.addEventListener('change', function(){
         filters[col] = filterSel.value || null;
         refresh();
+      });
+
+      // Column resizer handle (append to header cell)
+      const resizer = document.createElement('span');
+      resizer.className = 'gt-resizer';
+      resizer.title = 'Drag to resize';
+      th.style.position = th.style.position || 'sticky'; // ensure positioned for absolute child
+      th.appendChild(resizer);
+      let startX = 0;
+      let startWidth = 0;
+      function onMouseMove(e){
+        const dx = e.clientX - startX;
+        const newW = Math.max(60, startWidth + dx); // minimum width
+        try { if (colEls[colIdx]) colEls[colIdx].style.width = newW + 'px'; } catch(_){}
+      }
+      function onMouseUp(){
+        document.removeEventListener('mousemove', onMouseMove);
+        document.removeEventListener('mouseup', onMouseUp);
+        try { saveColumnWidths(); } catch(_){}
+      }
+      resizer.addEventListener('mousedown', function(e){
+        e.preventDefault(); e.stopPropagation();
+        startX = e.clientX;
+        const wStr = (colEls[colIdx] && colEls[colIdx].style && colEls[colIdx].style.width) || '';
+        startWidth = (wStr && wStr.endsWith('px')) ? parseFloat(wStr) : th.getBoundingClientRect().width;
+        document.addEventListener('mousemove', onMouseMove);
+        document.addEventListener('mouseup', onMouseUp);
       });
     });
     // If grouping requested, add a grouping row spanning the grouped columns.
@@ -179,7 +228,8 @@
     footer.appendChild(pageInfo);
     footer.appendChild(pager);
 
-    table.appendChild(thead);
+  table.appendChild(colgroup);
+  table.appendChild(thead);
     table.appendChild(tbody);
     tableWrap.appendChild(table);
 
@@ -396,6 +446,39 @@
     searchInput.addEventListener('input', function(){ currentPage = 1; refresh(); });
     pageSizeSel.addEventListener('change', function(){ pageSize = parseInt(pageSizeSel.value,10)||10; currentPage = 1; refresh(); });
 
+    // Session persistence for column widths
+    const storageKey = (function(){
+      try {
+        const idPart = (root && (root.id || root.getAttribute && root.getAttribute('data-gt-key'))) || '';
+        const titlePart = (cfg.title || '').trim();
+        const colsPart = (cfg.columns || []).join('|');
+        const pathPart = (window && window.location && window.location.pathname) ? window.location.pathname : '';
+        return 'gt-width:' + [pathPart, idPart || titlePart, colsPart].filter(Boolean).join('::');
+      } catch(e){ return 'gt-width:' + (cfg.title || '') + '::' + (cfg.columns || []).join('|'); }
+    })();
+
+    function saveColumnWidths(){
+      try {
+        const widths = colEls.map(function(c, i){
+          const w = c && c.style && c.style.width ? c.style.width : '';
+          if (w && w.endsWith('px')) return parseFloat(w);
+          const th = headerRow.children[i];
+          return th ? Math.round(th.getBoundingClientRect().width) : null;
+        });
+        sessionStorage.setItem(storageKey, JSON.stringify(widths));
+      } catch(e){}
+    }
+    function applySavedColumnWidths(){
+      try {
+        const raw = sessionStorage.getItem(storageKey);
+        if(!raw) return;
+        const arr = JSON.parse(raw);
+        if(!Array.isArray(arr)) return;
+        arr.forEach(function(w, i){ if (w != null && colEls[i]) colEls[i].style.width = w + 'px'; });
+      } catch(e){}
+    }
+    applySavedColumnWidths();
+
     // Initial
     rebuildFilters(cfg.rows);
     refresh();
@@ -415,6 +498,7 @@
       .gt-table{border-collapse:collapse;width:100%;}
   .gt-table th,.gt-table td{border:1px solid #ddd;padding:6px 8px;}
   .gt-table th{position:sticky;top:0;background:#f5f5f5;white-space:nowrap;}
+  .gt-table th, .gt-table td{overflow:hidden;text-overflow:ellipsis;}
   .gt-col-label{margin-right:6px;display:inline-block;vertical-align:middle;}
   .gt-sort{margin:0 6px 0 0;padding:2px 6px;width:1.5em;display:inline-flex;justify-content:center;align-items:center;line-height:1;box-sizing:content-box;white-space:nowrap;overflow:hidden;}
   .gt-group-header{position:static !important;}
@@ -422,6 +506,7 @@
       .gt-filter{padding:2px 6px;}
       .gt-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;}
       .gt-pager button{margin:0 4px;}
+      .gt-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;user-select:none;}
       `;
       document.head.appendChild(st);
     }
