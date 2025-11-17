@@ -195,90 +195,36 @@
                                         var first = modal.querySelector('input,select,button'); if(first) first.focus(); }
                                 }catch(_){ }
                             }
+                        },
+                        deleteColumn: {
+                            header: 'Delete',
+                            widthPx: 100,
+                            confirm: function(row){
+                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                var projName = pick(row, ['Project','Project Name','name','project']);
+                                var dept = pick(row, ['Department','BU','department','department name']);
+                                return 'WARNING: Deleting this project will permanently delete the project and ALL associated data, including:\n\n'
+                                    + '- IOs under this project\n'
+                                    + '- Operating expenses linked to those IOs\n'
+                                    + '- Project forecasts (PC and Non-PC)\n'
+                                    + '- CapEx forecasts, budgets, and expenses\n\n'
+                                    + 'This action cannot be undone.\n\n'
+                                    + 'Confirm DELETE for: ' + (projName || 'Project') + ' / ' + (dept || 'BU') + '?';
+                            },
+                            endpoint: '/modify_project/delete_project',
+                            payload: function(row){
+                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                var projId = pick(row, ['id','ID']);
+                                if (projId) return { project_id: projId };
+                                var projName = pick(row, ['Project','Project Name','name','project']);
+                                var dept = pick(row, ['Department','BU','department','department name']);
+                                var payload = {};
+                                if (projName) payload.project_name = projName;
+                                if (dept) payload.department = dept;
+                                return payload;
+                            }
                         }
                     });
-                    // Inject Delete buttons with strong warning
-                    (function(){
-                        function norm(s){ return (s||'').toLowerCase().replace(/\u00a0/g,' ').replace(/\s+/g,' ').trim(); }
-                        function pick(map, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(map.hasOwnProperty(k) && map[k]) return map[k]; } return ''; }
-                        function pickByIncludes(map, includeAny){
-                            var keys = Object.keys(map);
-                            for (var i=0;i<keys.length;i++){
-                                var k = keys[i];
-                                for (var j=0;j<includeAny.length;j++){
-                                    if (k.indexOf(includeAny[j]) !== -1) return map[k];
-                                }
-                            }
-                            return '';
-                        }
-                        function inject(){
-                            try{
-                                var table = el.querySelector('table');
-                                if(!table) return;
-                                var theadTr = table.querySelector('thead tr');
-                                if(theadTr && !theadTr.querySelector('th.gt-delete-col')){
-                                    var th = document.createElement('th');
-                                    th.className = 'gt-delete-col';
-                                    th.textContent = 'Delete';
-                                    theadTr.appendChild(th);
-                                }
-                                var headerTexts = Array.prototype.map.call(table.querySelectorAll('thead th'), function(th){ return (th.textContent||'').trim(); });
-                                table.querySelectorAll('tbody tr').forEach(function(tr){
-                                    if(tr.querySelector('td.gt-delete-cell')) return;
-                                    var td = document.createElement('td');
-                                    td.className = 'gt-delete-cell';
-                                    var btn = document.createElement('button');
-                                    btn.type = 'button';
-                                    btn.textContent = 'Delete';
-                                    btn.style.cssText = 'padding:2px 6px;font-size:12px;background:#c0392b;color:#fff;border:none;border-radius:4px;cursor:pointer;';
-                                    btn.addEventListener('click', function(ev){
-                                        ev.stopPropagation();
-                                        try{
-                                            var cells = Array.prototype.slice.call(tr.querySelectorAll('td, th'));
-                                            var lowerMap = {};
-                                            for (var i = 0; i < headerTexts.length && i < cells.length; i++) {
-                                                var key = norm(headerTexts[i] || '');
-                                                lowerMap[key] = (cells[i].textContent || '').trim();
-                                            }
-                                            var projId = pick(lowerMap, ['id']);
-                                            var projName = pick(lowerMap, ['project']) || pickByIncludes(lowerMap, ['project']);
-                                            var dept = pick(lowerMap, ['bu','department','department name']) || pickByIncludes(lowerMap, ['bu','department']);
-                                            var warn = 'WARNING: Deleting this project will permanently delete the project and ALL associated data, including: \n\n'
-                                                      + '- IOs under this project\n'
-                                                      + '- Operating expenses linked to those IOs\n'
-                                                      + '- Project forecasts (PC and Non-PC)\n'
-                                                      + '- CapEx forecasts, budgets, and expenses\n\n'
-                                                      + 'This action cannot be undone.\n\n'
-                                                                          + 'Confirm DELETE for: ' + (projName||'Project') + ' / ' + (dept||'BU') + '?';
-                                            if(!confirm(warn)) return;
-                                            var payload = {};
-                                            if(projId) payload.project_id = projId;
-                                            else {
-                                                payload.project_name = projName;
-                                                payload.department = dept;
-                                            }
-                                            fetch('/modify_project/delete_project', {
-                                                method: 'POST',
-                                                headers: { 'Content-Type': 'application/json' },
-                                                body: JSON.stringify(payload)
-                                            }).then(function(r){ return r.json(); }).then(function(resp){
-                                                if(resp && resp.status === 'ok'){
-                                                    tr.remove();
-                                                } else {
-                                                    alert('Delete failed: ' + ((resp && resp.message) ? resp.message : 'unknown error'));
-                                                }
-                                            }).catch(function(err){ alert('Delete error: ' + err); });
-                                        }catch(e){}
-                                    });
-                                    td.appendChild(btn);
-                                    tr.appendChild(td);
-                                });
-                            }catch(e){}
-                        }
-                        setTimeout(inject, 60);
-                        var obs = new MutationObserver(function(){ inject(); });
-                        obs.observe(el, { childList: true, subtree: true });
-                    })();
                 });
             }
 

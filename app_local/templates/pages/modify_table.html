@@ -281,6 +281,30 @@
                                                 var oDesc = modal.querySelector('input[name="original_capex_description"]'); if(oDesc && descVal) oDesc.value = descVal;
                                             }catch(e){}
                                         };
+                                        // Configure Delete column for CapEx Forecasts table
+                                        opts.deleteColumn = {
+                                            header: 'Delete',
+                                            widthPx: 110,
+                                            confirm: function(row){
+                                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                                var po = pick(row, ['PO','PO Name','po_name','name_po']);
+                                                var dept = pick(row, ['Department','Department Name','department_name','BU','name_departments']);
+                                                var proj = pick(row, ['Project','Project Name','project_name']);
+                                                var year = pick(row, ['Capex Year','Capital Year','Fiscal Year','cap_year','fiscal_year','Year']);
+                                                return 'Delete CapEx Forecast for ' + [proj, dept, po, year?('('+year+')'):''].filter(Boolean).join(' / ') + '?';
+                                            },
+                                            endpoint: '/capex_forecast/delete_capex_forecast',
+                                            payload: function(row){
+                                                function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
+                                                return {
+                                                    po: pick(row, ['PO','PO Name','po_name','name_po']),
+                                                    department: pick(row, ['Department','Department Name','department_name','BU','name_departments']),
+                                                    project_name: pick(row, ['Project','Project Name','project_name']),
+                                                    cap_year: pick(row, ['Capex Year','Capital Year','Fiscal Year','cap_year','fiscal_year','Year']),
+                                                    capex_description: pick(row, ['Capex Description','capex_description','Description','desc'])
+                                                };
+                                            }
+                                        };
                                     } else if (tableName === 'departments'){
                                         opts.rowClickEditModal.prefill = function(modal, row){
                                             try{
@@ -673,11 +697,7 @@
                                         return payload;
                                     }
 
-                                    if (tableName === 'capex_forecasts'){
-                                        setTimeout(function(){ injectDeleteButtons('/capex_forecast/delete_capex_forecast', extractorCapexForecast); }, 60);
-                                        var obs1 = new MutationObserver(function(){ injectDeleteButtons('/capex_forecast/delete_capex_forecast', extractorCapexForecast); });
-                                        obs1.observe(el, { childList: true, subtree: true });
-                                    } else if (tableName === 'budgets'){
+                                    if (tableName === 'budgets'){
                                         setTimeout(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget); }, 60);
                                         var obs2 = new MutationObserver(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget); });
                                         obs2.observe(el, { childList: true, subtree: true });

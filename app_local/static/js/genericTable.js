@@ -10,7 +10,17 @@
       title: '',
       // Optional: built-in row-click edit modal support
       // rowClickEditModal: { selector: '#modalId', prefill: (modal,row)=>{}, onOpen:(modal,row)=>{} }
-      rowClickEditModal: null
+      rowClickEditModal: null,
+      // Optional: rightmost Delete column with per-row action
+      // deleteColumn: {
+      //   header: 'Delete',            // header label
+      //   widthPx: 100,                // fixed width for delete column
+      //   confirm: (row) => string,    // return confirm message string; if returns falsy, will skip ask/continue
+      //   onDelete: async (row, api) => { /* perform delete, then api.removeRow(rowIndex) or api.refresh() */ },
+      //   endpoint: '/path',           // if provided, default fetch will be used
+      //   payload: (row) => ({}),      // build payload object for default fetch
+      //   method: 'POST'               // optional HTTP method (default POST)
+      // }
     }, options || {});
 
     // Basic layout
@@ -33,7 +43,15 @@
   titleEl.className = 'gt-title';
   titleEl.textContent = cfg.title || '';
 
+  // Reset column widths button
+  const resetBtn = document.createElement('button');
+  resetBtn.type = 'button';
+  // Use the same visual style as the Add button for exact match
+  resetBtn.className = 'gt-add-btn gt-reset-widths-btn';
+  resetBtn.textContent = 'Reset column width';
+
   leftBar.appendChild(addBtn);
+  leftBar.appendChild(resetBtn);
   leftBar.appendChild(titleEl);
 
   const controlsRight = document.createElement('div');
@@ -75,6 +93,17 @@
       colEls.push(colEl);
       colgroup.appendChild(colEl);
     });
+    // Reserve a col for delete column when configured
+    let deleteColEl = null;
+    const hasDeleteCol = !!(cfg.deleteColumn);
+    if (hasDeleteCol) {
+      deleteColEl = document.createElement('col');
+      if (cfg.deleteColumn && cfg.deleteColumn.widthPx) {
+        deleteColEl.style.width = Math.max(60, parseInt(cfg.deleteColumn.widthPx, 10) || 100) + 'px';
+      } else {
+        deleteColEl.style.width = '100px';
+      }
+    }
 
     const thead = document.createElement('thead');
     const groupRow = document.createElement('tr'); // optional top grouping row
@@ -108,7 +137,7 @@
       return c;
     }
 
-    cfg.columns.forEach(function(col, colIdx){
+  cfg.columns.forEach(function(col, colIdx){
       const th = document.createElement('th');
       const label = document.createElement('span');
       label.textContent = displayLabel(col);
@@ -183,6 +212,18 @@
         document.addEventListener('mouseup', onMouseUp);
       });
     });
+    // Append Delete header cell (and filter spacer) if configured
+    if (hasDeleteCol) {
+      const dth = document.createElement('th');
+      dth.className = 'gt-delete-col';
+      dth.textContent = (cfg.deleteColumn && cfg.deleteColumn.header) ? String(cfg.deleteColumn.header) : 'Delete';
+      // no sorting/filtering for delete column
+      headerRow.appendChild(dth);
+      const dthFilter = document.createElement('th');
+      dthFilter.className = 'gt-delete-filter-spacer';
+      dthFilter.innerHTML = '';
+      filterRow.appendChild(dthFilter);
+    }
     // If grouping requested, add a grouping row spanning the grouped columns.
     // cfg.groups structure: { GroupLabel: [col1,col2,...] }
     if (cfg.groups && typeof cfg.groups === 'object') {
@@ -220,6 +261,14 @@
           emptyTh.style.borderBottom = 'none';
           groupRow.appendChild(emptyTh);
         }
+        // If a Delete column is configured, add a spacer cell for it so the grouping row lines up with header/filter rows
+        if (hasDeleteCol) {
+          const delSpacer = document.createElement('th');
+          delSpacer.className = 'gt-group-spacer';
+          delSpacer.style.background = '#f5f5f5';
+          delSpacer.style.borderBottom = 'none';
+          groupRow.appendChild(delSpacer);
+        }
       });
       // Append grouping row only if it has children
       if(groupRow.children.length){ thead.appendChild(groupRow); }
@@ -241,6 +290,9 @@
     footer.appendChild(pager);
 
   table.appendChild(colgroup);
+  if (hasDeleteCol && deleteColEl) {
+    colgroup.appendChild(deleteColEl);
+  }
   table.appendChild(thead);
     table.appendChild(tbody);
     tableWrap.appendChild(table);
@@ -428,6 +480,30 @@
       });
     })();
 
+    // Reset column widths to initial (content-based) state and persist
+    function resetColumnWidths(){
+      try {
+        // Clear saved widths so future loads don't re-apply old values
+        try { sessionStorage.removeItem(storageKey); } catch(e) {}
+        // Remove explicit widths from columns
+        try { colEls.forEach(function(c){ if(c && c.style) c.style.width = ''; }); } catch(e) {}
+        // Force reflow
+        try { void table.offsetHeight; } catch(e) {}
+        // Measure current natural header widths and set them explicitly
+        try {
+          Array.from(headerRow.children).forEach(function(th, i){
+            if(i < colEls.length && th){
+              const w = Math.round(th.getBoundingClientRect().width);
+              if (w > 0 && colEls[i]) colEls[i].style.width = w + 'px';
+            }
+          });
+        } catch(e) {}
+        // Persist these widths for stability across refresh/setData
+        try { saveColumnWidths(); } catch(e) {}
+      } catch(e) {}
+    }
+    resetBtn.addEventListener('click', resetColumnWidths);
+
     function renderBody(rows){
       tbody.innerHTML = '';
       const start = (currentPage - 1) * pageSize;
@@ -439,6 +515,66 @@
           td.textContent = r[c] != null ? r[c] : '';
           tr.appendChild(td);
         });
+        if (hasDeleteCol) {
+          const td = document.createElement('td');
+          td.className = 'gt-delete-cell';
+          td.style.textAlign = 'center';
+          const btn = document.createElement('button');
+          btn.type = 'button';
+          btn.className = 'gt-delete-btn';
+          btn.textContent = (cfg.deleteColumn && cfg.deleteColumn.buttonLabel) ? String(cfg.deleteColumn.buttonLabel) : 'Delete';
+          btn.addEventListener('click', function(ev){
+            ev.stopPropagation();
+            try {
+              // Ask for confirmation if provided
+              if (cfg.deleteColumn && typeof cfg.deleteColumn.confirm === 'function') {
+                const msg = cfg.deleteColumn.confirm(r, start + i);
+                if (typeof msg === 'string' && msg) {
+                  if (!window.confirm(msg)) return;
+                } else if (msg === false) {
+                  // explicit cancel
+                  return;
+                }
+              }
+              // Custom handler wins
+              if (cfg.deleteColumn && typeof cfg.deleteColumn.onDelete === 'function') {
+                const api = {
+                  removeRow: function(){ tr.remove(); },
+                  refresh: function(){ refresh(); }
+                };
+                const maybe = cfg.deleteColumn.onDelete(r, start + i, api);
+                // allow promise
+                if (maybe && typeof maybe.then === 'function') {
+                  maybe.catch(function(){ /* no-op */ });
+                }
+                return;
+              }
+              // Default fetch behavior if endpoint provided
+              if (cfg.deleteColumn && cfg.deleteColumn.endpoint) {
+                const url = cfg.deleteColumn.endpoint;
+                const method = (cfg.deleteColumn.method || 'POST').toUpperCase();
+                let payload = {};
+                try { payload = (typeof cfg.deleteColumn.payload === 'function') ? (cfg.deleteColumn.payload(r, start + i) || {}) : {}; } catch(e) { payload = {}; }
+                fetch(url, {
+                  method: method,
+                  headers: { 'Content-Type': 'application/json' },
+                  body: method === 'GET' ? undefined : JSON.stringify(payload)
+                }).then(function(res){ return res.json().catch(function(){ return {}; }); })
+                  .then(function(resp){
+                    if (resp && (resp.status === 'ok' || resp.success === true)) {
+                      tr.remove();
+                    } else {
+                      const msg = (resp && (resp.message || resp.error)) ? (resp.message || resp.error) : 'unknown error';
+                      window.alert('Delete failed: ' + msg);
+                    }
+                  }).catch(function(err){ window.alert('Delete error: ' + err); });
+                return;
+              }
+            } catch(e) {}
+          });
+          td.appendChild(btn);
+          tr.appendChild(td);
+        }
         tr.addEventListener('click', function(){ handleRowClick(r, start + i); });
         tbody.appendChild(tr);
       });
@@ -536,6 +672,8 @@
           }
         });
         __gtInitialWidthsFrozen = true;
+        // Persist these initial widths so future refreshes/setData keep them identical
+        try { saveColumnWidths(); } catch(e) {}
       }catch(e){}
     }
 
@@ -559,6 +697,8 @@
       .gt-search{padding:6px 8px;}
       .gt-page-size{padding:6px 8px;}
   .gt-add-btn{box-sizing:border-box; padding:6px 8px; border:1px solid #444; background:#fff; cursor:pointer; border-radius:4px; flex:0 0 15%; width:15%; min-width:120px; max-width:260px; font-weight:600;}
+  /* Ensure the Reset Column Width button uses identical base style but grows to fit its label without wrapping */
+  .gt-reset-widths-btn{white-space:nowrap; width:auto !important; min-width:max-content; max-width:none; flex:0 0 auto;}
   .gt-add-btn:hover{background:#f5f5f5;}
       .gt-table-wrap{overflow:auto;flex:1 1 auto;}
       .gt-table{border-collapse:collapse;width:100%;}
@@ -573,6 +713,7 @@
       .gt-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;}
       .gt-pager button{margin:0 4px;}
       .gt-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;user-select:none;}
+      .gt-delete-btn{padding:2px 6px;font-size:12px;background:#c0392b;color:#fff;border:none;border-radius:4px;cursor:pointer;}
       `;
       document.head.appendChild(st);
     }
@@ -580,6 +721,8 @@
     return {
       refresh: refresh,
       setData: function(columns, rows){
+        // Save current widths before re-creating, so we can re-apply them identically
+        try { saveColumnWidths(); } catch(e) {}
         cfg.columns = columns || [];
         cfg.rows = (rows || []).map(function(r){
           if(Array.isArray(r)){
