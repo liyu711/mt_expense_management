@@ -89,14 +89,11 @@
             <!-- Modify button to open modal for updating existing forecasts -->
             <button id="modify_button" type="button">Modify</button>
         </div>
+        {% from 'components/movable_modal.html' import movable_modal %}
 
-        <!-- Modal for forecast input (hidden by default) -->
-        <div id="forecastModal" class="modal" aria-hidden="true" role="dialog">
-            <div class="modal-overlay" id="forecastModalOverlay"></div>
-            <div class="modal-content">
-                <button class="modal-close" id="forecastModalClose" aria-label="Close">&times;</button>
-                <h1>Forecast Input (Personnel & Non-Personnel)</h1>
-                <form method="POST" action="/upload_forecast" id="upload_forecast">
+        <!-- Movable modal for forecast input -->
+        {% call movable_modal('forecastModal','Forecast Input (Personnel & Non-Personnel)', overlay_id='forecastModalOverlay', close_id='forecastModalClose') %}
+            <form method="POST" action="/upload_forecast" id="upload_forecast">
                     <div class="form-group">
                         <label for="PO">PO</label>
                         <select name="PO" id="po_select" required>
@@ -158,16 +155,11 @@
                         <button type="button" id="forecastModalCancel">Cancel</button>
                     </div>
                 </form>
-            </div>
-        </div>
+        {% endcall %}
 
-        <!-- Modal for modifying forecasts (hidden by default) -->
-        <div id="modifyForecastModal" class="modal" aria-hidden="true" role="dialog">
-            <div class="modal-overlay" id="modifyForecastModalOverlay"></div>
-            <div class="modal-content">
-                <button class="modal-close" id="modifyForecastModalClose" aria-label="Close">&times;</button>
-                <h1>Modify Forecast (Personnel & Non-Personnel)</h1>
-                <form method="POST" action="/manual_input/change_forecast" id="modify_forecast">
+        <!-- Movable modal for modifying forecasts -->
+        {% call movable_modal('modifyForecastModal','Modify Forecast (Personnel & Non-Personnel)', overlay_id='modifyForecastModalOverlay', close_id='modifyForecastModalClose') %}
+            <form method="POST" action="/manual_input/change_forecast" id="modify_forecast">
                     <div class="form-group">
                         <label for="PO_modify">PO</label>
                         <select name="PO" id="po_select_modify" required>
@@ -221,8 +213,7 @@
                         <button type="button" id="modifyForecastModalCancel">Cancel</button>
                     </div>
                 </form>
-            </div>
-        </div>
+        {% endcall %}
 
         <!-- Display combined project forecasts table (GenericTable) -->
         {% if combined_forecast_columns %}
@@ -1394,5 +1385,6 @@
                 cursor: pointer;
             }
         </style>
+        <script src="{{ url_for('static', filename='js/movableModal.js') }}"></script>
     </div>
 {% endblock %}

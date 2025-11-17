@@ -17,15 +17,27 @@
     root.classList.add('gt-container');
     root.innerHTML = '';
 
-    const header = document.createElement('div');
-    header.className = 'gt-header';
+  const header = document.createElement('div');
+  header.className = 'gt-header';
 
-    const titleEl = document.createElement('div');
-    titleEl.className = 'gt-title';
-    titleEl.textContent = cfg.title || '';
+  // Left side: Add button + title
+  const leftBar = document.createElement('div');
+  leftBar.className = 'gt-left';
 
-    const controlsRight = document.createElement('div');
-    controlsRight.className = 'gt-controls';
+  const addBtn = document.createElement('button');
+  addBtn.type = 'button';
+  addBtn.className = 'gt-add-btn';
+  addBtn.textContent = (cfg.addButton && cfg.addButton.label) ? String(cfg.addButton.label) : 'Add';
+
+  const titleEl = document.createElement('div');
+  titleEl.className = 'gt-title';
+  titleEl.textContent = cfg.title || '';
+
+  leftBar.appendChild(addBtn);
+  leftBar.appendChild(titleEl);
+
+  const controlsRight = document.createElement('div');
+  controlsRight.className = 'gt-controls';
 
     const searchInput = document.createElement('input');
     searchInput.type = 'search';
@@ -42,10 +54,10 @@
       pageSizeSel.appendChild(opt);
     });
 
-    controlsRight.appendChild(searchInput);
-    controlsRight.appendChild(pageSizeSel);
-    header.appendChild(titleEl);
-    header.appendChild(controlsRight);
+  controlsRight.appendChild(searchInput);
+  controlsRight.appendChild(pageSizeSel);
+  header.appendChild(leftBar);
+  header.appendChild(controlsRight);
 
     const tableWrap = document.createElement('div');
     tableWrap.className = 'gt-table-wrap';
@@ -391,6 +403,31 @@
       }
     }
 
+    // Wire Add button behavior: prefer cfg.addButton.onClick, otherwise click legacy #add_button, otherwise open #modifyModal if present
+    (function(){
+      function tryLegacyClick(){
+        try {
+          const legacy = document.getElementById('add_button');
+          if(legacy && typeof legacy.click === 'function'){ legacy.click(); return true; }
+        } catch(e) {}
+        return false;
+      }
+      function tryOpenDefaultModal(){
+        try {
+          const m = document.getElementById('modifyModal') || document.querySelector('#modifyModal');
+          if(m){ openModal(m); return true; }
+        } catch(e) {}
+        return false;
+      }
+      addBtn.addEventListener('click', function(){
+        try {
+          if (cfg.addButton && typeof cfg.addButton.onClick === 'function') { cfg.addButton.onClick(); return; }
+        } catch(e) {}
+        if (tryLegacyClick()) return;
+        tryOpenDefaultModal();
+      });
+    })();
+
     function renderBody(rows){
       tbody.innerHTML = '';
       const start = (currentPage - 1) * pageSize;
@@ -515,11 +552,14 @@
       st.id = 'gt-styles';
       st.textContent = `
       .gt-container{display:flex;flex-direction:column;gap:8px;height:100%;}
-      .gt-header{display:flex;justify-content:space-between;align-items:center;}
-      .gt-title{font-weight:600;font-size:1.1em;}
-      .gt-controls{display:flex;gap:8px;align-items:center;}
+  .gt-header{display:flex;justify-content:space-between;align-items:center;gap:8px;}
+  .gt-left{display:flex;align-items:center;gap:8px;flex:1 1 auto;}
+  .gt-title{font-weight:600;font-size:1.1em;flex:1 1 auto;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .gt-controls{display:flex;gap:8px;align-items:center;flex:0 0 auto;}
       .gt-search{padding:6px 8px;}
       .gt-page-size{padding:6px 8px;}
+  .gt-add-btn{box-sizing:border-box; padding:6px 8px; border:1px solid #444; background:#fff; cursor:pointer; border-radius:4px; flex:0 0 15%; width:15%; min-width:120px; max-width:260px; font-weight:600;}
+  .gt-add-btn:hover{background:#f5f5f5;}
       .gt-table-wrap{overflow:auto;flex:1 1 auto;}
       .gt-table{border-collapse:collapse;width:100%;}
   .gt-table th,.gt-table td{border:1px solid #ddd;padding:6px 8px;}

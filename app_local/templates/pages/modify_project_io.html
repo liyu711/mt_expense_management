@@ -170,7 +170,32 @@
                         title: title,
                         columns: data.columns || [],
                         rows: data.rows || [],
-                        onRowClick: onRowClick
+                        onRowClick: onRowClick,
+                        addButton: {
+                            onClick: function(){
+                                try{
+                                    var btn = document.getElementById('add_project_button');
+                                    if(btn && typeof btn.click === 'function'){ btn.click(); return; }
+                                }catch(e){}
+                                // Fallback: open the project modal directly in add mode
+                                try{
+                                    var form = document.getElementById('projectForm');
+                                    var modal = document.getElementById('projectModal');
+                                    if(form){
+                                        var em = document.getElementById('proj_edit_mode'); if(em) em.value = '0';
+                                        var pid = document.getElementById('proj_project_id'); if(pid) pid.value = '';
+                                        var existC = document.getElementById('proj_existing_container'); if(existC) existC.style.display = 'none';
+                                        form.removeAttribute('action');
+                                        try{ form.reset(); }catch(_){ }
+                                        // show IO inputs and reset rows
+                                        var grp = document.getElementById('proj_io_group'); if(grp) grp.style.display = '';
+                                        if(window.IOInputs && typeof window.IOInputs.reset === 'function'){ window.IOInputs.reset(); }
+                                    }
+                                    if(modal){ modal.style.display='block'; modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
+                                        var first = modal.querySelector('input,select,button'); if(first) first.focus(); }
+                                }catch(_){ }
+                            }
+                        }
                     });
                     // Inject Delete buttons with strong warning
                     (function(){
