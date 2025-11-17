@@ -1,0 +1,22 @@
+{#
+  Reusable movable modal macro.
+  Usage:
+    {% from 'components/movable_modal.html' import movable_modal %}
+    {% call movable_modal('projectModal','Project') %}
+        ... modal inner HTML (form, body) ...
+    {% endcall %}
+#}
+{% macro movable_modal(modal_id, title, overlay_id=None, close_id=None) -%}
+<div id="{{ modal_id }}" class="modal" aria-hidden="true" role="dialog">
+  <div class="modal-overlay" id="{{ overlay_id or (modal_id ~ 'Overlay') }}"></div>
+  <div class="modal-content" role="document" tabindex="0" aria-labelledby="{{ modal_id }}Title">
+    <div class="modal-header" style="cursor:move; display:flex; align-items:center; justify-content:space-between; gap:12px;">
+      <h2 id="{{ modal_id }}Title" style="margin:0;">{{ title }}</h2>
+      <button class="modal-close" id="{{ close_id or (modal_id ~ 'Close') }}" aria-label="Close">&times;</button>
+    </div>
+    <div class="modal-body">
+      {{ caller() }}
+    </div>
+  </div>
+</div>
+{%- endmacro %}

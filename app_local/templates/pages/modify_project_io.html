@@ -32,60 +32,56 @@
             </div>
         </div>
 
-        <!-- Project Add/Modify Modal -->
-        <div id="projectModal" class="modal" aria-hidden="true" role="dialog" aria-labelledby="projectModalTitle">
-            <div class="modal-overlay" id="projectOverlay"></div>
-            <div class="modal-content" role="document">
-                <button class="modal-close" id="projectClose" aria-label="Close">&times;</button>
-                <h2 id="projectModalTitle">Project</h2>
-                <form method="POST" name="Modify_projects" id="projectForm">
-                    <input type="hidden" name="form_kind" value="project">
-                    <input type="hidden" name="table_name" value="projects">
-                    <input type="hidden" name="edit_mode" id="proj_edit_mode" value="0">
-                    <input type="hidden" name="project_id" id="proj_project_id" value="">
-                    <!-- Existing project selector (shown only in edit mode) -->
-                    <div class="form-group" id="proj_existing_container" style="display:none;">
-                        <label for="proj_existing_project">Existing Project</label>
-                        <select name="existing_project" id="proj_existing_project">
-                            <option value="" disabled selected>Select a project</option>
-                            {% for p in project_names %}
-                                <option value="{{ p.name }}" data-id="{{ p.id }}">{{ p.name }}</option>
-                            {% endfor %}
-                        </select>
+        <!-- Project Add/Modify Modal (movable component) -->
+        {% from 'components/movable_modal.html' import movable_modal %}
+        {% call movable_modal('projectModal','Project', overlay_id='projectOverlay', close_id='projectClose') %}
+            <form method="POST" name="Modify_projects" id="projectForm">
+                <input type="hidden" name="form_kind" value="project">
+                <input type="hidden" name="table_name" value="projects">
+                <input type="hidden" name="edit_mode" id="proj_edit_mode" value="0">
+                <input type="hidden" name="project_id" id="proj_project_id" value="">
+                <!-- Existing project selector (shown only in edit mode) -->
+                <div class="form-group" id="proj_existing_container" style="display:none;">
+                    <label for="proj_existing_project">Existing Project</label>
+                    <select name="existing_project" id="proj_existing_project">
+                        <option value="" disabled selected>Select a project</option>
+                        {% for p in project_names %}
+                            <option value="{{ p.name }}" data-id="{{ p.id }}">{{ p.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% for field in project_fields %}
+                    <div class="form-group">
+                        <label for="proj_{{ field.name }}">{{ field.label }}</label>
+                        {% if field.type == 'select' %}
+                            <select name="{{ field.name }}" id="proj_{{ field.name }}" required>
+                                <option value="" disabled selected>Select an option</option>
+                                {% for option in field.options %}
+                                    <option value="{{ option }}">{{ option }}</option>
+                                {% endfor %}
+                            </select>
+                        {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
+                            <input type="{{ field.type }}" name="{{ field.name }}" id="proj_{{ field.name }}" required>
+                        {% endif %}
                     </div>
-                    {% for field in project_fields %}
-                        <div class="form-group">
-                            <label for="proj_{{ field.name }}">{{ field.label }}</label>
-                            {% if field.type == 'select' %}
-                                <select name="{{ field.name }}" id="proj_{{ field.name }}" required>
-                                    <option value="" disabled selected>Select an option</option>
-                                    {% for option in field.options %}
-                                        <option value="{{ option }}">{{ option }}</option>
-                                    {% endfor %}
-                                </select>
-                            {% elif field.type == 'text' or field.type == 'password' or field.type == 'number' %}
-                                <input type="{{ field.type }}" name="{{ field.name }}" id="proj_{{ field.name }}" required>
-                            {% endif %}
-                        </div>
-                    {% endfor %}
-                    <!-- IO numbers for merged add flow (supports multiple) -->
-                    <div class="form-group" id="proj_io_group">
-                        <label>IO Number(s)</label>
-                        <div id="ioInputs" style="display:flex;flex-direction:column;gap:8px;">
-                            <div class="io-row" style="display:flex;gap:8px;align-items:center;">
-                                <input type="number" name="IO" class="proj_io_input" placeholder="Optional: IO number for this project">
-                                <button type="button" class="io-add">+</button>
-                                <button type="button" class="io-del">-</button>
-                            </div>
+                {% endfor %}
+                <!-- IO numbers for merged add flow (supports multiple) -->
+                <div class="form-group" id="proj_io_group">
+                    <label>IO Number(s)</label>
+                    <div id="ioInputs" style="display:flex;flex-direction:column;gap:8px;">
+                        <div class="io-row" style="display:flex;gap:8px;align-items:center;">
+                            <input type="number" name="IO" class="proj_io_input" placeholder="Optional: IO number for this project">
+                            <button type="button" class="io-add">+</button>
+                            <button type="button" class="io-del">-</button>
                         </div>
                     </div>
-                    <div style="margin-top:12px;">
-                        <button type="submit">Submit</button>
-                        <button type="button" id="projectCancel">Cancel</button>
-                    </div>
-                </form>
-            </div>
-        </div>
+                </div>
+                <div style="margin-top:12px;">
+                    <button type="submit">Submit</button>
+                    <button type="button" id="projectCancel">Cancel</button>
+                </div>
+            </form>
+        {% endcall %}
 
     
         
@@ -105,6 +101,7 @@
 {% endblock %}
 {% block scripts %}
     <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/movableModal.js') }}"></script>
     <script>
         // Basic modal open/close wiring
         (function(){

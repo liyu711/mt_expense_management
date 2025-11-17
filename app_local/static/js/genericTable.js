@@ -477,11 +477,37 @@
         arr.forEach(function(w, i){ if (w != null && colEls[i]) colEls[i].style.width = w + 'px'; });
       } catch(e){}
     }
-    applySavedColumnWidths();
+    // Apply saved widths if any; otherwise freeze initial positions so columns don't expand from center when resizing
+    let __gtHasSavedWidths = false;
+    try { __gtHasSavedWidths = !!sessionStorage.getItem(storageKey); } catch(e) { __gtHasSavedWidths = false; }
+    if (__gtHasSavedWidths) {
+      applySavedColumnWidths();
+    }
+
+    // After first layout, capture the initial pixel widths so dragging adjusts the right edge only
+    let __gtInitialWidthsFrozen = false;
+    function freezeInitialColumnWidths(){
+      if(__gtInitialWidthsFrozen) return;
+      // If saved widths existed, we don't need to freeze again
+      if(__gtHasSavedWidths) { __gtInitialWidthsFrozen = true; return; }
+      try{
+        // Use the rendered header cell widths as the baseline
+        Array.from(headerRow.children).forEach(function(th, i){
+          if(colEls[i] && th){
+            const w = Math.round(th.getBoundingClientRect().width);
+            if(w > 0) colEls[i].style.width = w + 'px';
+          }
+        });
+        __gtInitialWidthsFrozen = true;
+      }catch(e){}
+    }
 
     // Initial
     rebuildFilters(cfg.rows);
-    refresh();
+  refresh();
+  // Freeze initial widths after first render to anchor left edges
+  // Use requestAnimationFrame to ensure DOM has painted
+  try { requestAnimationFrame(freezeInitialColumnWidths); } catch(e) { setTimeout(freezeInitialColumnWidths, 0); }
 
     // Minimal styles (scoped)
     if(!document.getElementById('gt-styles')){
