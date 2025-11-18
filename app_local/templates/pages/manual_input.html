@@ -128,7 +128,7 @@
                     </div>
                     <div class="form-group">
                         <label for="IO">IO</label>
-                        <input type="text" name="IO" required value="{{ ios[0] if ios|length > 0 else '' }}">
+                        <input type="text" name="IO" required value="{{ ios[0] if ios|length > 0 else '' }}" readonly style="background:#f9f9f9; cursor:not-allowed;">
                     </div>
                     <div class="form-group">
                         <label>Human Resource FTEs</label>
@@ -152,33 +152,41 @@
             <form method="POST" action="/manual_input/change_forecast" id="modify_forecast">
                     <div class="form-group">
                         <label for="PO_modify">PO</label>
-                        <select name="PO" id="po_select_modify" required>
+                        <select name="PO" id="po_select_modify" required disabled style="background:#f9f9f9; cursor:not-allowed;">
                             <option value="" selected disabled>Select PO</option>
                             {% for po in pos %}
                             <option value="{{ po.name }}">{{ po.name }}</option>
                             {% endfor %}
                         </select>
+                        <!-- mirror for disabled select so value is submitted -->
+                        <input type="hidden" name="PO" id="hidden_po_modify" value="">
                     </div>
                     <div class="form-group">
                         <label for="Department_modify">BU</label>
-                        <select name="Department" id="department_select_modify" required>
+                        <select name="Department" id="department_select_modify" required disabled style="background:#f9f9f9; cursor:not-allowed;">
                             <option value="" selected disabled>Select BU</option>
                         </select>
+                        <!-- mirror for disabled select so value is submitted -->
+                        <input type="hidden" name="Department" id="hidden_department_modify" value="">
                     </div>
                     <div class="form-group">
                         <label for="fiscal_year_modify">Fiscal Year</label>
-                        <select name="fiscal_year" id="fiscal_year_modify" required>
+                        <select name="fiscal_year" id="fiscal_year_modify" required disabled style="background:#f9f9f9; cursor:not-allowed;">
                             <option value="" selected disabled>Select Fiscal Year</option>
                             {% for y in range(2020, 2036) %}
                             <option value="{{ y }}">{{ y }}</option>
                             {% endfor %}
                         </select>
+                        <!-- mirror for disabled select so value is submitted -->
+                        <input type="hidden" name="fiscal_year" id="hidden_fiscal_year_modify" value="">
                     </div>
                     <div class="form-group">
                         <label for="Project_Name_modify">Project Name</label>
-                        <select name="Project_Name" id="project_name_modify" required>
+                        <select name="Project_Name" id="project_name_modify" required disabled style="background:#f9f9f9; cursor:not-allowed;">
                             <option value="" selected disabled>Select Project</option>
                         </select>
+                        <!-- mirror for disabled select so value is submitted -->
+                        <input type="hidden" name="Project_Name" id="hidden_project_modify" value="">
                     </div>
                     <div class="form-group">
                         <label for="Project_Category_modify">Project Category</label>
@@ -481,12 +489,17 @@
                             var deptSel = document.getElementById('department_select_modify');
                             var fySel = document.getElementById('fiscal_year_modify');
                             var projSel = document.getElementById('project_name_modify');
+                            var hiddenProj = document.getElementById('hidden_project_modify');
                             var pcInp = document.getElementById('project_category_modify');
                             var ioInp = document.getElementById('io_modify');
                             var nonpcInp = document.getElementById('Non_personnel_cost_modify');
                             var fiscalYear = row['Fiscal Year'] || row['fiscal_year'];
+                            var hiddenPo = document.getElementById('hidden_po_modify');
+                            var hiddenDept = document.getElementById('hidden_department_modify');
+                            var hiddenFy = document.getElementById('hidden_fiscal_year_modify');
                             // Set PO immediately
                             if (poSel && row['PO']) { poSel.value = row['PO']; }
+                            if (hiddenPo && row['PO']) { hiddenPo.value = row['PO']; }
                             // Fetch departments for PO then set Department
                             function fetchDepartments(){
                                 return new Promise(function(resolve){
@@ -502,6 +515,7 @@
                                                 opt.value = d.name; opt.textContent = d.name; deptSel.appendChild(opt);
                                             });
                                             if (row['Department']) deptSel.value = row['Department'];
+                                            if (hiddenDept && row['Department']) hiddenDept.value = row['Department'];
                                         }
                                         resolve();
                                       }).catch(function(){ resolve(); });
@@ -525,6 +539,7 @@
                                             if (row['Project'] || row['Project Name']) {
                                                 var pname = row['Project'] || row['Project Name'];
                                                 projSel.value = pname;
+                                                if (hiddenProj) hiddenProj.value = pname;
                                             }
                                         }
                                         resolve();
@@ -533,6 +548,7 @@
                             }
                             // Set fiscal year select
                             if (fySel && fiscalYear){ fySel.value = fiscalYear; }
+                            if (hiddenFy && fiscalYear){ hiddenFy.value = fiscalYear; }
                             // Sequential async population
                             fetchDepartments().then(fetchProjects).then(function(){
                                 if (pcInp && row['Project Category']) pcInp.value = row['Project Category'];

@@ -364,25 +364,17 @@ def render_mannual_input():
                         int(year_val)
                     )
                     if cost_val is not None:
+                        # Only record exact keys (po, department, category, year). No global fallbacks.
                         base_cost_lookup[key] = cost_val
-                    # Also store fallbacks without PO/Dept to ease lookup
-                    key_po_only = (key[0], None, key[2], key[3])
-                    key_dept_only = (None, key[1], key[2], key[3])
-                    key_none = (None, None, key[2], key[3])
-                    if cost_val is not None:
-                        # only set if not already present to preserve more specific entries
-                        base_cost_lookup.setdefault(key_po_only, cost_val)
-                        base_cost_lookup.setdefault(key_dept_only, cost_val)
-                        base_cost_lookup.setdefault(key_none, cost_val)
                 except Exception:
                     continue
     except Exception:
         base_cost_lookup = {}
 
     def compute_personnel_cost(pr):
-        """Derive personnel cost = FTE * base_cost(category, fiscal_year). Falls back to stored Personnel Expense if present."""
-        # Attempt to read previously stored cost columns (legacy) first
-        legacy_cost = pr.get('Personnel Expense') or pr.get('Personnel Cost') or pr.get('personnel_expense')
+        """Derive personnel cost = FTE * base_cost(category, fiscal_year).
+        If no configured cost exists for the category/year (and optional PO/Dept), return None so the UI shows no value.
+        """
         # Determine FTE and category
         cat = pr.get('Human resource category') or pr.get('Staff Category')
         fte_raw = pr.get('Human resource FTE') or pr.get('Work Hours(FTE)') or pr.get('human_resource_fte')
@@ -398,29 +390,19 @@ def render_mannual_input():
         except Exception:
             fy_val = None
         if cat and fte_val is not None and fy_val is not None:
-            # try most specific -> least specific
+            # Strict match: use only exact (PO, Department, Category, Year). No fallback.
             cat_key = str(cat).strip().lower()
             po_key = str(po_name).strip().lower() if po_name not in (None, '') else None
             dept_key = str(dept_name).strip().lower() if dept_name not in (None, '') else None
-            base_cost = None
-            for k in [
-                (po_key, dept_key, cat_key, fy_val),
-                (po_key, None, cat_key, fy_val),
-                (None, dept_key, cat_key, fy_val),
-                (None, None, cat_key, fy_val)
-            ]:
-                if k in base_cost_lookup:
-                    base_cost = base_cost_lookup.get(k)
-                    if base_cost is not None:
-                        break
+            base_cost = base_cost_lookup.get((po_key, dept_key, cat_key, fy_val))
             try:
                 base_num = float(base_cost) if base_cost is not None else None
             except Exception:
                 base_num = None
             if base_num is not None:
                 return base_num * fte_val
-        # fallback to legacy stored cost value if available
-        return legacy_cost
+        # No base cost available or missing inputs -> display as no value
+        return None
 
     def build_row_base(source_dict):
         return {c: source_dict.get(c) for c in base_cols_order}
@@ -969,8 +951,68 @@ def manual_project_categories():
 
 @manual_upload.route('/manual_input/ios', methods=['GET'])
 def manual_ios():
-    """IO dimension removed; return empty list for compatibility."""
-    return jsonify({'ios': []}), 200
+    """Return IO numbers for the provided project name (query param 'project') or for the
+    current module-level selected_project. Response JSON: { 'ios': [ '1000123', ... ] }
+    If project is missing or no IOs found, returns an empty list. This endpoint is used to
+    auto-populate the read-only IO field in the upload/modify forecast forms.
+    """
+    project_name = request.args.get('project') or selected_project
+    ios = []
+    if not project_name or str(project_name).strip() == '' or str(project_name) == 'All':
+        return jsonify({'ios': ios}), 200
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        # resolve project id
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+        proj_id = None
+        if proj_df is not None:
+            try:
+                # normalize possible project name columns
+                name_col = None
+                if 'name' in proj_df.columns: name_col = 'name'
+                elif 'Project' in proj_df.columns: name_col = 'Project'
+                elif 'project' in proj_df.columns: name_col = 'project'
+                if name_col:
+                    mask = proj_df[name_col].astype(str).str.strip().str.lower() == str(project_name).strip().lower()
+                    match = proj_df[mask]
+                    if not match.empty and 'id' in match.columns and pd.notna(match.iloc[0]['id']):
+                        try:
+                            proj_id = int(match.iloc[0]['id'])
+                        except Exception:
+                            proj_id = None
+            except Exception:
+                proj_id = None
+
+        # fetch IOs for project_id
+        if proj_id is not None:
+            ios_df = select_all_from_table(cursor, cnxn, 'IOs')
+            if ios_df is not None:
+                try:
+                    df = ios_df
+                    # filter by project_id if such column exists
+                    if 'project_id' in df.columns:
+                        try:
+                            df = df[df['project_id'].astype('Int64') == proj_id]
+                        except Exception:
+                            try:
+                                df = df[df['project_id'].astype(str) == str(proj_id)]
+                            except Exception:
+                                pass
+                    # choose IO number column
+                    io_col = 'IO_num' if 'IO_num' in df.columns else ('io_num' if 'io_num' in df.columns else None)
+                    if io_col:
+                        ios = [str(v) for v in df[io_col].dropna().astype(str).tolist() if str(v).strip()]
+                except Exception:
+                    ios = []
+
+        try:
+            cursor.close(); cnxn.close()
+        except Exception:
+            pass
+        return jsonify({'ios': ios}), 200
+    except Exception as e:
+        return jsonify({'ios': [], 'error': str(e)}), 500
 
 
 @manual_upload.route("/upload_forecast_nonpc", methods=['POST'])
