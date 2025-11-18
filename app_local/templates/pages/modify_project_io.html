@@ -23,14 +23,7 @@
 {% endblock %}
 {% block content %}
     <div class="page-wrapper">
-        <div class="page-top">
-            <div class="container">
-                <div class="button-row">
-                    <button id="add_project_button" type="button">Add new project</button>
-                    <button id="modify_project_button" type="button">Modify existing project</button>
-                </div>
-            </div>
-        </div>
+        <div class="page-top"></div>
 
         <!-- Project Add/Modify Modal (movable component) -->
         {% from 'components/movable_modal.html' import movable_modal %}
@@ -88,7 +81,6 @@
             <!-- Combined Projects table (includes grouped IOs column) -->
             <div class="tables-row">
                 <div class="table-half" style="flex:1 1 100%;">
-                    <h3>Projects (with IOs)</h3>
                     <div id="gt-projects" style="height:600px;"></div>
                 </div>
             </div>
@@ -103,15 +95,13 @@
     <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
     <script src="{{ url_for('static', filename='js/movableModal.js') }}"></script>
     <script>
-        // Basic modal open/close wiring
+        // Basic modal open/close wiring (open directly from table interactions)
         (function(){
             function open(modal){ modal.style.display='block'; modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
                 var firstInput = modal.querySelector('input,select,button'); if(firstInput) firstInput.focus(); }
             function close(modal){ modal.style.display='none'; modal.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
 
             var projModal = document.getElementById('projectModal');
-            var addProjBtn = document.getElementById('add_project_button');
-            var modProjBtn = document.getElementById('modify_project_button');
             var projClose = document.getElementById('projectClose');
             var projOverlay = document.getElementById('projectOverlay');
             var projCancel = document.getElementById('projectCancel');
@@ -119,39 +109,27 @@
                 var grp = document.getElementById('proj_io_group');
                 if(grp) grp.style.display = visible ? '' : 'none';
             }
-            // Add mode
-            addProjBtn && addProjBtn.addEventListener('click', function(){
-                // Reset edit mode
+            // Expose helpers to open modal in specific modes
+            window.__openProjectAdd = function(){
                 var form = document.getElementById('projectForm');
                 document.getElementById('proj_edit_mode').value = '0';
                 document.getElementById('proj_project_id').value = '';
-                var existC = document.getElementById('proj_existing_container');
-                if (existC) existC.style.display = 'none';
-                // reset form action to default (post back to same route)
+                var existC = document.getElementById('proj_existing_container'); if (existC) existC.style.display = 'none';
                 form.removeAttribute('action');
-                // clear fields
                 try { form.reset(); } catch(e){}
-                // Show IO field in add mode
                 setIoFieldVisible(true);
-                // Reset IO inputs to a single empty row
                 try { if (window.IOInputs && typeof window.IOInputs.reset === 'function') window.IOInputs.reset(); } catch(e){}
                 open(projModal);
-            });
-            // Edit mode
-            modProjBtn && modProjBtn.addEventListener('click', function(){
+            };
+            window.__openProjectEdit = function(){
                 var form = document.getElementById('projectForm');
                 document.getElementById('proj_edit_mode').value = '1';
-                var existC = document.getElementById('proj_existing_container');
-                if (existC) existC.style.display = '';
-                // set form action to change endpoint
+                var existC = document.getElementById('proj_existing_container'); if (existC) existC.style.display = '';
                 form.action = '/modify_project/change_project';
-                // Show IO field in edit mode (IO can be added/removed)
                 setIoFieldVisible(true);
                 open(projModal);
-            });
+            };
             [projClose, projOverlay, projCancel].forEach(function(el){ el && el.addEventListener('click', function(){ close(projModal); }); });
-
-            // IO modification is integrated into the Project modal
         })();
     </script>
 
@@ -161,41 +139,15 @@
             function fetchJSON(url){
                 return fetch(url).then(function(r){ return r.ok ? r.json() : {columns:[], rows:[]}; }).catch(function(){ return {columns:[], rows:[]}; });
             }
-            function mountTable(elId, title, listUrl, onRowClick){
+            function mountTable(elId, listUrl, onRowClick){
                 var el = document.getElementById(elId);
                 if(!el) return;
                 fetchJSON(listUrl).then(function(data){
                     if(!window.GenericTable || !GenericTable.create) return;
                     GenericTable.create(el, {
-                        title: title,
                         columns: data.columns || [],
                         rows: data.rows || [],
                         onRowClick: onRowClick,
-                        addButton: {
-                            onClick: function(){
-                                try{
-                                    var btn = document.getElementById('add_project_button');
-                                    if(btn && typeof btn.click === 'function'){ btn.click(); return; }
-                                }catch(e){}
-                                // Fallback: open the project modal directly in add mode
-                                try{
-                                    var form = document.getElementById('projectForm');
-                                    var modal = document.getElementById('projectModal');
-                                    if(form){
-                                        var em = document.getElementById('proj_edit_mode'); if(em) em.value = '0';
-                                        var pid = document.getElementById('proj_project_id'); if(pid) pid.value = '';
-                                        var existC = document.getElementById('proj_existing_container'); if(existC) existC.style.display = 'none';
-                                        form.removeAttribute('action');
-                                        try{ form.reset(); }catch(_){ }
-                                        // show IO inputs and reset rows
-                                        var grp = document.getElementById('proj_io_group'); if(grp) grp.style.display = '';
-                                        if(window.IOInputs && typeof window.IOInputs.reset === 'function'){ window.IOInputs.reset(); }
-                                    }
-                                    if(modal){ modal.style.display='block'; modal.setAttribute('aria-hidden','false'); document.body.style.overflow='hidden';
-                                        var first = modal.querySelector('input,select,button'); if(first) first.focus(); }
-                                }catch(_){ }
-                            }
-                        },
                         deleteColumn: {
                             header: 'Delete',
                             widthPx: 100,
@@ -230,20 +182,20 @@
 
             function openProjectEdit(row){
                 try{
-                    // Switch to edit mode (triggers showing existing project selector)
-                    var modBtn = document.getElementById('modify_project_button');
-                    if(modBtn) modBtn.click();
-                    // Set existing project and trigger details fetch (handled by existing change listener)
+                    // Open modal directly in edit mode
+                    if (window.__openProjectEdit) window.__openProjectEdit();
+                    // Set existing project and trigger details fetch
                     var existSel = document.getElementById('proj_existing_project');
-                    if(existSel && row && row.Project){
-                        existSel.value = row.Project;
+                    var projName = row && (row.Project || row['Project Name'] || row.name);
+                    if(existSel && projName){
+                        existSel.value = projName;
                         existSel.dispatchEvent(new Event('change', { bubbles: true }));
                     }
                 }catch(e){}
             }
 
             // Mount single combined table
-            mountTable('gt-projects', 'Projects', "{{ url_for('project_routes.list_projects') }}", openProjectEdit);
+            mountTable('gt-projects', "{{ url_for('project_routes.list_projects') }}", openProjectEdit);
         })();
     </script>
 

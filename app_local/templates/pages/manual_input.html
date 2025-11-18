@@ -63,12 +63,7 @@
             box-sizing: border-box;
         }
 
-        .page-top {
-            flex: 0 0 10vh;
-            /* 10% of viewport height */
-            padding-left: 24px;
-            box-sizing: border-box;
-        }
+        .page-top { flex: 0 0 auto; padding-left: 24px; box-sizing: border-box; }
 
         .table-container {
             /* Let table take all remaining vertical space under the header */
@@ -83,12 +78,7 @@
 {% endblock %}
 {% block content %}
     <div class="page-wrapper">
-        <div class="page-top">
-            <!-- Add button to open modal for manual forecast input -->
-            <button id="add_button" type="button">Add</button>
-            <!-- Modify button to open modal for updating existing forecasts -->
-            <button id="modify_button" type="button">Modify</button>
-        </div>
+        <div class="page-top"></div>
         {% from 'components/movable_modal.html' import movable_modal %}
 
         <!-- Movable modal for forecast input -->
@@ -218,8 +208,7 @@
         <!-- Display combined project forecasts table (GenericTable) -->
         {% if combined_forecast_columns %}
         <div class="table-container">
-            <h3>Project Forecasts</h3>
-            <div id="gt-forecasts" style="height:100%;" data-cols='{{ combined_forecast_columns|tojson|safe }}' data-rows='{{ (combined_forecast_data or [])|tojson|safe }}' data-group-start='{{ (personnel_group_columns or [])|first }}' data-group-end='{{ (personnel_group_columns or [])|last }}'></div>
+            <div id="gt-forecasts" style="height:600px;" data-cols='{{ combined_forecast_columns|tojson|safe }}' data-rows='{{ (combined_forecast_data or [])|tojson|safe }}' data-group-start='{{ (personnel_group_columns or [])|first }}' data-group-end='{{ (personnel_group_columns or [])|last }}'></div>
         </div>
         {% endif %}
 

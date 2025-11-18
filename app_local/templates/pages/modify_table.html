@@ -32,17 +32,8 @@
             height: calc(100vh - 0px);
             box-sizing: border-box;
         }
-        .page-top {
-            flex: 0 0 20vh; /* top area 20% */
-            box-sizing: border-box;
-            padding: 24px 0 0 0;
-        }
-        .table-container {
-            flex: 0 0 80vh; /* table area 80% */
-            box-sizing: border-box;
-            padding: 0 24px 24px 24px;
-            overflow: auto;
-        }
+        .page-top { flex: 0 0 auto; box-sizing: border-box; padding: 24px 0 0 0; }
+        .table-container { box-sizing: border-box; padding: 0 24px 24px 24px; overflow: auto; }
     </style>
 {% endblock %}
 {% block content %}
@@ -51,11 +42,6 @@
             <div class="container">
                 {% from 'components/movable_modal.html' import movable_modal %}
                 
-                <!-- Add and Modify buttons to trigger modal popups -->
-                <button id="add_button" type="button">Add</button>
-                {% if table_name == 'human_resource_cost' or table_name == 'capex_forecasts' or table_name == 'budgets' or table_name == 'fundings' or table_name == 'capex_budgets' %}
-                <button id="modify_button" type="button">Modify</button>
-                {% endif %}
 
         <!-- Movable Modal (Add/Modify Primary) -->
         {% call movable_modal('modifyModal','Modify ' ~ title, overlay_id='modalOverlay', close_id='modalClose') %}
@@ -155,7 +141,7 @@
                 <div class="table-container">
                 {% if columns %}
                     <!-- <h3>Current table data</h3> -->
-                    <div id="gt-generic" style="height:60vh;" data-cols='{{ columns|tojson|safe }}' data-rows='{{ data|tojson|safe }}' data-table='{{ table_name }}'></div>
+                    <div id="gt-generic" style="height:600px;" data-cols='{{ columns|tojson|safe }}' data-rows='{{ data|tojson|safe }}' data-table='{{ table_name }}'></div>
                     <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
                     <script>
                         (function(){
@@ -169,7 +155,7 @@
                                 });
                                 if(!window.GenericTable || !GenericTable.create) return;
                                 var modalEl = document.getElementById('modifyModalChange');
-                                var opts = { title: '', columns: cols, rows: rows };
+                                var opts = { columns: cols, rows: rows };
                                 if(modalEl){
                                     opts.rowClickEditModal = { selector: '#modifyModalChange' };
                                     // Special prefill for PO page: set both existing_name and the new input value
@@ -770,23 +756,20 @@
             </div>
             {% if table_name == 'projects' %}
             <div style="padding: 0 24px 24px 24px;">
-                <h3>Projects</h3>
-                <div id="projectsTable" style="height:300px;"></div>
-                <h3 style="margin-top:16px;">IOs</h3>
-                <div id="iosTable" style="height:300px;"></div>
+                <div id="projectsTable" style="height:600px;"></div>
+                <div id="iosTable" style="height:600px; margin-top:16px;"></div>
             </div>
             <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
             <script>
             (function(){
                 function fetchJSON(url){ return fetch(url).then(function(r){ return r.ok ? r.json() : {columns:[], rows:[]}; }); }
-                function mountTable(elId, title, listUrl, onRowClick){
+                function mountTable(elId, listUrl, onRowClick){
                     var el = document.getElementById(elId);
                     if(!el) return;
                     fetchJSON(listUrl).then(function(data){
                         var cols = data.columns || [];
                         var rows = (data.rows || []).map(function(r){ return r; });
                         GenericTable.create(el, {
-                            title: title,
                             columns: cols,
                             rows: rows,
                             defaultPageSize: 10,
@@ -796,94 +779,66 @@
                 }
 
                 function openProjectEdit(row){
-                    var addBtn = document.getElementById('add_button');
-                    if(addBtn) addBtn.click();
-                    setTimeout(function(){
-                        var modal = document.getElementById('modifyModal');
-                        if(!modal) return;
-                        var nameIn = modal.querySelector('input[name="name"]');
-                        if(nameIn && row.Project) nameIn.value = row.Project;
-                        var poSel = modal.querySelector('select[name="po"]');
-                        if(poSel && row.PO){ poSel.value = row.PO; poSel.dispatchEvent(new Event('change')); }
-                        var deptSel = modal.querySelector('select[name="department"]');
-                        if(deptSel && row.BU){ deptSel.value = row.BU; }
-                        var fySel = modal.querySelector('select[name="fiscal_year"]');
-                        if(fySel && row['Fiscal Year']){ fySel.value = String(row['Fiscal Year']); }
-                    }, 50);
+                    var modal = document.getElementById('modifyModal');
+                    if(!modal) return;
+                    // Open the modal directly
+                    modal.style.display = 'block';
+                    modal.setAttribute('aria-hidden','false');
+                    document.body.style.overflow = 'hidden';
+                    var firstInput = modal.querySelector('input, select, button');
+                    if(firstInput) firstInput.focus();
+                    // Prefill fields
+                    var nameIn = modal.querySelector('input[name="name"]');
+                    if(nameIn && row.Project) nameIn.value = row.Project;
+                    var poSel = modal.querySelector('select[name="po"]');
+                    if(poSel && row.PO){ poSel.value = row.PO; poSel.dispatchEvent(new Event('change')); }
+                    var deptSel = modal.querySelector('select[name="department"]');
+                    if(deptSel && row.BU){ deptSel.value = row.BU; }
+                    var fySel = modal.querySelector('select[name="fiscal_year"]');
+                    if(fySel && row['Fiscal Year']){ fySel.value = String(row['Fiscal Year']); }
                 }
 
                 function openIoEdit(row){
-                    var addBtn = document.getElementById('add_button');
-                    if(addBtn) addBtn.click();
-                    setTimeout(function(){
-                        var modal = document.getElementById('modifyModal');
-                        if(!modal) return;
-                        var ioIn = modal.querySelector('input[name="IO"], input[name="io"], input[name="IO_num"]');
-                        if(ioIn && row.IO != null){ ioIn.value = row.IO; }
-                        var projSel = modal.querySelector('select[name="project_name"]');
-                        if(projSel && row.Project){ projSel.value = row.Project; }
-                    }, 50);
+                    var modal = document.getElementById('modifyModal');
+                    if(!modal) return;
+                    // Open the modal directly
+                    modal.style.display = 'block';
+                    modal.setAttribute('aria-hidden','false');
+                    document.body.style.overflow = 'hidden';
+                    var firstInput = modal.querySelector('input, select, button');
+                    if(firstInput) firstInput.focus();
+                    // Prefill fields
+                    var ioIn = modal.querySelector('input[name="IO"], input[name="io"], input[name="IO_num"]');
+                    if(ioIn && row.IO != null){ ioIn.value = row.IO; }
+                    var projSel = modal.querySelector('select[name="project_name"]');
+                    if(projSel && row.Project){ projSel.value = row.Project; }
                 }
 
-                mountTable('projectsTable', 'Projects', "{{ url_for('project_routes.list_projects') }}", openProjectEdit);
-                mountTable('iosTable', 'IOs', "{{ url_for('io_routes.list_ios') }}", openIoEdit);
+                mountTable('projectsTable', "{{ url_for('project_routes.list_projects') }}", openProjectEdit);
+                mountTable('iosTable', "{{ url_for('io_routes.list_ios') }}", openIoEdit);
             })();
             </script>
             {% endif %}
     <script>
-        // Modal open/close logic
+        // Modal close logic (clicking X/overlay/cancel) remains; opening is handled by row-click in tables
         (function(){
-            var addBtn = document.getElementById('add_button');
             var modal = document.getElementById('modifyModal');
             var modalClose = document.getElementById('modalClose');
             var modalOverlay = document.getElementById('modalOverlay');
             var modalCancel = document.getElementById('modalCancel');
-
-            function openModal(){
-                modal.style.display = 'block';
-                modal.setAttribute('aria-hidden','false');
-                // prevent background scrolling
-                document.body.style.overflow = 'hidden';
-                // focus first input
-                var firstInput = modal.querySelector('input, select, button');
-                if(firstInput) firstInput.focus();
-            }
-            function closeModal(){
-                modal.style.display = 'none';
-                modal.setAttribute('aria-hidden','true');
-                document.body.style.overflow = '';
-            }
-
-            addBtn && addBtn.addEventListener('click', openModal);
+            function closeModal(){ if(!modal) return; modal.style.display='none'; modal.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
             modalClose && modalClose.addEventListener('click', closeModal);
             modalOverlay && modalOverlay.addEventListener('click', closeModal);
             modalCancel && modalCancel.addEventListener('click', closeModal);
 
-            // Modify modal handlers
-            var modifyBtn = document.getElementById('modify_button');
             var modalChange = document.getElementById('modifyModalChange');
             var modalCloseChange = document.getElementById('modalCloseChange');
             var modalOverlayChange = document.getElementById('modalOverlayChange');
             var modalCancelChange = document.getElementById('modalCancelChange');
-
-            function openChangeModal(){
-                modalChange.style.display = 'block';
-                modalChange.setAttribute('aria-hidden','false');
-                document.body.style.overflow = 'hidden';
-                var firstInput = modalChange.querySelector('input, select, button');
-                if(firstInput) firstInput.focus();
-            }
-            function closeChangeModal(){
-                modalChange.style.display = 'none';
-                modalChange.setAttribute('aria-hidden','true');
-                document.body.style.overflow = '';
-            }
-
-            modifyBtn && modifyBtn.addEventListener('click', openChangeModal);
+            function closeChangeModal(){ if(!modalChange) return; modalChange.style.display='none'; modalChange.setAttribute('aria-hidden','true'); document.body.style.overflow=''; }
             modalCloseChange && modalCloseChange.addEventListener('click', closeChangeModal);
             modalOverlayChange && modalOverlayChange.addEventListener('click', closeChangeModal);
             modalCancelChange && modalCancelChange.addEventListener('click', closeChangeModal);
-            // close on escape
             document.addEventListener('keydown', function(e){ if(e.key === 'Escape') closeModal(); });
         })();
     </script>
