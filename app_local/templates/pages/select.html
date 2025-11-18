@@ -1,8 +1,7 @@
 {% extends 'basic_page.html' %}
 {% block title %}Select Data{% endblock %}
 {% block head %}
-    <!-- DataTables CSS -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
+    {# GenericTable injects its own minimal styles; no external CSS needed #}
 {% endblock %}
 {% block page_title %}Select Data{% endblock %}
 {% block content %}
@@ -103,119 +102,33 @@
                 }
                 </script>
             {% endif %} -->
-            <table border="1" id="data_table" class="display" style="width:100%">
-                <thead>
-                    <tr>
-                        {% for col in columns %}
-                        <th>{{ col }}</th>
-                        {% endfor %}
-                    </tr>
-                </thead>
-                <tfoot>
-                    <tr>
-                        {# Empty footer cells - DataTables will populate these with select filters #}
-                        {% for col in columns %}
-                        <th></th>
-                        {% endfor %}
-                    </tr>
-                </tfoot>
-                <tbody>
-                    {% for row in data %}
-                    <tr>
-                    {% for item in row %}
-                    {% set colname = columns[loop.index0] if columns|length > loop.index0 else '' %}
-                    {% if colname and (colname|lower == 'id' or (colname|lower)[-3:] == '_id' or (colname|lower)[-2:] == 'id' or colname == 'PO' or colname == 'IO' or colname == 'IO number' or colname == 'IO Number' or colname|lower == 'po' or colname|lower == 'io' or colname|lower == 'io number' or colname == 'Month' or colname|lower == 'month' or colname == 'Fiscal Year' or colname|lower == 'fiscal year' or colname|lower == 'fiscal_year' or colname == 'Capital Year' or colname|lower == 'capital year' or colname|lower == 'capital_year' or colname == 'Year' or colname|lower == 'year') %}
-                        <td>{{ item|as_int }}</td>
-                    {% else %}
-                        <td>{{ item|one_decimal }}</td>
-                    {% endif %}
-                    {% endfor %}
-                    </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
-            <!-- jQuery and DataTables JS (CDN with local fallback) -->
-            <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-            {% block scripts %}{% endblock %}
+            <div id="gt-select" style="height:600px;"
+                 data-cols='{{ (columns or [])|tojson|safe }}'
+                 data-rows='{{ (data or [])|tojson|safe }}'></div>
+            <script src="{{ url_for('static', filename='js/genericTable.js') }}"></script>
             <script>
-                // If CDN jQuery fails (no network), load local fallback if present
-                if (typeof jQuery === 'undefined') {
-                    var s = document.createElement('script');
-                    s.src = "{{ url_for('static', filename='vendor/jquery-3.7.1.min.js') }}";
-                    document.head.appendChild(s);
-                }
-            </script>
-            <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
-            <script>
-                // If CDN DataTables fails, load local fallback
-                (function ensureDataTables(){
-                    if (window.jQuery && (!jQuery.fn || !jQuery.fn.dataTable)) {
-                        var s = document.createElement('script');
-                        s.src = "{{ url_for('static', filename='vendor/jquery.dataTables.min.js') }}";
-                        document.head.appendChild(s);
-                    }
-                })();
-            </script>
-            <!-- DataTables CSS (CDN with local fallback) -->
-            <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-            <script>
-            // Resilient init: wait until jQuery and DataTables are available, then initialize
-            (function initDataTableRetry(retries){
-                retries = retries || 20; // try for ~4 seconds (20 * 200ms)
-                function init(){
-                    if (window.jQuery && window.jQuery.fn && window.jQuery.fn.dataTable) {
-                        (function($){
-                            var table = $('#data_table').DataTable({
-                                paging: true,
-                                searching: true,
-                                ordering: true,
-                                lengthMenu: [ [10, 25, 50, 100], [10, 25, 50, 100] ],
-                                initComplete: function () {
-                                    // Whitelist of columns that should get a select filter
-                                    var allowedCols = ['fiscal_year', 'cap_year', 'department', 'PO', 'category', 'category_id', 'Department', 'IO', 'IO number', 'Project Category', 'Capital Year'];
-                                    // For each column, add a select filter in the footer only if the column is in the whitelist
-                                    this.api().columns().every(function () {
-                                        var column = this;
-                                        var colTitle = $(column.header()).text().trim();
-                                        // If this column is not in the allowed list, leave the footer cell empty
-                                        if (allowedCols.indexOf(colTitle) === -1) {
-                                            $(column.footer()).empty();
-                                            return;
-                                        }
-
-                                        var footerCell = $(column.footer());
-                                        // Create a select element
-                                        var select = $('<select><option value="">(All)</option></select>')
-                                            .appendTo(footerCell.empty())
-                                            .on('change', function () {
-                                                var val = $.fn.dataTable.util.escapeRegex($(this).val());
-                                                // Use exact match when possible
-                                                column.search(val ? '^' + val + '$' : '', true, false).draw();
-                                            });
-
-                                        // Populate the select with unique, sorted values from the column
-                                        column.data().unique().sort().each(function (d, j) {
-                                            if (d === null || d === undefined) d = '';
-                                            var text = (typeof d === 'object') ? JSON.stringify(d) : d;
-                                            select.append('<option value="' + text + '">' + text + '</option>');
-                                        });
-                                    });
-                                }
+                (function(){
+                    function mount(){
+                        var el = document.getElementById('gt-select');
+                        if(!el || !window.GenericTable || !GenericTable.create) return;
+                        try{
+                            var cols = JSON.parse(el.getAttribute('data-cols') || '[]');
+                            var raw = JSON.parse(el.getAttribute('data-rows') || '[]');
+                            // Map array rows (from server) into objects keyed by column names
+                            var rows = (raw || []).map(function(r){
+                                if (r && typeof r === 'object' && !Array.isArray(r)) return r; // already an object
+                                var o = {}; (cols || []).forEach(function(c, i){ o[c] = (Array.isArray(r) ? r[i] : null); });
+                                return o;
                             });
-                        })(jQuery);
-                    } else if (retries > 0) {
-                        setTimeout(function(){ initDataTableRetry(retries - 1); }, 200);
-                    } else {
-                        console.warn('DataTables not available; table will not be enhanced.');
+                            GenericTable.create(el, {
+                                columns: cols,
+                                rows: rows,
+                                defaultPageSize: 25
+                            });
+                        }catch(e){ console.warn('Failed to mount select table', e); }
                     }
-                }
-                // Kick off after DOM ready
-                if (document.readyState === 'complete' || document.readyState === 'interactive') {
-                    init();
-                } else {
-                    document.addEventListener('DOMContentLoaded', init);
-                }
-            })();
+                    if (document.readyState === 'complete' || document.readyState === 'interactive') mount(); else document.addEventListener('DOMContentLoaded', mount);
+                })();
             </script>
         {% endif %}
     </div>
