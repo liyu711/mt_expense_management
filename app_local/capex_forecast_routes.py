@@ -90,17 +90,15 @@ def capex_department_update():
 
 @capex_forecast_routes.route('/capex_forecast/project_update', methods=['GET'])
 def capex_project_update():
-    """Return a JSON list of projects filtered by PO, Department and Fiscal Year.
+    """Return a JSON list of projects filtered by PO and Department (not by Year).
 
     Query params:
     - po: PO name
     - department: department name
-    - fiscal_year or cap_year: year
     """
     try:
         po = request.args.get('po')
         department = request.args.get('department')
-        fiscal_year = request.args.get('fiscal_year') or request.args.get('cap_year')
 
         df = get_projects_display()
         if df is None or df.empty:
@@ -109,15 +107,12 @@ def capex_project_update():
         proj_col = 'project_name' if 'project_name' in df.columns else ('name' if 'name' in df.columns else (df.columns[0] if len(df.columns)>0 else None))
         dept_col = next((c for c in ('department_name','department','name') if c in df.columns), None)
         po_col = next((c for c in ('po_name','po','name_po') if c in df.columns), None)
-        fy_col = next((c for c in ('fiscal_year','Fiscal Year') if c in df.columns), None)
 
         filt = df
         if po and po_col in filt.columns:
             filt = filt[filt[po_col].astype(str) == str(po)]
         if department and dept_col in filt.columns:
             filt = filt[filt[dept_col].astype(str) == str(department)]
-        if fiscal_year and fy_col in filt.columns:
-            filt = filt[filt[fy_col].astype(str) == str(fiscal_year)]
 
         try:
             projects = list(dict.fromkeys([p for p in filt[proj_col].dropna().astype(str).tolist()])) if proj_col in filt.columns else []

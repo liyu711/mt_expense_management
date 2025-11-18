@@ -212,9 +212,8 @@
                                                     var projSel = modal.querySelector('select[name="project_name"]');
                                                     var currentPO = poSel ? poSel.value : '';
                                                     var currentDept = deptSel ? deptSel.value : '';
-                                                    var currentFY = yearSel ? yearSel.value : '';
-                                                    if(projSel && currentPO && currentDept && currentFY){
-                                                        var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                                                    if(projSel && currentPO && currentDept){
+                                                        var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept);
                                                         fetch(url)
                                                             .then(function(res){ return res.ok ? res.json() : { projects: [] }; })
                                                             .then(function(json){
@@ -522,9 +521,8 @@
                                                     if(deptSel && deptVal){ deptSel.value = deptVal; }
                                                     var currentPO = poSel ? poSel.value : '';
                                                     var currentDept = deptSel ? deptSel.value : '';
-                                                    var currentFY = yearSel ? yearSel.value : '';
-                                                    if(projSel && currentPO && currentDept && currentFY){
-                                                        var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                                                    if(projSel && currentPO && currentDept){
+                                                        var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept);
                                                         fetch(url)
                                                             .then(function(res){ return res.ok ? res.json() : { projects: [] }; })
                                                             .then(function(json){
@@ -551,29 +549,6 @@
                                                                     deptSel.innerHTML = '';
                                                                     var placeholder = document.createElement('option');
                                                                     placeholder.value=''; placeholder.disabled=true; placeholder.selected=true; placeholder.textContent='Select an option';
-                                                            // Configure Delete column for Staff Cost with cascade warning
-                                                            opts.deleteColumn = {
-                                                                header: 'Delete',
-                                                                widthPx: 110,
-                                                                confirm: function(row){
-                                                                    function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
-                                                                    var po = pick(row, ['PO','po','PO Name','name_po']);
-                                                                    var dept = pick(row, ['BU','Department','department','department_name','name_departments']);
-                                                                    var cat = pick(row, ['Staff Category','staff_category','Category','category','name']);
-                                                                    var year = pick(row, ['Year','year','Fiscal Year','fiscal_year']);
-                                                                    return 'Delete Staff Cost for ' + [cat, dept, po, year?('('+year+')'):''].filter(Boolean).join(' / ') + '\n\nNote: This will also delete associated personnel forecasts under Manual Input for the same PO/BU/Year and category. Continue?';
-                                                                },
-                                                                endpoint: '/modify_staff_cost/delete_staff_cost',
-                                                                payload: function(row){
-                                                                    function pick(obj, keys){ for(var i=0;i<keys.length;i++){ var k=keys[i]; if(obj && obj[k] != null && obj[k] !== '') return obj[k]; } return ''; }
-                                                                    return {
-                                                                        po: pick(row, ['PO','po','PO Name','name_po']),
-                                                                        department: pick(row, ['BU','Department','department','department_name','name_departments']),
-                                                                        staff_category: pick(row, ['Staff Category','staff_category','Category','category','name']),
-                                                                        year: pick(row, ['Year','year','Fiscal Year','fiscal_year'])
-                                                                    };
-                                                                }
-                                                            };
                                                                     deptSel.appendChild(placeholder);
                                                                     (json && json.departments ? json.departments : []).forEach(function(name){
                                                                         var opt = document.createElement('option'); opt.value = name; opt.textContent = name; deptSel.appendChild(opt);
@@ -632,7 +607,7 @@
                                         }
                                         return '';
                                     }
-                                    function injectDeleteButtons(endpoint, extractor){
+                                    function injectDeleteButtons(endpoint, extractor, confirmBuilder){
                                         try{
                                             var table = el.querySelector('table');
                                             if(!table) return;
@@ -663,12 +638,19 @@
                                                         }
                                                         var payload = extractor(lowerMap);
                                                         if(!payload || payload.error){ alert(payload && payload.error || 'Missing key fields for deletion.'); return; }
-                                                        var labelParts = [];
-                                                        if(payload.project_name) labelParts.push(payload.project_name);
-                                                        if(payload.department) labelParts.push(payload.department);
-                                                        if(payload.po) labelParts.push(payload.po);
-                                                        if(payload.fiscal_year || payload.cap_year) labelParts.push('(' + (payload.fiscal_year || payload.cap_year) + ')');
-                                                        if(!confirm('Delete entry for ' + labelParts.join(' / ') + '?')) return;
+                                                        var message = '';
+                                                        if (typeof confirmBuilder === 'function') {
+                                                            try { message = confirmBuilder(lowerMap, payload) || ''; } catch(e) { message = ''; }
+                                                        }
+                                                        if (!message) {
+                                                            var labelParts = [];
+                                                            if(payload.project_name) labelParts.push(payload.project_name);
+                                                            if(payload.department) labelParts.push(payload.department);
+                                                            if(payload.po) labelParts.push(payload.po);
+                                                            if(payload.fiscal_year || payload.cap_year) labelParts.push('(' + (payload.fiscal_year || payload.cap_year) + ')');
+                                                            message = 'Delete entry for ' + labelParts.join(' / ') + '?';
+                                                        }
+                                                        if(!confirm(message)) return;
                                                         fetch(endpoint, {
                                                             method: 'POST',
                                                             headers: { 'Content-Type': 'application/json' },
@@ -735,16 +717,38 @@
                                     }
 
                                     if (tableName === 'budgets'){
-                                        setTimeout(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget); }, 60);
-                                        var obs2 = new MutationObserver(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget); });
+                                        function confirmBudget(_row, payload){
+                                            var parts = [];
+                                            if(payload.department) parts.push(payload.department);
+                                            if(payload.po) parts.push(payload.po);
+                                            if(payload.fiscal_year) parts.push('(' + payload.fiscal_year + ')');
+                                            return 'WARNING: Deleting this budget will permanently remove the budget entry for the specified PO/BU/Fiscal Year.\n\nThis action cannot be undone.\n\nConfirm DELETE for: ' + parts.join(' / ') + '?';
+                                        }
+                                        setTimeout(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget, confirmBudget); }, 60);
+                                        var obs2 = new MutationObserver(function(){ injectDeleteButtons('/upload_budget/delete_budget', extractorBudget, confirmBudget); });
                                         obs2.observe(el, { childList: true, subtree: true });
                                     } else if (tableName === 'fundings'){
-                                        setTimeout(function(){ injectDeleteButtons('/modify_funding/delete_funding', extractorFunding); }, 60);
-                                        var obs3 = new MutationObserver(function(){ injectDeleteButtons('/modify_funding/delete_funding', extractorFunding); });
+                                        function confirmFunding(_row, payload){
+                                            var parts = [];
+                                            if(payload.department) parts.push(payload.department);
+                                            if(payload.po) parts.push(payload.po);
+                                            if(payload.fiscal_year) parts.push('(' + payload.fiscal_year + ')');
+                                            return 'WARNING: Deleting this funding will permanently remove the funding entry for the specified PO/BU/Fiscal Year.\n\nThis action cannot be undone.\n\nConfirm DELETE for: ' + parts.join(' / ') + '?';
+                                        }
+                                        setTimeout(function(){ injectDeleteButtons('/modify_funding/delete_funding', extractorFunding, confirmFunding); }, 60);
+                                        var obs3 = new MutationObserver(function(){ injectDeleteButtons('/modify_funding/delete_funding', extractorFunding, confirmFunding); });
                                         obs3.observe(el, { childList: true, subtree: true });
                                     } else if (tableName === 'capex_budgets'){
-                                        setTimeout(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); }, 60);
-                                        var obs4 = new MutationObserver(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget); });
+                                        function confirmCapexBudget(_row, payload){
+                                            var parts = [];
+                                            if(payload.project_name) parts.push(payload.project_name);
+                                            if(payload.department) parts.push(payload.department);
+                                            if(payload.po) parts.push(payload.po);
+                                            if(payload.cap_year) parts.push('(' + payload.cap_year + ')');
+                                            return 'WARNING: Deleting this CapEx budget will permanently remove the approved budget entry for the specified Project / PO / BU / Capex Year.\n\nThis action cannot be undone.\n\nConfirm DELETE for: ' + parts.join(' / ') + '?';
+                                        }
+                                        setTimeout(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget, confirmCapexBudget); }, 60);
+                                        var obs4 = new MutationObserver(function(){ injectDeleteButtons('/capex_budget/delete_capex_budget', extractorCapexBudget, confirmCapexBudget); });
                                         obs4.observe(el, { childList: true, subtree: true });
                                     }
                                 })();
@@ -895,13 +899,12 @@
                     sel.addEventListener('change', function () {
                         var val = sel.value || '';
                         fetch('/capex_forecast/department_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ department: val }) }).catch(function () { });
-                        // attempt to refresh projects if PO, Department and Cap Year are selected
+                        // attempt to refresh projects when PO and Department are selected (year not used)
                         try {
                             var currentPO = (modal.querySelector('select[name="po"]') || modal.querySelector('select[id="po"]'))?.value || '';
                             var currentDept = val;
-                            var currentFY = (modal.querySelector('select[name="cap_year"]') || modal.querySelector('select[id="cap_year"]'))?.value || '';
-                            if (currentPO && currentDept && currentFY) {
-                                var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                            if (currentPO && currentDept) {
+                                var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept);
                                 fetch(url).then(function (res) {
                                     if (!res.ok) return null;
                                     return res.json();
@@ -935,13 +938,12 @@
                     sel.addEventListener('change', function () {
                         var val = sel.value || '';
                         fetch('/capex_forecast/cap_year_selection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cap_year: val }) }).catch(function () { });
-                        // when cap year changes, try to refresh projects if PO & Department are set
+                        // when cap year changes, refresh projects if PO & Department are set (year not used)
                         try {
                             var currentPO = (modal.querySelector('select[name="po"]') || modal.querySelector('select[id="po"]'))?.value || '';
                             var currentDept = (modal.querySelector('select[name="department"]') || modal.querySelector('select[id="department"]'))?.value || '';
-                            var currentFY = val;
-                            if (currentPO && currentDept && currentFY) {
-                                var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept) + '&fiscal_year=' + encodeURIComponent(currentFY);
+                            if (currentPO && currentDept) {
+                                var url = '/capex_forecast/project_update?po=' + encodeURIComponent(currentPO) + '&department=' + encodeURIComponent(currentDept);
                                 fetch(url).then(function (res) {
                                     if (!res.ok) return null;
                                     return res.json();
@@ -1018,10 +1020,9 @@
                 function refreshProjects(){
                     var po = (modal.querySelector('select[name="po"], #change_po')||{}).value || '';
                     var dept = (modal.querySelector('select[name="department"], #change_department')||{}).value || '';
-                    var year = (modal.querySelector('select[name="cap_year"], #change_cap_year, select[name="fiscal_year"], #change_fiscal_year')||{}).value || '';
                     var projSelects = modal.querySelectorAll('select[name="project_name"], #change_project_name');
-                    if (!po || !dept || !year || projSelects.length === 0) return;
-                    var url = '/capex_forecast/project_update?po=' + encodeURIComponent(po) + '&department=' + encodeURIComponent(dept) + '&fiscal_year=' + encodeURIComponent(year);
+                    if (!po || !dept || projSelects.length === 0) return;
+                    var url = '/capex_forecast/project_update?po=' + encodeURIComponent(po) + '&department=' + encodeURIComponent(dept);
                     fetch(url)
                         .then(function(res){ return res.ok ? res.json() : { projects: [] }; })
                         .then(function(json){
@@ -1034,7 +1035,7 @@
                         .catch(function(){});
                 }
 
-                // Department and Cap Year changes -> refresh projects
+                // Department and Cap Year changes -> refresh projects (year value not used for filtering)
                 var deptSelects = modal.querySelectorAll('select[name="department"], #change_department');
                 deptSelects.forEach(function(sel){ sel.addEventListener('change', refreshProjects); });
                 var yearSelects = modal.querySelectorAll('select[name="cap_year"], #change_cap_year, select[name="fiscal_year"], #change_fiscal_year');
