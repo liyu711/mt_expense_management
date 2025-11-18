@@ -124,7 +124,7 @@
 
                     <div class="form-group">
                         <label for="Project_Category">Project Category</label>
-                        <input type="text" name="Project_Category" required value="{{ project_categories[0] if project_categories|length > 0 else '' }}">
+                        <input type="text" name="Project_Category" required value="{{ project_categories[0] if project_categories|length > 0 else '' }}" readonly class="locked" style="background:#f9f9f9; cursor:not-allowed;">
                     </div>
                     <div class="form-group">
                         <label for="IO">IO</label>
@@ -363,7 +363,7 @@
             })();
         </script>
         <script>
-            // Per-category HR cost updater based on FTE and /api/hr_cost (hierarchical by PO/Department)
+            // Per-category HR cost updater based on FTE and /api/hr_cost (exact-match by PO, Department, Category, Fiscal Year)
             (function(){
                 function parseNum(v){ var n = parseFloat(v); return isNaN(n) ? 0 : n; }
                 function getFY(){
@@ -395,6 +395,7 @@
                     var qs = new URLSearchParams({category: name, year: year});
                     if (poVal) qs.append('po', poVal);
                     if (deptVal) qs.append('department', deptVal);
+                    qs.append('strict','1');
                     return fetch('/api/hr_cost?' + qs.toString())
                         .then(function(r){ return r.json(); })
                         .then(function(j){ var c = (j && j.cost != null) ? parseNum(j.cost) : null; costCache[key] = c; return c; })
@@ -570,9 +571,10 @@
                                                                         // fetch base cost using hierarchical context: PO + Department + Fiscal Year
                                                                         var poVal = poSel && poSel.value ? poSel.value : '';
                                                                         var deptVal = deptSel && deptSel.value ? deptSel.value : '';
-                                                                        var params = new URLSearchParams({ category: catName, year: String(year) });
+                                    var params = new URLSearchParams({ category: catName, year: String(year) });
                                                                         if (poVal) params.append('po', poVal);
                                                                         if (deptVal) params.append('department', deptVal);
+                                    params.append('strict','1');
                                                                         promises.push(
                                                                                 fetch('/api/hr_cost?' + params.toString())
                                                                                     .then(function(r){ return r.json(); })

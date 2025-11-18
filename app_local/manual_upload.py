@@ -531,23 +531,26 @@ def render_mannual_input():
 
 @manual_upload.route('/api/hr_cost', methods=['GET'])
 def api_hr_cost():
-    """Return hierarchical unit cost for a human resource category.
-    Query params:
-      category (required) - HR category name
-      year (required) - fiscal year
-      po (optional) - PO name for most specific match
-      department (optional) - Department/BU name for most specific match
-    Specificity order:
-      (po, department, category, year)
-      (department, category, year)
-      (po, category, year)
-      (category, year)
-    Returns JSON: {"cost": <float|null>}
+    """Return unit cost for a human resource category.
+        Query params:
+            category (required) - HR category name
+            year (required) - fiscal year
+            po (optional) - PO name
+            department (optional) - Department/BU name
+            strict (optional) - when truthy (1/true/yes), require exact match on (po, department, category, year);
+                                                    no fallback. When false/missing, a hierarchical fallback is used for compatibility.
+        Hierarchical fallback order (when strict is false):
+            (po, department, category, year) -> (department, category, year) -> (po, category, year) -> (category, year)
+        Returns JSON: {"cost": <float|null>}
     """
     category = request.args.get('category')
     year = request.args.get('year')
     po_name = request.args.get('po') or selected_po
     dept_name = request.args.get('department') or selected_department
+    strict_raw = request.args.get('strict')
+    strict_mode = False
+    if isinstance(strict_raw, str):
+        strict_mode = strict_raw.strip().lower() in ('1', 'true', 'yes', 'y')
     if not category or not year:
         return jsonify({'cost': None}), 200
     try:
@@ -593,17 +596,27 @@ def api_hr_cost():
                 return None
 
         cost = None
-        if cost is None and all(v is not None for v in (po_id, dept_id, cat_id)):
-            cost = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND department_id = ? AND category_id = ? AND year = ? LIMIT 1", (po_id, dept_id, cat_id, y))
-        if cost is None and all(v is not None for v in (dept_id, cat_id)):
-            cost = fetch("SELECT cost FROM human_resource_cost WHERE department_id = ? AND category_id = ? AND year = ? LIMIT 1", (dept_id, cat_id, y))
-        if cost is None and all(v is not None for v in (po_id, cat_id)):
-            cost = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND category_id = ? AND year = ? LIMIT 1", (po_id, cat_id, y))
-        if cost is None and cat_id is not None:
-            cost = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (cat_id, y))
-        if cost is None:
-            # fallback where category stored as text
-            cost = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (category, y))
+        if strict_mode:
+            # Strict: require exact match on po, department, category, year. If any id is missing, return None.
+            if all(v is not None for v in (po_id, dept_id, cat_id)):
+                cost = fetch(
+                    "SELECT cost FROM human_resource_cost WHERE po_id = ? AND department_id = ? AND category_id = ? AND year = ? LIMIT 1",
+                    (po_id, dept_id, cat_id, y)
+                )
+            # No other fallbacks in strict mode
+        else:
+            # Hierarchical fallbacks for backward compatibility
+            if cost is None and all(v is not None for v in (po_id, dept_id, cat_id)):
+                cost = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND department_id = ? AND category_id = ? AND year = ? LIMIT 1", (po_id, dept_id, cat_id, y))
+            if cost is None and all(v is not None for v in (dept_id, cat_id)):
+                cost = fetch("SELECT cost FROM human_resource_cost WHERE department_id = ? AND category_id = ? AND year = ? LIMIT 1", (dept_id, cat_id, y))
+            if cost is None and all(v is not None for v in (po_id, cat_id)):
+                cost = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND category_id = ? AND year = ? LIMIT 1", (po_id, cat_id, y))
+            if cost is None and cat_id is not None:
+                cost = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (cat_id, y))
+            if cost is None:
+                # fallback where category stored as text
+                cost = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (category, y))
         return jsonify({'cost': cost}), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
@@ -1271,18 +1284,13 @@ def manual_change_forecast():
                 fr = cursor.fetchone(); return fr[0] if fr else None
             except Exception:
                 return None
-        cost_local = None
-        if cost_local is None and all(v is not None for v in (po_id, dept_id, cat_id_lookup, fy_val)):
-            cost_local = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND department_id = ? AND category_id = ? AND year = ? LIMIT 1", (int(po_id), int(dept_id), int(cat_id_lookup), int(fy_val)))
-        if cost_local is None and all(v is not None for v in (dept_id, cat_id_lookup, fy_val)):
-            cost_local = fetch("SELECT cost FROM human_resource_cost WHERE department_id = ? AND category_id = ? AND year = ? LIMIT 1", (int(dept_id), int(cat_id_lookup), int(fy_val)))
-        if cost_local is None and all(v is not None for v in (po_id, cat_id_lookup, fy_val)):
-            cost_local = fetch("SELECT cost FROM human_resource_cost WHERE po_id = ? AND category_id = ? AND year = ? LIMIT 1", (int(po_id), int(cat_id_lookup), int(fy_val)))
-        if cost_local is None and all(v is not None for v in (cat_id_lookup, fy_val)):
-            cost_local = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (int(cat_id_lookup), int(fy_val)))
-        if cost_local is None:
-            cost_local = fetch("SELECT cost FROM human_resource_cost WHERE category_id = ? AND year = ? LIMIT 1", (cat_name_local, int(fy_val)))
-        return cost_local
+        # Strict exact-match only: require po_id, dept_id, cat_id and fy
+        if all(v is not None for v in (po_id, dept_id, cat_id_lookup, fy_val)):
+            return fetch(
+                "SELECT cost FROM human_resource_cost WHERE po_id = ? AND department_id = ? AND category_id = ? AND year = ? LIMIT 1",
+                (int(po_id), int(dept_id), int(cat_id_lookup), int(fy_val))
+            )
+        return None
     for key in form.keys():
         # Accept either fte__slug (forward) or cost__slug (reverse)
         if key.startswith('fte__') or key.startswith('cost__'):
