@@ -34,6 +34,8 @@
         }
         .page-top { flex: 0 0 auto; box-sizing: border-box; padding: 24px 0 0 0; }
         .table-container { box-sizing: border-box; padding: 0 24px 24px 24px; overflow: auto; }
+        /* Unified locked styling */
+        .locked { background:#f9f9f9; cursor:not-allowed; }
     </style>
 {% endblock %}
 {% block content %}
@@ -98,7 +100,7 @@
                                     <div class="form-group">
                                         <label for="change_{{ field.name }}">{{ field.label }}</label>
                                         {% if field.type == 'select' %}
-                                            <select name="{{ field.name }}" id="change_{{ field.name }}" required>
+                                            <select name="{{ field.name }}" id="change_{{ field.name }}" required {% if table_name == 'human_resource_cost' and field.name in ['staff_category','year','fiscal_year'] %}disabled class="locked"{% endif %}>
                                                 <option value="" disabled selected>Select an option</option>
                                                 {% for option in field.options %}
                                                     <option value="{{ option }}">{{ option }}</option>
