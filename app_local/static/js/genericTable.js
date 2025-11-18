@@ -130,6 +130,8 @@
     function displayLabel(col){
       var c = String(col || '');
       var lower = c.toLowerCase();
+      // Map bare ID column to Item for clearer semantics
+      if (lower === 'id') return 'Item';
       // Common department labels to map
       if (lower === 'department' || lower === 'department name' || lower === 'name_departments' || lower === 'department_name') return 'BU';
       if (lower === 'dept') return 'BU';

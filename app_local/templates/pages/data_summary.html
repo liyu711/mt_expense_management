@@ -3,21 +3,50 @@
 {% block page_title %}Expense Summary{% endblock %}
 {% block head %}
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/jquery.dataTables.min.css">
-    <style>.hidden { display:none; }</style>
+    <style>
+        .hidden { display:none; }
+        /* Flex layout for label + dropdown rows on data_summary */
+        .ds-row {
+            display: flex;
+            align-items: center;
+            margin-left: 5%; /* requested margin share */
+            column-gap: 15%; /* space between label and dropdown */
+        }
+        /* Ensure hidden wins over flex when both classes present */
+        .ds-row.hidden { display: none !important; }
+        .ds-row > label {
+            flex: 0 0 25%;
+        }
+        .ds-row > select {
+            flex: 0 0 50%;
+        }
+        /* Side-by-side layout for statistics tables */
+        .stats-wrap {
+            margin: 5%;
+            display: flex;
+            column-gap: 10%;
+        }
+        .stats-pane {
+            flex: 0 0 45%;
+            max-width: 45%;
+        }
+    </style>
 {% endblock %}
 {% block content %}
         <div>
-            <label for="po">Choose PO</label>
-            <select name="po" id="po">
-                <option value="">-- select PO --</option>
-                <option value="All" {% if selected_po == 'All' %}selected{% endif %}>All</option>
-                {% if pos %}
-                    {% for p in pos %}
-                        <option value="{{ p.name }}" data-po-id="{{ p.id }}" {% if selected_po and selected_po == p.name %}selected{% endif %}>{{ p.name }}</option>
-                    {% endfor %}
-                {% endif %}
-            </select>
-            <div id="department_wrapper" class="{% if not selected_po %}hidden{% endif %}" style="margin-top:10px;">
+            <div class="ds-row">
+                <label for="po">Choose PO</label>
+                <select name="po" id="po">
+                    <option value="">-- select PO --</option>
+                    <option value="All" {% if selected_po == 'All' %}selected{% endif %}>All</option>
+                    {% if pos %}
+                        {% for p in pos %}
+                            <option value="{{ p.name }}" data-po-id="{{ p.id }}" {% if selected_po and selected_po == p.name %}selected{% endif %}>{{ p.name }}</option>
+                        {% endfor %}
+                    {% endif %}
+                </select>
+            </div>
+            <div id="department_wrapper" class="ds-row {% if not selected_po %}hidden{% endif %}" style="margin-top:10px;">
                 <label for="department">Choose BU</label>
                 <select name="department" id="department">
                     <option value="">-- select BU --</option>
@@ -30,7 +59,7 @@
                     {% endif %}
                 </select>
             </div>
-            <div id="fiscal_year_wrapper" class="{% if not selected_department or not selected_po %}hidden{% endif %}" style="margin-top:10px;">
+            <div id="fiscal_year_wrapper" class="ds-row {% if not selected_department or not selected_po %}hidden{% endif %}" style="margin-top:10px;">
                 <label for="fiscal_year">Choose Fiscal Year</label>
                 <select name="fiscal_year" id="fiscal_year">
                     <option value="">-- select Year --</option>
@@ -172,16 +201,18 @@
             </script>
         </div>
         <hr style="margin:20px 0;" />
-        <div id="stats" style="margin-top:12px;">
-            <h3 style="margin:0 0 8px;">Statistics</h3>
-            <div id="stats-content"><em>Loading…</em></div>
-            <div style="margin-top:10px;">
-                <button id="calculate_stats">Refresh statistics</button>
+        <div class="stats-wrap">
+            <div class="stats-pane" id="stats">
+                <h3 style="margin:0 0 8px;">Statistics</h3>
+                <div id="stats-content"><em>Loading…</em></div>
+                <div style="margin-top:10px;">
+                    <button id="calculate_stats">Refresh statistics</button>
+                </div>
             </div>
-        </div>
-        <div id="capex-stats" style="margin-top:18px;">
-            <h3 style="margin:0 0 8px;">Capex Statistics</h3>
-            <div id="capex-stats-content"><em>Loading…</em></div>
+            <div class="stats-pane" id="capex-stats">
+                <h3 style="margin:0 0 8px;">Capex Statistics</h3>
+                <div id="capex-stats-content"><em>Loading…</em></div>
+            </div>
         </div>
         <script>
             (function(){
