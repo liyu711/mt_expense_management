@@ -436,9 +436,7 @@
                 // initial bind on DOM ready
                 function init(){ bindFte('add'); bindFte('modify'); bindFY(); }
                 if (document.readyState === 'complete' || document.readyState === 'interactive') init(); else document.addEventListener('DOMContentLoaded', init);
-                // when opening Add or Modify, rebind and compute shortly after
-                var addBtn = document.getElementById('add_button');
-                if (addBtn){ addBtn.addEventListener('click', function(){ setTimeout(function(){ bindFte(); updateAll(); }, 100); }); }
+                // when opening Modify, rebind and compute shortly after (Add handled by GenericTable.addButton)
                 var modifyBtn = document.getElementById('modify_button');
                 if (modifyBtn){ modifyBtn.addEventListener('click', function(){ setTimeout(function(){ bindFte('modify'); updateAll(); }, 100); }); }
                 // Invalidate cache and recompute when hierarchy changes
@@ -586,6 +584,23 @@
                             columns: cols,
                             rows: rows,
                             defaultPageSize: 25,
+                            addButton: {
+                                label: 'Add',
+                                onClick: function(){
+                                    // Open Add Forecast modal and prepare form & costs
+                                    try { if (typeof window.resetForecastForm === 'function') window.resetForecastForm(); } catch(e) {}
+                                    var modal = document.getElementById('forecastModal');
+                                    if (modal){
+                                        modal.style.display = 'block';
+                                        modal.setAttribute('aria-hidden','false');
+                                        document.body.style.overflow = 'hidden';
+                                        var first = modal.querySelector('input, select, button');
+                                        if (first) first.focus();
+                                    }
+                                    try { if (typeof window.bindHrFteListeners === 'function') window.bindHrFteListeners(); } catch(e) {}
+                                    try { if (typeof window.updateAllHrCosts === 'function') setTimeout(window.updateAllHrCosts, 50); } catch(e) {}
+                                }
+                            },
                             groups: groupCols.length ? { 'Personnel Cost': groupCols } : null,
                             rowClickEditModal: {
                                 selector: '#modifyForecastModal',
@@ -634,7 +649,7 @@
         <script>
             // Modal handlers (aligned with modify_table.html style)
             (function () {
-                var addBtn = document.getElementById('add_button');
+                var addBtn = null; // Add button handled by GenericTable config
                 var modal = document.getElementById('forecastModal');
                 var modalClose = document.getElementById('forecastModalClose');
                 var modalOverlay = document.getElementById('forecastModalOverlay');
@@ -671,7 +686,7 @@
                     modifyModal.setAttribute('aria-hidden', 'true');
                     document.body.style.overflow = '';
                 }
-                addBtn && addBtn.addEventListener('click', openModal);
+                // Add is handled by GenericTable.addButton.onClick
                 modalClose && modalClose.addEventListener('click', closeModal);
                 modalOverlay && modalOverlay.addEventListener('click', closeModal);
                 modalCancel && modalCancel.addEventListener('click', closeModal);

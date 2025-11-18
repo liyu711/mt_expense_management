@@ -75,9 +75,6 @@
                 </div>
             </form>
         {% endcall %}
-
-    
-        
             <!-- Combined Projects table (includes grouped IOs column) -->
             <div class="tables-row">
                 <div class="table-half" style="flex:1 1 100%;">
@@ -133,6 +130,8 @@
         })();
     </script>
 
+    
+
     <script>
         // Mount generic tables and wire row-click to open the existing edit modals
         (function(){
@@ -147,6 +146,10 @@
                     GenericTable.create(el, {
                         columns: data.columns || [],
                         rows: data.rows || [],
+                        addButton: {
+                            label: 'Add Project',
+                            onClick: function(){ if (window.__openProjectAdd) window.__openProjectAdd(); }
+                        },
                         onRowClick: onRowClick,
                         deleteColumn: {
                             header: 'Delete',

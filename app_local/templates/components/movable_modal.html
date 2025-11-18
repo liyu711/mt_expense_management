@@ -10,8 +10,27 @@
 <div id="{{ modal_id }}" class="modal" aria-hidden="true" role="dialog">
   <div class="modal-overlay" id="{{ overlay_id or (modal_id ~ 'Overlay') }}"></div>
   <div class="modal-content" role="document" tabindex="0" aria-labelledby="{{ modal_id }}Title">
-    <div class="modal-header" style="cursor:move; display:flex; align-items:center; justify-content:space-between; gap:12px;">
-      <h2 id="{{ modal_id }}Title" style="margin:0;">{{ title }}</h2>
+    <style>
+      /* Modal-local form layout: labels + controls use flex; controls fill remaining space.
+         This overrides inline widths on inputs/selects inside modal content. */
+      .modal-content .form-group{ display:flex; align-items:center; margin-bottom:12px; }
+      .modal-content .form-group label{ flex: 0 0 33%; max-width:33%; min-width:110px; text-align:left; margin-right:12px; }
+      .modal-content .form-group select,
+      .modal-content .form-group input[type="text"],
+      .modal-content .form-group input[type="number"],
+      .modal-content .form-group input[type="password"]{
+        flex: 1 1 auto !important; max-width: none !important; width: auto !important; text-align:left;
+      }
+      /* Ensure cost spans and small inline helpers don't push layout */
+      .modal-content .form-group .hr-cost,
+      .modal-content .form-group span{ margin-left:12px; }
+      /* Keep modal header layout consistent */
+      .modal-header{ cursor:move; display:flex; align-items:center; justify-content:space-between; gap:12px; }
+      .modal-header h2{ margin:0; font-size:1.125rem; }
+    </style>
+    <div class="modal-header">
+      {% set display_title = title|replace('Modify Modify','Modify') %}
+      <h2 id="{{ modal_id }}Title">{{ display_title }}</h2>
       <button class="modal-close" id="{{ close_id or (modal_id ~ 'Close') }}" aria-label="Close">&times;</button>
     </div>
     <div class="modal-body">
