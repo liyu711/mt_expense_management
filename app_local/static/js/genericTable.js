@@ -84,6 +84,12 @@
     table.className = 'gt-table';
     // Fixed layout so column widths from <colgroup> are respected
     table.style.tableLayout = 'fixed';
+    // If rows are clickable (rowClickEditModal or onRowClick), add a class to reflect hover cursor
+    try {
+      if (cfg && (typeof cfg.onRowClick === 'function' || (cfg.rowClickEditModal && cfg.rowClickEditModal.selector))) {
+        table.classList.add('gt-row-clickable');
+      }
+    } catch(e) {}
 
     // Prepare colgroup for column width control
     const colgroup = document.createElement('colgroup');
@@ -690,7 +696,7 @@
     if(!document.getElementById('gt-styles')){
       const st = document.createElement('style');
       st.id = 'gt-styles';
-      st.textContent = `
+    st.textContent = `
       .gt-container{display:flex;flex-direction:column;gap:8px;height:100%;}
   .gt-header{display:flex;justify-content:space-between;align-items:center;gap:8px;}
   .gt-left{display:flex;align-items:center;gap:8px;flex:1 1 auto;}
@@ -708,14 +714,16 @@
   .gt-table th{position:sticky;top:0;background:#f5f5f5;white-space:nowrap;}
   .gt-table th, .gt-table td{overflow:hidden;text-overflow:ellipsis;}
   .gt-col-label{margin-right:6px;display:inline-block;vertical-align:middle;}
-  .gt-sort{margin:0 6px 0 0;padding:2px 6px;width:1.5em;display:inline-flex;justify-content:center;align-items:center;line-height:1;box-sizing:content-box;white-space:nowrap;overflow:hidden;}
+  .gt-sort{margin:0 6px 0 0;padding:2px 6px;width:1.5em;display:inline-flex;justify-content:center;align-items:center;line-height:1;box-sizing:content-box;white-space:nowrap;overflow:hidden;cursor:pointer;}
   .gt-group-header{position:static !important;}
   .gt-group-spacer{position:static !important;}
       .gt-filter{padding:2px 6px;}
       .gt-footer{display:flex;justify-content:space-between;align-items:center;gap:8px;}
-      .gt-pager button{margin:0 4px;}
+    .gt-pager button{margin:0 4px; cursor:pointer;}
       .gt-resizer{position:absolute;right:0;top:0;width:6px;height:100%;cursor:col-resize;user-select:none;}
       .gt-delete-btn{padding:2px 6px;font-size:12px;background:#c0392b;color:#fff;border:none;border-radius:4px;cursor:pointer;}
+    /* Indicate clickable rows when row click behavior is enabled */
+    .gt-table.gt-row-clickable tbody tr:hover{ cursor:pointer; }
       `;
       document.head.appendChild(st);
     }

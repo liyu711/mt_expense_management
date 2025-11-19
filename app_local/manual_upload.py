@@ -6,9 +6,7 @@ from backend.connect_local import connect_local, select_columns_from_table, sele
 from app_local.select_data import transform_table
 
 from backend import \
-    upload_nonpc_forecasts_local_m, upload_pc_forecasts_local_m,\
-    upload_budgets_local_m, upload_expenses_local, upload_fundings_local, \
-    upload_capex_forecast_m, upload_capex_budgets_local_m, upload_capex_expense_local, get_projects_display,\
+    get_projects_display, \
     get_project_cateogory_display, get_hr_category_display
 from backend.upload_forecasts_nonpc import upload_nonpc_forecasts_df, upload_nonpc_forecasts_local_m
 import pandas as pd
@@ -879,24 +877,6 @@ def manual_hr_categories():
     return jsonify({'human_resource_categories': cats}), 200
 
 
-@manual_upload.route('/manual_input/fiscal_years', methods=['GET'])
-def manual_fiscal_years():
-    """Return fiscal year options filtered by provided query params: po (name), department (name).
-    If department is not provided, return empty list to enforce hierarchy.
-    Response JSON: {'fiscal_years': ['2022', '2023', ...]}
-    """
-    po_name = request.args.get('po') or selected_po
-    dept_name = request.args.get('department') or selected_department
-    # If no department selected, fiscal year options should be empty
-    if not dept_name or str(dept_name).strip() == '' or str(dept_name) == 'All':
-        return jsonify({'fiscal_years': []}), 200
-
-    years = set()
-    
-    years_list = sorted(list(years))
-    return jsonify({'fiscal_years': years_list}), 200
-
-
 @manual_upload.route('/manual_input/project_selection', methods=['POST'])
 def manual_project_selection():
     """Receive Project selection from client for manual input page and update module-level selected_project."""
@@ -1028,117 +1008,7 @@ def manual_ios():
         return jsonify({'ios': [], 'error': str(e)}), 500
 
 
-@manual_upload.route("/upload_forecast_nonpc", methods=['POST'])
-def upload_forecast_nonpc_r():
-    df = pd.DataFrame(columns = ["PO","Department","Project Category","Project Name","fiscal_year","Non-personnel cost"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    try:
-        columns_changed = upload_nonpc_forecasts_local_m(df)
-        if columns_changed > 0:
-            return "Upload successful"
-        else:
-            return "Value already exist"
-    except:
-        return "Upload failed. Please check your input values."
-
-    # return "Upload successful"
-
-@manual_upload.route("/upload_forecast_pc", methods=['POST'])
-def upload_forecast_pc_r():
-    df = pd.DataFrame(columns=upload_columns["forecast_pc"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    # project_forecasts_pc table does not store personnel_expense - drop Personnel cost before upload
-    if 'Personnel cost' in df.columns:
-        df = df.drop(columns=['Personnel cost'])
-    try:
-        columns_changed = upload_pc_forecasts_local_m(df)
-        if columns_changed > 0:
-            return "Upload successful"
-        else:
-            return "Value already exist"
-    except:
-        return "Upload failed. Please check your input values."
-    # return "Upload successful"
-
-@manual_upload.route("/upload_budgets", methods=['POST'])
-def upload_budgets_r():
-    df = pd.DataFrame(columns=upload_columns["budgets"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    print(df)
-    res = upload_budgets_local_m(df)
-    return "Upload successful"
-
-@manual_upload.route("/upload_expenses", methods=['POST'])
-def upload_expenses_r():
-    df = pd.DataFrame(columns=upload_columns["expenses"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    # try:
-    res = upload_expenses_local(df)
-    return "successful"
-
-@manual_upload.route("/upload_fundings", methods=['POST'])
-def upload_fundings_r():
-    df = pd.DataFrame(columns=upload_columns["fundings"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    # try:
-    res = upload_fundings_local(df)
-    return "successful"
-
-@manual_upload.route("/upload_capex_forecast", methods=['POST'])
-def upload_capex_forecast_r():
-    df = pd.DataFrame(columns=upload_columns["capex_forecast"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    print(df)
-    res = upload_capex_forecast_m(df)
-    return "Upload successful"
-
-@manual_upload.route("/upload_capex_budget", methods=['POST'])
-def upload_capex_budget_r():
-    df = pd.DataFrame(columns=upload_columns["capex_budget"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    print(df)
-    res = upload_capex_budgets_local_m(df)
-    return "Upload successful"
-
-@manual_upload.route("/upload_capex_expense", methods=['POST'])
-def upload_capex_expense_r():
-    df = pd.DataFrame(columns=upload_columns["capex_expense"])
-    row = {}
-    for fieldname, value in request.form.items():
-        # print(fieldname, value)
-        row[fieldname] = value
-    df.loc[len(df)] = row
-    # try:
-    res = upload_capex_expense_local(df, clear=False)
-    return "successful"
+## Removed unused routes: fiscal_years listing and individual upload endpoints now superseded by /upload_forecast.
 
 
 @manual_upload.route('/manual_input/change_forecast', methods=['POST'])

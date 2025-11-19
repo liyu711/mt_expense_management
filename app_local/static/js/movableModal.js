@@ -66,6 +66,7 @@
     var closeBtn = modal.querySelector('.modal-close');
     function resetPosition(){ try{ content.style.transform = ''; }catch(_){} }
     if(overlay){
+      try { overlay.style.cursor = 'pointer'; } catch(_){}
       overlay.addEventListener('click', function(){
         modal.style.display = 'none';
         modal.setAttribute('aria-hidden','true');
@@ -74,6 +75,7 @@
       });
     }
     if(closeBtn){
+      try { closeBtn.style.cursor = 'pointer'; } catch(_){}
       closeBtn.addEventListener('click', function(){
         modal.style.display = 'none';
         modal.setAttribute('aria-hidden','true');
