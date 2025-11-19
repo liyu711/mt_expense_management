@@ -1,9 +1,27 @@
 import pandas as pd
 
 def join_tables(left, right, left_col, right_col, drops, rename_dic):
+    """
+    Left join two DataFrames on given columns, drop specified columns if they exist,
+    and then rename columns per the provided mapping. Drops are tolerant: missing
+    columns are ignored instead of raising.
+    """
     res = pd.merge(left, right, left_on=left_col, right_on=right_col, how='left')
-    res.drop(drops, axis=1, inplace=True)
-    res.rename(columns=rename_dic, inplace=True)
+    try:
+        # Drop only those columns that actually exist to avoid KeyError
+        to_drop = [c for c in drops if c in res.columns]
+        if to_drop:
+            res.drop(to_drop, axis=1, inplace=True)
+    except Exception:
+        # As a last resort, attempt drop with ignore if pandas supports it
+        try:
+            res.drop(drops, axis=1, inplace=True, errors='ignore')  # type: ignore
+        except Exception:
+            pass
+    try:
+        res.rename(columns=rename_dic, inplace=True)
+    except Exception:
+        pass
     return res
 
 def merge_dataframes(cloud, local, columns, merge_on, departments=False):

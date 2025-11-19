@@ -4,6 +4,7 @@ from backend import close_connection, connect_to_sql, select_all_from_table
 import backend.connect_local as cl
 
 tables_allow_empty = ['project_forecasts_nonpc', 'capex_forecasts']
+# Columns in incoming CSVs we validate against reference tables
 columns_to_check = ['PO', 'Department', 'Project Name']
 column_name_to_table = {
     'PO': 'POs',
@@ -26,8 +27,6 @@ def check_input_integrity(df_upload, table_name):
         return False
     else:
         return True
-
-
 
 def check_if_all_tables_empty(type):
     if type == 'local':
@@ -83,27 +82,72 @@ def clear_table(cursor, cnxn, table_name, conn_type):
         cnxn.commit()
 
 def check_missing_attribute(df_upload, table_name, type):
+    """Validate that key text columns in the upload exist in reference tables.
+
+    We check presence for columns that actually exist in the incoming DataFrame among
+    ['PO', 'Department', 'Project Name'] and compare against the corresponding
+    reference tables' name columns. Comparison is case-insensitive and ignores
+    leading/trailing whitespace to be robust to minor formatting differences.
+    Returns (True, column) on first missing value, else (False, None).
+    """
+    # Pick connection
     if type == 'server':
         engine, cursor, cnxn = connect_to_sql(engine=True)
     else:
         conn = cl.connect_local()
         engine, cursor, cnxn = conn.connect_to_db(engine=True)
+
+    # Tables that may be uploaded before reference data
     if table_name in tables_allow_empty:
         return False, None
-    columns_check = []
-    for column in df_upload.columns:
-        if column in columns_to_check:
-            columns_check.append(column)
+
+    # Determine which columns to validate (only those present)
+    columns_check = [c for c in columns_to_check if c in list(df_upload.columns)]
+    if not columns_check:
+        return False, None
+
+    # Normalizer: string, strip, lower
+    def norm(x):
+        try:
+            s = str(x)
+        except Exception:
+            s = ''
+        return s.strip().lower()
+
     for column in columns_check:
-        table = column_name_to_table[column]
-        df = select_all_from_table(cursor, cnxn, table)
-        db_values = df['name'].values
-        df_values = df_upload[column].values
-        for value in df_values:
-            value = str(value)
-            if value not in db_values:
-                print('test2')
+        table = column_name_to_table.get(column)
+        if not table:
+            continue
+        try:
+            ref_df = select_all_from_table(cursor, cnxn, table)
+        except Exception:
+            ref_df = None
+        if ref_df is None or ref_df.empty:
+            # If reference table is empty, treat as missing
+            return True, column
+
+        # Determine the reference name column (prefer 'name')
+        ref_name_col = 'name' if 'name' in ref_df.columns else (ref_df.columns[0] if len(ref_df.columns) > 0 else None)
+        if ref_name_col is None:
+            return True, column
+
+        # Build normalized set of known names
+        try:
+            ref_values = set(ref_df[ref_name_col].dropna().map(norm).tolist())
+        except Exception:
+            ref_values = set(norm(v) for v in ref_df[ref_name_col].tolist())
+
+        # Validate every non-null value in the upload column
+        try:
+            series = df_upload[column]
+        except Exception:
+            series = []
+        for raw in series:
+            if raw is None or (isinstance(raw, float) and pd.isna(raw)):
+                # Skip nulls; they will be handled by downstream uploaders
+                continue
+            if norm(raw) not in ref_values:
                 return True, column
-        print('test3')
+
     return False, None
 

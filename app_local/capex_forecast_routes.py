@@ -1,4 +1,4 @@
-from flask import Blueprint, request
+from flask import Blueprint, request, redirect, url_for
 from backend.connect_local import connect_local, select_all_from_table
 from backend.create_display_table import get_departments_display, get_projects_display
 
@@ -220,7 +220,8 @@ def change_capex_forecast():
 
         cursor.execute(base_sql, tuple(params))
         cnxn.commit()
-        return {'status': 'ok'}, 200
+        # On success, return to the CapEx Forecast page
+        return redirect(url_for('modify_tables.modify_table_router', action='capex_forecast'))
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
 
@@ -394,7 +395,8 @@ def change_capex_budget():
             ),
         )
         cnxn.commit()
-        return {'status': 'ok'}, 200
+        # On success, return to the CapEx Budget page
+        return redirect(url_for('modify_tables.modify_table_router', action='capex_budget'))
     except Exception as e:
         return {'status': 'error', 'message': str(e)}, 500
 
