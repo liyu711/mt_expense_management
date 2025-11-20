@@ -556,45 +556,82 @@
                                 if (ioInp && row['IO']) ioInp.value = row['IO'];
                                 var nonpc = (row['Non-personnel Forecast']!=null && row['Non-personnel Forecast']!=='') ? row['Non-personnel Forecast'] : row['Non-personnel Expense'];
                                 if (nonpcInp && nonpc!=null && nonpc!=='') nonpcInp.value = nonpc;
-                                // Prefill per-category FTEs by converting cost -> FTE using /api/hr_cost
+                                // Prefill per-category FTEs. Strategy:
+                                // 1. Fetch existing FTE map from backend for this composite key.
+                                // 2. For each HR category column: if cost present and unit base cost exists -> derive FTE = cost/base.
+                                //    Else if cost missing or base missing -> use existing FTE from map if available; otherwise leave as 0.
                                 var year = fiscalYear;
-                                var promises = [];
-                                Object.keys(row).forEach(function(key){
-                                    if (['id','PO','Department','Fiscal Year','Project Category','Project','Project Name','IO','Forecast Sum','Non-personnel Forecast'].indexOf(key) >= 0) return;
-                                    // Remaining keys are HR categories (cost values)
-                                    var costVal = row[key];
-                                    if (costVal == null || costVal === '') return;
-                                    var catName = key;
-                                    var slug = slugify(catName);
-                                    var fteInput = document.querySelector('#modify_forecast input[name="fte__' + slug + '"]');
-                                    if (!fteInput) return;
-                                                                        // fetch base cost using hierarchical context: PO + Department + Fiscal Year
-                                                                        var poVal = poSel && poSel.value ? poSel.value : '';
-                                                                        var deptVal = deptSel && deptSel.value ? deptSel.value : '';
-                                    var params = new URLSearchParams({ category: catName, year: String(year) });
-                                                                        if (poVal) params.append('po', poVal);
-                                                                        if (deptVal) params.append('department', deptVal);
-                                    params.append('strict','1');
-                                                                        promises.push(
-                                                                                fetch('/api/hr_cost?' + params.toString())
-                                                                                    .then(function(r){ return r.json(); })
-                                                                                    .then(function(j){
-                                                                                        var base = j && j.cost != null ? parseFloat(j.cost) : null;
-                                                                                        var c = parseFloat(costVal);
-                                                                                        if (base && base > 0){
-                                                                                                var fte = c / base;
-                                                                                                fteInput.value = (isFinite(fte)? fte.toFixed(1): '0');
-                                                                                        } else {
-                                                                                                // fallback can't derive FTE, set 0
-                                                                                                fteInput.value = '0';
-                                                                                        }
-                                                                                    })
-                                                                                    .catch(function(){ fteInput.value = '0'; })
-                                                                        );
-                                });
-                                Promise.all(promises).then(function(){
-                                    // Recalculate cost spans based on filled FTEs
-                                    if (typeof window.updateAllHrCosts === 'function') window.updateAllHrCosts();
+                                var poVal = poSel && poSel.value ? poSel.value : '';
+                                var deptVal = deptSel && deptSel.value ? deptSel.value : '';
+                                var projVal = (row['Project'] || row['Project Name']) || '';
+                                var pcVal = row['Project Category'] || '';
+                                var fteMapPromise = Promise.resolve({});
+                                if (poVal && deptVal && projVal && pcVal && year){
+                                    var fteQs = new URLSearchParams({ po: poVal, department: deptVal, project_name: projVal, project_category: pcVal, fiscal_year: String(year) });
+                                    fteMapPromise = fetch('/manual_input/personnel_fte?' + fteQs.toString())
+                                        .then(function(r){ return r.json(); })
+                                        .then(function(j){ return (j && j.fte) ? j.fte : {}; })
+                                        .catch(function(){ return {}; });
+                                }
+                                fteMapPromise.then(function(fteMap){
+                                    var promises = [];
+                                    Object.keys(row).forEach(function(key){
+                                        if (['id','PO','Department','Fiscal Year','Project Category','Project','Project Name','IO','Forecast Sum','Non-personnel Forecast'].indexOf(key) >= 0) return;
+                                        var catName = key;
+                                        var slug = slugify(catName);
+                                        var fteInput = document.querySelector('#modify_forecast input[name="fte__' + slug + '"]');
+                                        if (!fteInput) return;
+                                        var costVal = row[key];
+                                        // If cost value missing or blank -> try existing map immediately
+                                        if (costVal == null || costVal === ''){
+                                            if (fteMap.hasOwnProperty(catName)){
+                                                var fteExist = parseFloat(fteMap[catName]);
+                                                if (!isNaN(fteExist)) fteInput.value = fteExist.toFixed(1);
+                                            }
+                                            return; // no cost to derive from
+                                        }
+                                        // Have a cost value; attempt to fetch base cost to derive FTE
+                                        var params = new URLSearchParams({ category: catName, year: String(year) });
+                                        if (poVal) params.append('po', poVal);
+                                        if (deptVal) params.append('department', deptVal);
+                                        params.append('strict','1');
+                                        promises.push(
+                                            fetch('/api/hr_cost?' + params.toString())
+                                                .then(function(r){ return r.json(); })
+                                                .then(function(j){
+                                                    var base = j && j.cost != null ? parseFloat(j.cost) : null;
+                                                    var c = parseFloat(costVal);
+                                                    if (base && base > 0){
+                                                        var fte = c / base;
+                                                        fteInput.value = (isFinite(fte)? fte.toFixed(1): '0');
+                                                    } else {
+                                                        // No base cost; fall back to existing FTE if present
+                                                        if (fteMap.hasOwnProperty(catName)){
+                                                            var fteExist = parseFloat(fteMap[catName]);
+                                                            if (!isNaN(fteExist)){
+                                                                fteInput.value = fteExist.toFixed(1);
+                                                                return;
+                                                            }
+                                                        }
+                                                        fteInput.value = '0';
+                                                    }
+                                                })
+                                                .catch(function(){
+                                                    // Fallback on error: existing FTE or 0
+                                                    if (fteMap.hasOwnProperty(catName)){
+                                                        var fteExist = parseFloat(fteMap[catName]);
+                                                        if (!isNaN(fteExist)){
+                                                            fteInput.value = fteExist.toFixed(1);
+                                                            return;
+                                                        }
+                                                    }
+                                                    fteInput.value = '0';
+                                                })
+                                        );
+                                    });
+                                    Promise.all(promises).then(function(){
+                                        if (typeof window.updateAllHrCosts === 'function') window.updateAllHrCosts();
+                                    });
                                 });
                             });
                         }

@@ -27,20 +27,138 @@ def upload_pc_forecasts_local(df_upload):
     return df_fin.to_sql("project_forecasts_pc", con=engine, if_exists='append', index=False)
 
 
-def upload_pc_forecasts_local_m(df_upload):
-    conn = cl.connect_local()
-    engine, cursor, cnxn = conn.connect_to_db(engine=True)
-    df_fin = upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, 'local')
-    existing_values = select_columns_from_table(cursor, "project_forecasts_pc", table_column_dict["project_forecasts_pc"])
-    
-    shared_columns = [col for col in df_fin.columns if col in existing_values.columns and col != 'personnel_expense']
+def upload_pc_forecasts_local_m(df_upload, engine=None, cursor=None, cnxn=None, begin_immediate=True):
+    """Upload personnel (PC) forecast rows locally with optional external connection reuse.
 
-    # Remove rows from df_fin that exist in existing_values based on shared columns
-    merged = df_fin.merge(existing_values[shared_columns], on=shared_columns, how='left', indicator=True)
-    df_filtered = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
-    # print(df_filtered)
-    return df_filtered.to_sql("project_forecasts_pc", con=engine, if_exists='append', index=False)
-    # print(existing_values)
+    Parameters
+    ----------
+    df_upload : pandas.DataFrame
+        DataFrame containing columns: PO, Department, Project Category, Project Name,
+        fiscal_year, Human resource category, Human resource FTE (Personnel cost optional).
+    engine, cursor, cnxn : optional
+        Existing SQLAlchemy engine and DBAPI cursor/connection obtained upstream. If provided,
+        they are reused to avoid opening nested connections (prevents SQLite locking). If any
+        are None, a new local connection (with engine=True) is created.
+    begin_immediate : bool
+        When True and we control the cursor, executes a BEGIN IMMEDIATE to acquire a write lock
+        up-front, reducing contention. Should be False if the caller already started a transaction.
+
+    Returns
+    -------
+    int
+        Number of new rows inserted (rows that did not already exist on composite key).
+    """
+    created_connection = False
+    if engine is None or cursor is None or cnxn is None:
+        conn = cl.connect_local()
+        engine, cursor, cnxn = conn.connect_to_db(engine=True)
+        created_connection = True
+
+    # Start transaction early if requested and we created / control the cursor
+    if begin_immediate and cursor is not None:
+        try:
+            cursor.execute("BEGIN IMMEDIATE")
+        except Exception:
+            # Non-fatal; continue without explicit BEGIN
+            pass
+
+    # Build fully merged DataFrame with id columns
+    df_fin = upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, 'local')
+
+    # Fetch existing values for dedupe (avoid multiplicative joins; only compare stable columns)
+    existing_values = select_columns_from_table(cursor, "project_forecasts_pc", table_column_dict["project_forecasts_pc"])
+    if existing_values is None:
+        # Table empty -> all rows are new
+        df_filtered = df_fin
+    else:
+        shared_columns = [col for col in df_fin.columns if col in existing_values.columns and col != 'personnel_expense']
+        try:
+            merged = df_fin.merge(existing_values[shared_columns], on=shared_columns, how='left', indicator=True)
+            df_filtered = merged[merged['_merge'] == 'left_only'].drop(columns=['_merge'])
+        except Exception:
+            # If merge fails (schema drift), fall back to inserting all rows to avoid silent data loss
+            df_filtered = df_fin
+
+    # Insert only new rows
+    rows_to_insert = len(df_filtered.index)
+    if rows_to_insert > 0:
+        # pandas to_sql returns None; we rely on count we computed
+        try:
+            df_filtered.to_sql("project_forecasts_pc", con=engine, if_exists='append', index=False)
+        except Exception:
+            # On failure, zero rows considered inserted
+            rows_to_insert = 0
+    # Commit if we created the connection or explicitly started transaction here
+    if created_connection:
+        try:
+            cnxn.commit()
+        except Exception:
+            pass
+        try:
+            cursor.close(); cnxn.close()
+        except Exception:
+            pass
+    return rows_to_insert
+
+
+def fast_insert_pc_forecasts(rows, cursor, cnxn, create_index=True):
+    """Fast path insertion for small batches of personnel forecast rows.
+
+    Each row dict must contain keys:
+      PO_id, department_id, project_id, project_category_id, fiscal_year, human_resource_category_id, human_resource_fte
+
+    This avoids the heavy DataFrame merge & full-table scan by performing targeted existence
+    checks with a composite index (created if requested). Suitable for manual single-project
+    multi-category updates.
+    """
+    if not rows:
+        return 0
+    try:
+        if create_index:
+            # Create composite index to accelerate existence lookups (idempotent)
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_project_forecasts_pc_key ON project_forecasts_pc (PO_id, department_id, project_id, project_category_id, fiscal_year, human_resource_category_id)"
+            )
+    except Exception:
+        # Non-fatal if index creation fails
+        pass
+    inserted = 0
+    select_sql = ("SELECT 1 FROM project_forecasts_pc WHERE PO_id=? AND department_id=? AND project_id=? "
+                  "AND project_category_id=? AND fiscal_year=? AND human_resource_category_id=? LIMIT 1")
+    insert_sql = ("INSERT INTO project_forecasts_pc (PO_id, department_id, project_id, project_category_id, fiscal_year, human_resource_category_id, human_resource_fte) "
+                  "VALUES (?,?,?,?,?,?,?)")
+    for r in rows:
+        try:
+            params_select = (
+                int(r['PO_id']), int(r['department_id']), int(r['project_id']), int(r['project_category_id']), int(r['fiscal_year']), int(r['human_resource_category_id'])
+            )
+        except Exception:
+            # Skip malformed row
+            continue
+        try:
+            cursor.execute(select_sql, params_select)
+            exists = cursor.fetchone() is not None
+        except Exception:
+            # If existence check fails, attempt blind insert to avoid data loss
+            exists = False
+        if exists:
+            continue
+        fte_val = r.get('human_resource_fte')
+        try:
+            fte_num = float(fte_val) if fte_val not in (None, '') else None
+        except Exception:
+            fte_num = None
+        try:
+            cursor.execute(insert_sql, params_select + (fte_num,))
+            inserted += 1
+        except Exception:
+            # Skip on failure; continue remaining rows
+            continue
+    try:
+        cnxn.commit()
+    except Exception:
+        pass
+    return inserted
 
 
 def upload_pc_forecasts_df(df_upload, engine, cursor, cnxn, type):

@@ -625,6 +625,121 @@ def api_hr_cost():
             pass
 
 
+@manual_upload.route('/manual_input/personnel_fte', methods=['GET'])
+def manual_personnel_fte():
+    """Return existing personnel forecast FTE values per human resource category for the composite key.
+    Query params (all required):
+        po - PO name
+        department - Department/BU name
+        project_name - Project name (or 'project')
+        project_category - Project category name
+        fiscal_year - integer fiscal year
+    Response JSON: { "fte": { "Category Name": <float>, ... } }
+    If identifiers cannot be resolved returns empty mapping.
+    """
+    po_name = request.args.get('po') or request.args.get('PO')
+    dept_name = request.args.get('department') or request.args.get('Department')
+    project_name = request.args.get('project_name') or request.args.get('project') or request.args.get('Project_Name')
+    project_category = request.args.get('project_category') or request.args.get('Project_Category') or request.args.get('category')
+    fiscal_year = request.args.get('fiscal_year') or request.args.get('Fiscal_Year') or request.args.get('year')
+    try:
+        fy_val = int(fiscal_year)
+    except Exception:
+        fy_val = None
+    # Basic validation
+    if not all([po_name, dept_name, project_name, project_category]) or fy_val is None:
+        return jsonify({'fte': {}}), 200
+    try:
+        db = connect_local()
+        cursor, cnxn = db.connect_to_db()
+        # Resolve IDs
+        def resolve_single(table, name_col_candidates, value, ret_id='id'):
+            try:
+                df = select_all_from_table(cursor, cnxn, table)
+            except Exception:
+                return None
+            if df is None or df.empty:
+                return None
+            name_col = None
+            for c in name_col_candidates:
+                if c in df.columns:
+                    name_col = c; break
+            if not name_col or ret_id not in df.columns:
+                return None
+            mask = df[name_col].astype(str).str.strip().str.lower() == str(value).strip().lower()
+            m = df[mask]
+            if m.empty:
+                return None
+            try:
+                return int(m.iloc[0][ret_id])
+            except Exception:
+                return None
+        po_id = resolve_single('pos', ['name','Name'], po_name)
+        dept_id = resolve_single('departments', ['name','Name','Department'], dept_name)
+        # Project resolution also constrained by department when available
+        proj_id = None
+        try:
+            proj_df = select_all_from_table(cursor, cnxn, 'projects')
+            if proj_df is not None and not proj_df.empty and 'name' in proj_df.columns and 'id' in proj_df.columns:
+                mask = proj_df['name'].astype(str).str.strip().str.lower() == str(project_name).strip().lower()
+                if dept_id is not None and 'department_id' in proj_df.columns:
+                    mask &= (proj_df['department_id'] == dept_id)
+                rows = proj_df[mask]
+                if not rows.empty:
+                    try: proj_id = int(rows.iloc[0]['id'])
+                    except Exception: proj_id = None
+        except Exception:
+            proj_id = None
+        pc_id = None
+        try:
+            pc_df = select_all_from_table(cursor, cnxn, 'project_categories')
+            if pc_df is not None and not pc_df.empty and 'category' in pc_df.columns and 'id' in pc_df.columns:
+                mask = pc_df['category'].astype(str).str.strip().str.lower() == str(project_category).strip().lower()
+                rows = pc_df[mask]
+                if not rows.empty:
+                    try: pc_id = int(rows.iloc[0]['id'])
+                    except Exception: pc_id = None
+        except Exception:
+            pc_id = None
+        if None in (po_id, dept_id, proj_id, pc_id):
+            try: cursor.close(); cnxn.close()
+            except Exception: pass
+            return jsonify({'fte': {}}), 200
+        # Fetch personnel forecasts
+        fte_map = {}
+        try:
+            cursor.execute(
+                """
+                SELECT human_resource_category_id, human_resource_fte
+                FROM project_forecasts_pc
+                WHERE PO_id = ? AND department_id = ? AND project_id = ?
+                  AND project_category_id = ? AND fiscal_year = ?
+                """,
+                (po_id, dept_id, proj_id, pc_id, fy_val)
+            )
+            rows = cursor.fetchall() or []
+            # Map category id -> name
+            cat_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+            cat_name_map = {}
+            if cat_df is not None and not cat_df.empty and 'id' in cat_df.columns:
+                name_col = 'name' if 'name' in cat_df.columns else None
+                if name_col:
+                    cat_name_map = {int(cid): str(n) for cid, n in zip(cat_df['id'], cat_df[name_col]) if pd.notna(cid) and pd.notna(n)}
+            for r in rows:
+                try:
+                    cid = r[0]; fte_val = r[1]
+                    if cid in cat_name_map and fte_val is not None:
+                        fte_map[cat_name_map[cid]] = float(fte_val)
+                except Exception:
+                    continue
+        except Exception:
+            fte_map = {}
+        try: cursor.close(); cnxn.close()
+        except Exception: pass
+        return jsonify({'fte': fte_map}), 200
+    except Exception as e:
+        return jsonify({'fte': {}, 'error': str(e)}), 500
+
 @manual_upload.route('/manual_input/po_selection', methods=['POST'])
 def manual_po_selection():
     """Endpoint to receive PO selection from client for manual input page and update module-level selected_po."""
@@ -1031,8 +1146,14 @@ def manual_change_forecast():
     fte = form.get('Human_resource_FTE')
     nonpc = form.get('Non_personnel_cost')
 
+    # Obtain engine-aware connection so we can reuse it for potential inserts without nested connections
     conn = connect_local()
-    cursor, cnxn = conn.connect_to_db()
+    engine, cursor, cnxn = conn.connect_to_db(engine=True)
+    # Acquire a write lock early to prevent SQLITE_BUSY during mixed UPDATE + INSERT cycles
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+    except Exception:
+        pass
 
     # Resolve IDs
     pos_df = select_all_from_table(cursor, cnxn, 'pos')
@@ -1161,6 +1282,9 @@ def manual_change_forecast():
                 (int(po_id), int(dept_id), int(cat_id_lookup), int(fy_val))
             )
         return None
+    # Collect personnel rows (id-based) that need insertion (those not updated) for fast path
+    missing_pc_rows = []  # legacy name with display columns
+    missing_pc_rows_fast = []  # id-based rows for direct insert
     for key in form.keys():
         # Accept either fte__slug (forward) or cost__slug (reverse)
         if key.startswith('fte__') or key.startswith('cost__'):
@@ -1228,9 +1352,8 @@ def manual_change_forecast():
 
                 # If no matching personnel row exists yet, fall back to upload (insert)
                 if rows_affected == 0:
-                    import pandas as pd  # local import
-                    from backend.upload_forecasts_pc import upload_pc_forecasts_local_m as _upload_pc
-                    pc_row = {
+                    # Prepare both display row (for potential reuse) and fast id row for direct insertion
+                    pc_row_display = {
                         'PO': po_name,
                         'Department': dept_name,
                         'Project Category': project_category,
@@ -1239,10 +1362,37 @@ def manual_change_forecast():
                         'Human resource category': cat_name,
                         'Human resource FTE': fte_local,
                     }
-                    df_pc = pd.DataFrame([pc_row])
-                    _upload_pc(df_pc)
+                    missing_pc_rows.append(pc_row_display)
+                    try:
+                        missing_pc_rows_fast.append({
+                            'PO_id': int(po_id) if po_id is not None else None,
+                            'department_id': int(dept_id) if dept_id is not None else None,
+                            'project_id': int(proj_id) if proj_id is not None else None,
+                            'project_category_id': int(pc_id) if pc_id is not None else None,
+                            'fiscal_year': int(fy_val) if fy_val is not None else None,
+                            'human_resource_category_id': int(hr_cat_id_local) if hr_cat_id_local is not None else None,
+                            'human_resource_fte': fte_local,
+                        })
+                    except Exception:
+                        pass
                 # except Exception:
                 #     pass
+
+    # Batch insert any new personnel rows using existing transaction/connection
+    if missing_pc_rows_fast:
+        # Fast path: direct id-based existence checks and inserts (avoids heavy DataFrame merges)
+        try:
+            from backend.upload_forecasts_pc import fast_insert_pc_forecasts
+            fast_insert_pc_forecasts(missing_pc_rows_fast, cursor, cnxn, create_index=True)
+        except Exception:
+            # Fallback to DataFrame path only if fast path fails entirely
+            try:
+                import pandas as pd
+                from backend.upload_forecasts_pc import upload_pc_forecasts_local_m as _upload_pc
+                df_missing = pd.DataFrame(missing_pc_rows)
+                _upload_pc(df_missing, engine=engine, cursor=cursor, cnxn=cnxn, begin_immediate=False)
+            except Exception:
+                pass
 
     try:
         cnxn.commit()

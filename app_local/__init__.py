@@ -1,7 +1,6 @@
 from flask import Flask, flash, render_template, request, redirect, url_for
 import pandas as pd
 import os
-from backend.select_data import select_projects
 from backend.upload_expenses import upload_expenses_df
 from werkzeug.utils import secure_filename
 from backend.login import valid_login

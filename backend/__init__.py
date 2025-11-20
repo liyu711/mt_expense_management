@@ -1,5 +1,4 @@
 # Organized imports for backend package
-from .select_data import select_projects
 from .upload_expenses import *
 from .upload_forecasts_nonpc import *
 from .upload_forecasts_pc import *
