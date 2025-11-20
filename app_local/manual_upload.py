@@ -1412,68 +1412,178 @@ def manual_change_forecast():
 def upload_forecast_merged():
     form = request.form
     results = []
+    po_name = form.get("PO")
+    dept_name = form.get("Department")
+    project_category = form.get("Project_Category")
+    project_name = form.get("Project_Name")
+    fiscal_year = form.get("fiscal_year")
+    # Validate minimal key presence
+    if not all([po_name, dept_name, project_category, project_name, fiscal_year]):
+        try: flash('Missing required key fields.', 'warning')
+        except Exception: pass
+        return redirect(url_for('manual_upload.render_mannual_input'))
 
-    # Shared keys
-    base_context = {
-        "PO": form.get("PO"),
-        "Department": form.get("Department"),
-        "Project Category": form.get("Project_Category"),
-        "Project Name": form.get("Project_Name"),
-        "fiscal_year": form.get("fiscal_year")
-    }
+    # Open single connection/transaction (fast path)
+    conn = connect_local()
+    engine, cursor, cnxn = conn.connect_to_db(engine=True)
+    try:
+        cursor.execute("BEGIN IMMEDIATE")
+    except Exception:
+        pass
 
-    # Non-personnel upload (single value)
-    nonpc_val = form.get("Non_personnel_cost")
-    if nonpc_val not in (None, ''):
-        nonpc_row = dict(base_context)
-        nonpc_row["Non-personnel cost"] = nonpc_val
-        df_nonpc = pd.DataFrame([nonpc_row])
-        changed = upload_nonpc_forecasts_local_m(df_nonpc)
-        if changed > 0:
-            results.append("Non-personnel forecast uploaded successfully.")
-        else:
-            results.append("Non-personnel forecast already exists.")
-        
-    pc_rows = []
+    # Resolve IDs once
+    def resolve_id(table, name_value, name_cols=('name','Name','Department','Project','project','Project Name')):
+        try:
+            df = select_all_from_table(cursor, cnxn, table)
+        except Exception:
+            df = None
+        if df is None or df.empty:
+            return None
+        target_col = None
+        for c in name_cols:
+            if c in df.columns:
+                target_col = c; break
+        if not target_col or 'id' not in df.columns:
+            return None
+        mask = df[target_col].astype(str).str.strip().str.lower() == str(name_value).strip().lower()
+        rows = df[mask]
+        if rows.empty:
+            return None
+        try:
+            return int(rows.iloc[0]['id'])
+        except Exception:
+            return None
+    po_id = resolve_id('pos', po_name, ('name','Name'))
+    dept_id = resolve_id('departments', dept_name, ('name','Name','Department'))
+    # project requires department constraint
+    proj_id = None
+    try:
+        proj_df = select_all_from_table(cursor, cnxn, 'projects')
+        if proj_df is not None and not proj_df.empty and 'name' in proj_df.columns and 'id' in proj_df.columns:
+            mask = proj_df['name'].astype(str).str.strip().str.lower() == str(project_name).strip().lower()
+            if dept_id is not None and 'department_id' in proj_df.columns:
+                mask &= (proj_df['department_id'] == dept_id)
+            r = proj_df[mask]
+            if not r.empty:
+                proj_id = int(r.iloc[0]['id'])
+    except Exception:
+        proj_id = None
+    pc_id = None
+    try:
+        pc_df = select_all_from_table(cursor, cnxn, 'project_categories')
+        if pc_df is not None and not pc_df.empty and 'category' in pc_df.columns and 'id' in pc_df.columns:
+            mask = pc_df['category'].astype(str).str.strip().str.lower() == str(project_category).strip().lower()
+            r = pc_df[mask]
+            if not r.empty:
+                pc_id = int(r.iloc[0]['id'])
+    except Exception:
+        pc_id = None
+    try:
+        fy_val = int(fiscal_year)
+    except Exception:
+        fy_val = None
+
+    if None in (po_id, dept_id, proj_id, pc_id, fy_val):
+        try: flash('Failed to resolve identifiers for upload.', 'danger')
+        except Exception: pass
+        try: cnxn.rollback()
+        except Exception: pass
+        try: cursor.close(); cnxn.close()
+        except Exception: pass
+        return redirect(url_for('manual_upload.render_mannual_input'))
+
+    # Fast Non-Personnel insert
+    nonpc_val_raw = form.get("Non_personnel_cost")
+    if nonpc_val_raw not in (None,''):
+        try:
+            nonpc_val = float(nonpc_val_raw)
+        except Exception:
+            nonpc_val = None
+        if nonpc_val is not None:
+            # Create index (idempotent) then insert if not exists
+            try:
+                cursor.execute("CREATE INDEX IF NOT EXISTS idx_project_forecasts_nonpc_key ON project_forecasts_nonpc (PO_id, department_id, project_id, project_category_id, fiscal_year)")
+            except Exception:
+                pass
+            try:
+                cursor.execute(
+                    "SELECT 1 FROM project_forecasts_nonpc WHERE PO_id=? AND department_id=? AND project_id=? AND project_category_id=? AND fiscal_year=? LIMIT 1",
+                    (po_id, dept_id, proj_id, pc_id, fy_val)
+                )
+                exists = cursor.fetchone() is not None
+            except Exception:
+                exists = False
+            if exists:
+                results.append('Non-personnel forecast already exists.')
+            else:
+                try:
+                    cursor.execute(
+                        "INSERT INTO project_forecasts_nonpc (PO_id, department_id, project_id, project_category_id, fiscal_year, non_personnel_expense) VALUES (?,?,?,?,?,?)",
+                        (po_id, dept_id, proj_id, pc_id, fy_val, nonpc_val)
+                    )
+                    results.append('Non-personnel forecast uploaded successfully.')
+                except Exception as e:
+                    results.append(f'Non-personnel upload failed: {e}')
+
+    # Fast Personnel inserts
+    # Build HR category name -> id map once
+    hr_cat_map = {}
+    try:
+        hrc_df = select_all_from_table(cursor, cnxn, 'human_resource_categories')
+        if hrc_df is not None and not hrc_df.empty and 'id' in hrc_df.columns:
+            name_col = 'name' if 'name' in hrc_df.columns else None
+            if name_col:
+                hr_cat_map = {str(n).strip(): int(cid) for cid, n in zip(hrc_df['id'], hrc_df[name_col]) if pd.notna(cid) and pd.notna(n)}
+    except Exception:
+        hr_cat_map = {}
+
+    personnel_rows_fast = []
     for key in form.keys():
         if key.startswith('fte__'):
             slug = key[len('fte__'):]
             fte_raw = form.get(key)
-            cat_key = 'cat__' + slug
-            category_name = form.get(cat_key)
-            if category_name is None:
+            cat_name = form.get('cat__' + slug)
+            if not cat_name:
                 continue
-            # Skip empty or zero FTE values
             try:
                 fte_val = float(fte_raw)
             except Exception:
                 fte_val = 0.0
             if fte_val == 0.0:
                 continue
-            pc_row = dict(base_context)
-            pc_row['Human resource category'] = category_name
-            pc_row['Human resource FTE'] = fte_val
-            # Personnel cost not stored; omit
-            pc_rows.append(pc_row)
+            hr_cat_id = hr_cat_map.get(cat_name) or hr_cat_map.get(str(cat_name).strip())
+            if hr_cat_id is None:
+                continue
+            personnel_rows_fast.append({
+                'PO_id': po_id,
+                'department_id': dept_id,
+                'project_id': proj_id,
+                'project_category_id': pc_id,
+                'fiscal_year': fy_val,
+                'human_resource_category_id': hr_cat_id,
+                'human_resource_fte': fte_val
+            })
 
-    if pc_rows:
-        df_pc = pd.DataFrame(pc_rows)
-        # IO removed; nothing to cast
+    if personnel_rows_fast:
         try:
-            from backend.upload_forecasts_pc import upload_pc_forecasts_local_m
-            changed = upload_pc_forecasts_local_m(df_pc)
-            if changed > 0:
-                results.append(f"{len(pc_rows)} personnel forecast row(s) uploaded successfully.")
+            from backend.upload_forecasts_pc import fast_insert_pc_forecasts
+            inserted_pc = fast_insert_pc_forecasts(personnel_rows_fast, cursor, cnxn, create_index=True)
+            if inserted_pc > 0:
+                results.append(f"{inserted_pc} personnel forecast row(s) uploaded successfully.")
             else:
                 results.append("Personnel forecast row(s) already exist.")
         except Exception as e:
             results.append(f"Personnel upload failed: {e}")
 
+    # Commit & close
+    try: cnxn.commit()
+    except Exception: pass
+    try: cursor.close(); cnxn.close()
+    except Exception: pass
+
     if not results:
-        try:
-            flash('No forecast data provided. Please fill at least one forecast field.', 'warning')
-        except Exception:
-            pass
+        try: flash('No forecast data provided. Please fill at least one forecast field.', 'warning')
+        except Exception: pass
         return redirect(url_for('manual_upload.render_mannual_input'))
 
     try:
