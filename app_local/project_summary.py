@@ -75,7 +75,7 @@ def project_summary():
         except Exception:
             departments = []
 
-    # Filter projects based on selected PO, Department, Fiscal Year
+    # Filter projects based on selected PO and Department only (project is no longer tied to fiscal year)
     projects = []
     if projects_df is not None and not projects_df.empty:
         filtered = projects_df.copy()
@@ -89,7 +89,7 @@ def project_summary():
 
             po_col = getcol('po_name', 'po name')
             dept_col = getcol('department_name', 'department name')
-            fy_col = getcol('fiscal_year', 'fiscal year', 'fy', 'year')
+            # fiscal year intentionally ignored for project dropdown
             proj_col = getcol('project_name', 'project name')
 
             mask = pd.Series(True, index=filtered.index)
@@ -97,8 +97,7 @@ def project_summary():
                 mask &= filtered[po_col].astype(str) == str(data_summary_module.selected_po)
             if data_summary_module.selected_department and data_summary_module.selected_department not in ('', 'All') and dept_col:
                 mask &= filtered[dept_col].astype(str) == str(data_summary_module.selected_department)
-            if data_summary_module.selected_fiscal_year and data_summary_module.selected_fiscal_year not in ('', 'All') and fy_col:
-                mask &= filtered[fy_col].astype(str) == str(data_summary_module.selected_fiscal_year)
+            # DO NOT filter by fiscal year: projects are independent of fiscal year
 
             filtered = filtered.loc[mask]
 

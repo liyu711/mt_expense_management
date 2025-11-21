@@ -451,8 +451,10 @@
                                                 var poVal = pick(row, ['PO','po','PO Name','name_po']);
                                                 var deptVal = pick(row, ['Department','department','Department Name','name_departments','BU']);
                                                 var fyVal = pick(row, ['Fiscal Year','fiscal_year','Year']);
-                                                var hrVal = pick(row, ['Personnel budget','human_resource_expense','Human Resource Expense','human_resource_expense']);
-                                                var npVal = pick(row, ['Non-personnel budget','non_personnel_expense','Non Personnel Expense','non_personnel_expense']);
+                                                // Include correctly capitalized display names from transform_table ('Personnel Budget', 'Non-personnel Budget')
+                                                // plus legacy/alternate variants for backward compatibility.
+                                                var hrVal = pick(row, ['Personnel Budget','Personnel budget','human_resource_expense','Human Resource Expense','human_resource_expense']);
+                                                var npVal = pick(row, ['Non-personnel Budget','Non-personnel budget','non_personnel_expense','Non Personnel Expense','non_personnel_expense']);
                                                 var poSel = modal.querySelector('select[name="po"]');
                                                 var deptSel = modal.querySelector('select[name="department"]');
                                                 var fySel = modal.querySelector('select[name="fiscal_year"]');

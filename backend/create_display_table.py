@@ -1223,6 +1223,7 @@ def get_expenses_display():
 	cost_elements = select_all_from_table(cursor, cnxn, 'cost_elements')
 	ios = select_all_from_table(cursor, cnxn, 'IOs')
 	projects = select_all_from_table(cursor, cnxn, 'projects')
+	pos = select_all_from_table(cursor, cnxn, 'pos')  # needed to map department -> PO Name
 
 	# Empty fallback
 	if exp is None or exp.empty:
@@ -1244,6 +1245,38 @@ def get_expenses_display():
 			work['BU Name'] = work['Department']
 	else:
 		work['BU Name'] = work['Department'] if 'Department' in work.columns else None
+
+	# Map department -> PO Name via departments.po_id -> pos.id -> pos.name so PO filtering works
+	if 'department_id' in work.columns and dept is not None and not dept.empty and pos is not None and not pos.empty:
+		try:
+			# Ensure expected columns exist
+			if 'po_id' in dept.columns and 'id' in dept.columns and 'id' in pos.columns:
+				pos_name_col = 'name' if 'name' in pos.columns else (pos.columns[0] if len(pos.columns) else None)
+				if pos_name_col:
+					dept_to_po = dict(zip(dept['id'], dept['po_id']))
+					po_id_to_name = dict(zip(pos['id'], pos[pos_name_col]))
+					def map_po(dept_id):
+						try:
+							po_id_val = dept_to_po.get(dept_id)
+							return po_id_to_name.get(po_id_val)
+						except Exception:
+							return None
+					work['PO Name'] = work['department_id'].map(map_po)
+			elif 'PO' in work.columns:
+				# fallback existing textual column
+				work['PO Name'] = work['PO']
+			elif 'po' in work.columns:
+				work['PO Name'] = work['po']
+			else:
+				work['PO Name'] = None
+		except Exception:
+			work['PO Name'] = None
+	elif 'PO' in work.columns and 'PO Name' not in work.columns:
+		work['PO Name'] = work['PO']
+	elif 'po' in work.columns and 'PO Name' not in work.columns:
+		work['PO Name'] = work['po']
+	elif 'PO Name' not in work.columns:
+		work['PO Name'] = None
 
 	# id column
 	if 'id' not in work.columns:
@@ -1323,8 +1356,10 @@ def get_expenses_display():
 	else:
 		work['fiscal_year'] = None
 
-	# Final column selection including project_name
-	return work.loc[:, ['id', 'BU Name', 'expense', 'Name', 'cost_element', 'project_name', 'fiscal_year']].reset_index(drop=True)
+	# Final column selection including project_name and PO Name (if available)
+	final_cols = [c for c in ['id', 'PO Name', 'BU Name', 'expense', 'Name', 'cost_element', 'project_name', 'fiscal_year'] if c in work.columns]
+	# Ensure stable ordering even if 'PO Name' was not created
+	return work.loc[:, final_cols].reset_index(drop=True)
 
 
 def get_capex_expenses_display():
